@@ -1,4 +1,4 @@
-#!/Users/mirkodandrea/anaconda3/envs/pyPropagator/bin/python3
+#!/usr/bin/env python
 __author__ = 'mirko'
 
 import argparse
