@@ -77,6 +77,9 @@ class Scheduler:
 
 def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset='default'):
     filename = var + '_' + str(tile_j) + '_' + str(tile_i) + '.mat'
+    if tileset != 'default':
+        tileset = 'tilesets/' + tileset
+
     filepath = join(DATA_DIR, tileset, str(zone_number), filename)
     logging.debug(filepath)
     try:
@@ -87,8 +90,12 @@ def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset='default'):
     return np.ascontiguousarray(m)
 
 
-def load_tile_ref(zone_number, var):
-    filename = join(DATA_DIR, 'default', str(zone_number), var + '_ref.mat')
+def load_tile_ref(zone_number, var, tileset='default'):
+    if tileset != 'default':
+        tileset = 'tilesets/' + tileset
+    
+    filename = join(DATA_DIR, tileset, str(zone_number), var + '_ref.mat')
+    logging.debug(filename)
     mat_file = scipy.io.loadmat(filename)
     step_x, step_y, max_y, min_x, tile_dim = \
         mat_file['stepx'][0][0], mat_file['stepy'][0][0], \
@@ -97,7 +104,7 @@ def load_tile_ref(zone_number, var):
 
 
 def load_tiles(zone_number, x, y, dim, var, tileset='default'):
-    step_x, step_y, max_y, min_x, tile_dim = load_tile_ref(zone_number, var)
+    step_x, step_y, max_y, min_x, tile_dim = load_tile_ref(zone_number, var, tileset)
     i = 1 + np.floor((max_y - y) / step_y)
     j = 1 + np.floor((x - min_x) / step_x)
 
@@ -126,25 +133,25 @@ def load_tiles(zone_number, x, y, dim, var, tileset='default'):
     idx_j_max = get_idx(j_max, tile_dim)
 
     if tile_i_max == tile_i_min and tile_j_max == tile_j_min:
-        m = load_tile(zone_number, var, tile_i_min, tile_j_min, tileset)
+        m = load_tile(zone_number, var, tile_i_min, tile_j_min, dim, tileset)
         mat = m[idx_i_min:idx_i_max, idx_j_min: idx_j_max]
     elif tile_i_min == tile_i_max:
-        m1 = load_tile(zone_number, var, tile_i_min, tile_j_min, tileset)
-        m2 = load_tile(zone_number, var, tile_i_min, tile_j_max, tileset)
+        m1 = load_tile(zone_number, var, tile_i_min, tile_j_min, dim, tileset)
+        m2 = load_tile(zone_number, var, tile_i_min, tile_j_max, dim, tileset)
         m = np.concatenate([m1, m2], axis=1)
         mat = m[idx_i_min:idx_i_max, idx_j_min: (tile_dim + idx_j_max)]
 
     elif tile_j_min == tile_j_max:
 
-        m1 = load_tile(zone_number, var, tile_i_min, tile_j_min, tileset)
-        m2 = load_tile(zone_number, var, tile_i_max, tile_j_min, tileset)
+        m1 = load_tile(zone_number, var, tile_i_min, tile_j_min, dim, tileset)
+        m2 = load_tile(zone_number, var, tile_i_max, tile_j_min, dim, tileset)
         m = np.concatenate([m1, m2], axis=0)
         mat = m[idx_i_min:(tile_dim + idx_i_max), idx_j_min: idx_j_max]
     else:
-        m1 = load_tile(zone_number, var, tile_i_min, tile_j_min, tileset)
-        m2 = load_tile(zone_number, var, tile_i_min, tile_j_max, tileset)
-        m3 = load_tile(zone_number, var, tile_i_max, tile_j_min, tileset)
-        m4 = load_tile(zone_number, var, tile_i_max, tile_j_max, tileset)
+        m1 = load_tile(zone_number, var, tile_i_min, tile_j_min, dim, tileset)
+        m2 = load_tile(zone_number, var, tile_i_min, tile_j_max, dim, tileset)
+        m3 = load_tile(zone_number, var, tile_i_max, tile_j_min, dim, tileset)
+        m4 = load_tile(zone_number, var, tile_i_max, tile_j_max, dim, tileset)
         m = np.concatenate([
             np.concatenate([m1, m2], axis=1),
             np.concatenate([m3, m4], axis=1)

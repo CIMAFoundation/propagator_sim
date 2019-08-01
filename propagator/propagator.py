@@ -205,13 +205,16 @@ def run(run_id,
 
     mid_lat, mid_lon, polys, lines, points = read_ignition(ignition_string)
     easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
+
+    logging.info('Loading VEGETATION from "' + tileset + '" tileset')
     veg, west, north, step_x, step_y = load_tiles(zone_number, easting, northing, grid_dim, 'prop', tileset)
     veg = veg.astype('int8')
 
     veg[:, (0, -1)] = 0
     veg[(0, -1), :] = 0
 
-    dem, west, north, step_x, step_y = load_tiles(zone_number, easting, northing, grid_dim, 'quo', tileset)
+    logging.info('Loading DEM "default" tileset')
+    dem, west, north, step_x, step_y = load_tiles(zone_number, easting, northing, grid_dim, 'quo', 'default')
     dem = dem.astype('int16')
 
     moist = np.zeros_like(veg)
