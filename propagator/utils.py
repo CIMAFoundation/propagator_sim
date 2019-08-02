@@ -77,8 +77,6 @@ class Scheduler:
 
 def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset='default'):
     filename = var + '_' + str(tile_j) + '_' + str(tile_i) + '.mat'
-    if tileset != 'default':
-        tileset = 'tilesets/' + tileset
 
     filepath = join(DATA_DIR, tileset, str(zone_number), filename)
     logging.debug(filepath)
@@ -91,9 +89,6 @@ def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset='default'):
 
 
 def load_tile_ref(zone_number, var, tileset='default'):
-    if tileset != 'default':
-        tileset = 'tilesets/' + tileset
-    
     filename = join(DATA_DIR, tileset, str(zone_number), var + '_ref.mat')
     logging.debug(filename)
     mat_file = scipy.io.loadmat(filename)
