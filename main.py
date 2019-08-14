@@ -3,17 +3,16 @@ __author__ = 'mirko'
 
 import argparse
 import json
-import numpy as np
 import logging
-import traceback
 import os
+import traceback
+from datetime import datetime
+
+import numpy as np
 
 import propagator.logging_config
-
-from propagator.utils import normalize
-
-from datetime import datetime
 from propagator import propagator
+from propagator.utils import normalize
 
 
 def init_parser():
