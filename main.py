@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 __author__ = 'mirko'
 
-import argparse
 import json
 import logging
 import os
@@ -13,76 +12,11 @@ import numpy as np
 import propagator.logging_config
 from propagator import propagator
 from propagator.utils import normalize
-
-
-def init_parser():
-    parser = argparse.ArgumentParser(
-        #prog='PROPAGATOR',
-        description='''Run the PROPAGATOR model'''
-    )
-
-    parser.add_argument('-id', 
-        dest='run_id', 
-        type=str,  
-        help='the run id'
-    )
-    parser.add_argument('-f', 
-        dest='param_file', 
-        type=argparse.FileType('r'), 
-        help='parameter file for the model'
-    )
-    parser.add_argument('-of', 
-        dest='output_folder', 
-        type=str,   
-        help='work folder'
-    )
-    parser.add_argument('-it', 
-        dest='image_time', 
-        type=str,       
-        help='image timing'
-    )
-    parser.add_argument('-st', 
-        dest='isochrone_time', 
-        type=int, 
-        help='isochrone timing'
-    )
-    parser.add_argument('-tl', 
-        dest='time_limit', 
-        type=int, 
-        help='time limit in hours'
-    )
-    parser.add_argument('-d', 
-        dest='debug_mode', 
-        action='store_true', 
-        help='debug mode', 
-        default=False
-    )
-    parser.add_argument('-v',
-        dest='write_vegetation',
-        action='store_true', 
-        help='write vegetation and dtm file to disk',
-        default=False
-    )    
-    parser.add_argument('-sr', 
-        dest='save_realizations', 
-        action='store_true', 
-        help='write a geotiff for each realization at the end of the simulation', 
-        default=False
-    )    
-    parser.add_argument('-sf', 
-        dest='simp_fact', 
-        type=float, 
-        default=0.00001, 
-        help='simplify factor for isochrones'
-    )
-
-    args = parser.parse_args()
-    
-    return args
+from propagator.args_parser import parse_params
 
 
 def main():
-    args = init_parser()
+    args = parse_params()
 
     if args.param_file is None:
         raise Exception('Error. Missing parameter file')
