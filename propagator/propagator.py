@@ -216,8 +216,9 @@ def run(run_id,
 
     logging.info('Loading DEM "default" tileset')
     dem, west, north, step_x, step_y = load_tiles(zone_number, easting, northing, grid_dim, 'quo', 'default')
+    dem = dem.astype('float')
 
-    moist = np.zeros_like(veg)
+    moist = np.zeros_like(veg, dtype='float')
 
     img, active_ignitions = \
         rasterize_ignitions((grid_dim, grid_dim),
@@ -351,3 +352,4 @@ def run(run_id,
             filename = 'final_' + str(t) + '.tiff'
             tiff_file = os.path.join(output_folder, filename)
             write_geotiff(tiff_file, values*255.0, dst_trans, dst_crs)
+
