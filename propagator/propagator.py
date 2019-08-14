@@ -1,14 +1,15 @@
 # import numpy as np
-from datetime import timedelta
-# import utm
-from numpy import pi, tanh, sign, array, tile
-from numpy.random import rand
-from .utils import *
-from .constants import *
-
-import os
-import logging
 import json
+import logging
+import os
+from datetime import timedelta
+
+# import utm
+from numpy import array, pi, sign, tanh, tile
+from numpy.random import rand
+
+from .constants import *
+from .utils import *
 
 neighbours = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 n_arr = array([(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)])
@@ -168,11 +169,11 @@ def apply_updates(c_time, ps, updates, f_global, w_speed, w_dir, dem, veg, moist
     
     # schedule the new updates
     unique_time = sorted(np.unique(prop_time))
-    updates = list(map(
+    new_updates = list(map(
         lambda t: (t, extract_updates(t)), 
     unique_time))
     
-    return updates
+    return new_updates
 
 
 def find_bc(boundary_conditions, time):
@@ -215,7 +216,6 @@ def run(run_id,
 
     logging.info('Loading DEM "default" tileset')
     dem, west, north, step_x, step_y = load_tiles(zone_number, easting, northing, grid_dim, 'quo', 'default')
-    dem = dem.astype('int16')
 
     moist = np.zeros_like(veg)
 
@@ -351,7 +351,3 @@ def run(run_id,
             filename = 'final_' + str(t) + '.tiff'
             tiff_file = os.path.join(output_folder, filename)
             write_geotiff(tiff_file, values*255.0, dst_trans, dst_crs)
-
-
-
-
