@@ -1,6 +1,7 @@
 import logging
 import sys
 
+
 #logging configuration
 class InfoFilter(logging.Filter):
     def filter(self, rec):

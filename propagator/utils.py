@@ -8,13 +8,12 @@ import scipy.io
 import utm
 from numpy import pi
 from pyproj import Proj
-from rasterio import crs, transform, warp, enums
+from rasterio import crs, enums, transform, warp
 from rasterio.features import shapes
 from scipy.ndimage import filters
-from scipy.ndimage.morphology import binary_erosion, binary_dilation
+from scipy.ndimage.morphology import binary_dilation, binary_erosion
 from scipy.signal.signaltools import medfilt2d
-from shapely.geometry import mapping
-from shapely.geometry import shape, MultiLineString, LineString
+from shapely.geometry import LineString, MultiLineString, mapping, shape
 from sortedcontainers import SortedDict
 
 DATA_DIR = 'data'
