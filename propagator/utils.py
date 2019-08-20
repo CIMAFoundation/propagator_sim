@@ -323,57 +323,66 @@ def rasterize_ignitions(dim, points, lines, polys, lonmin, latmax, stepx, stepy,
         active_points.extend(active)
     return img, active_points
 
+def trim_values(values, src_trans):
+    rows, cols = values.shape
+    min_row, max_row = int(rows / 2 - 1), int(rows / 2 + 1)
+    min_col, max_col = int(cols / 2 - 1), int(cols / 2 + 1)
 
-def reproject(src, reference, zone_number, zone_letter, trim=True):
+    v_rows = np.where(values.sum(axis=1) > 0)[0]
+    if len(v_rows) > 0:
+        min_row, max_row = v_rows[0] - 1, v_rows[-1] + 2
+
+    v_cols = np.where(values.sum(axis=0) > 0)[0]
+    if len(v_cols) > 0:
+        min_col, max_col = v_cols[0] - 1, v_cols[-1] + 2
+
+    trim_values = values[min_row:max_row, min_col:max_col]    
+    rows, cols = trim_values.shape
+
+    (west, east), (north, south) = rio.transform.xy(
+        src_trans, [min_row, max_row], [min_col, max_col],
+        offset='ul'
+    )
+    trim_trans = transform.from_bounds(west, south, east, north, cols, rows)
+    return trim_values, trim_trans
+
+
+def reproject(values, src_trans, src_crs, dst_crs, trim=True):
     if trim:
-        v_rows = np.where(src.sum(axis=1) > 0)[0]
-        v_cols = np.where(src.sum(axis=0) > 0)[0]
-        if len(v_rows) > 0:
-            min_row, max_row = v_rows[0] - 1, v_rows[-1] + 2
-        else:
-            n_rows = src.shape[0]
-            min_row, max_row = int(n_rows / 2 - 1), int(n_rows / 2 + 1)
+        values, src_trans = trim_values(values, src_trans)
 
-        if len(v_cols) > 0:
-            min_col, max_col = v_cols[0] - 1, v_cols[-1] + 2
-        else:
-            n_cols = src.shape[1]
-            min_col, max_col = int(n_cols / 2 - 1), int(n_cols / 2 + 1)
-
-        src = src[min_row:max_row, min_col:max_col]
-        step_x, step_y = reference[2], reference[3]
-        west = reference[0] + min_col * step_x
-        north = reference[1] - min_row * step_y
-    else:
-        west, north, step_x, step_y = reference
-
-    rows, cols = src.shape
-    south = north - (rows * step_y)
-    east = west + (cols * step_x)
+    rows, cols = values.shape
+    (west, east), (north, south) = rio.transform.xy(
+        src_trans, [0, rows], [0, cols],
+        offset='ul'
+    )
 
     with rio.Env():
-        src_prj = Proj(proj="utm", zone=zone_number, datum='WGS84')
-        dst_crs = crs.CRS({'init': 'EPSG:4326', 'no_defs': True})
-
-        src_trans = transform.from_bounds(west, south, east, north, cols, rows)
         dst_trans, dw, dh = warp.calculate_default_transform(
-            src_crs=src_prj.srs, dst_crs=dst_crs,
-            width=cols, height=rows,
-            left=west, bottom=south,
-            right=east, top=north, resolution=None
+            src_crs=src_crs,
+            dst_crs=dst_crs,
+            width=cols,
+            height=rows,
+            left=west,
+            bottom=south,
+            right=east,
+            top=north,
+            resolution=None
         )
         dst = np.empty((dh, dw))
 
         warp.reproject(
-            source=np.ascontiguousarray(src), destination=dst,
-            src_crs=src_prj.srs, dst_crs=dst_crs,
-            dst_transform=dst_trans, src_transform=src_trans,
+            source=np.ascontiguousarray(values), 
+            destination=dst,
+            src_crs=src_crs, 
+            dst_crs=dst_crs,
+            dst_transform=dst_trans, 
+            src_transform=src_trans,
             resampling=enums.Resampling.nearest,
             num_threads=1
         )
-
-        return dst, dst_trans, dst_crs
-
+    
+    return dst, dst_trans
 
 def write_geotiff(filename, values, dst_trans, dst_crs, dtype=np.uint8):
     with rio.Env():
@@ -421,7 +430,7 @@ def smooth_linestring(linestring, smooth_sigma):
 def extract_isochrone(values, transf,
                       thresholds=[0.5, 0.75, 0.9],
                       med_filt_val=9, min_length=0.0001,
-                      smooth_sigma=1.0, simp_fact=0.00001):
+                      smooth_sigma=0.8, simp_fact=0.00001):
     '''
     extract isochrone from the propagation probability map values at the probanilities thresholds,
      applying filtering to smooth out the result
@@ -449,14 +458,11 @@ def extract_isochrone(values, transf,
             for s, v in shapes(over_t, transform=transf):
                 sh = shape(s)
 
-                # if len(sh.interiors):
                 ml = [
-                    smooth_linestring(l, smooth_sigma).simplify(simp_fact)
+                    smooth_linestring(l, smooth_sigma) # .simplify(simp_fact)
                     for l in sh.interiors
                     if l.length > min_length
                 ]
-                # else:
-                #    ml = [smooth_linestring(sh.exterior, smooth_sigma).simplify(simp_fact)]
 
                 results[t] = MultiLineString(ml)
 
