@@ -88,9 +88,11 @@ def p_probability(dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moist, 
 
     return p_clip
 
+class PropagatorConfig:
+    pass
 
 class PropagatorSettings:
-    def __init__(self, settings_dict):
+    def __init__(self, **settings_dict):
         self.n_threads = settings_dict['n_threads']
         self.boundary_conditions = settings_dict['boundary_conditions']
         self.init_date = settings_dict['init_date'] 
@@ -100,13 +102,14 @@ class PropagatorSettings:
         self.time_resolution = settings_dict['time_resolution']
         self.output_folder = settings_dict['output_folder']
         self.time_limit = settings_dict['time_limit']
-        self.simp_fact = settings_dict['simp_fact']
-        self.debug_mode = settings_dict['debug_mode']
-        self.write_vegetation = settings_dict['write_vegetation']
-        self.save_realizations = settings_dict['save_realizations']
+        
+        #self.simp_fact = settings_dict['simp_fact']
+        #self.debug_mode = settings_dict['debug_mode']
+        #self.write_vegetation = settings_dict['write_vegetation']
+        #self.save_realizations = settings_dict['save_realizations']
 
 
-class PropagatorRun:
+class Propagator:
     def __init__(self, settings: PropagatorSettings):
         self.settings = settings
         self.ps = Scheduler()
@@ -114,40 +117,29 @@ class PropagatorRun:
         self.f_global = None
         self.veg = None
         self.dem = None
-        self.boundary_conditions = None
+        self.boundary_conditions = self.settings.boundary_conditions
 
+        # make it configurable
+        self.dst_crs = crs.CRS({'init': 'EPSG:4326', 'no_defs': True})
 
-        pass
-
-    def __init_crs_from_bounds(west:float, south:float, east:float, north:float, cols:int, rows:int, 
-                                zone:int, proj:str='utm', datum:str='WGS84'):
-        self.__prj = Proj(proj=proj, zone=zone_number, datum=datum)
+    def __init_crs_from_bounds(self, west:float, south:float, east:float, north:float, 
+                            cols:int, rows:int, 
+                            step_x:float, step_y:float,
+                            zone:int, proj:str='utm', datum:str='WGS84'):
+        self.__prj = Proj(proj=proj, zone=zone, datum=datum)
         self.__trans = transform.from_bounds(west, south, east, north, cols, rows)
+        self.__bounds = (west, south, east, north)
+        self.__shape = (rows, cols)
+        self.step_x = step_x
+        self.step_y = step_y
 
-
-    def load_data_from_files(self):
-        pass
-    
-    def __init_ignitions(self):
+    def init_ignitions(self, polys, lines, points, zone_number):
+        west, south, east, north = self.__bounds
+        
         img, active_ignitions = \
-        rasterize_ignitions((grid_dim, grid_dim),
-                            points, lines, polys, west, north, step_x, step_y, zone_number)
-
-
-    def load_data_from_tiles(self, easting, northing, zone_number):
-        logging.info('Loading VEGETATION from "' + self.settings.tileset + '" tileset')
-        self.veg, west, north, step_x, step_y = \
-            load_tiles(zone_number, easting, northing, grid_dim, 'prop', tileset)
-        veg = veg.astype('int8')
-        veg[:, (0, -1)] = 0
-        veg[(0, -1), :] = 0
-
-        logging.info('Loading DEM "default" tileset')
-        self.dem, west, north, step_x, step_y = \
-            load_tiles(zone_number, easting, northing, grid_dim, 'quo', 'default')
-        dem = dem.astype('float')
-
-        self.moist = np.zeros_like(veg, dtype='float')
+            rasterize_ignitions((self.settings.grid_dim, self.settings.grid_dim),
+                            points, lines, polys, west, north, self.step_x, self.step_y, zone_number)
+        self.__init_simulation(self.settings.n_threads, img, active_ignitions)
 
     def __compute_values(self):
         values = np.nanmean(self.f_global, 2)
@@ -155,10 +147,11 @@ class PropagatorRun:
 
     def __compute_stats(self, values):
         n_active = len(self.ps.active().tolist())
-        area_mean = float(np.sum(values) * step_x * step_y) / 10000
-        area_50 = float(np.sum(values >= 0.5) * step_x * step_y) / 10000
-        area_75 = float(np.sum(values >= 0.75) * step_x * step_y) / 10000
-        area_90 = float(np.sum(values >= 0.90) * step_x * step_y) / 10000
+        cell_area = float(self.step_x) * float(self.step_y) / 10000.0
+        area_mean = float(np.sum(values) * cell_area)
+        area_50 = float(np.sum(values >= 0.5) * cell_area)
+        area_75 = float(np.sum(values >= 0.75) * cell_area)
+        area_90 = float(np.sum(values >= 0.90) * cell_area)
 
         return n_active, area_mean, area_50, area_75, area_90
 
@@ -174,28 +167,45 @@ class PropagatorRun:
         )
 
 
-    def __wite_output(self, values, **kwargs):
+    def __write_output(self, values, dst_trans, **kwargs):
         filename = os.path.join(self.settings.output_folder, str(self.c_time))
         tiff_file = filename + '.tiff'
         json_file = filename + '.json'
 
-        
-        ref_date = str(self.settings.init_date + timedelta(minutes=c_time))
-
-
+        ref_date = str(self.settings.init_date + timedelta(minutes=self.c_time))
         with open(json_file, 'w') as fp:
             json.dump(
                 dict(
-                    time=c_time,
+                    time=self.c_time,
                     timeref=ref_date,
                 ).update(kwargs),
                 fp
             )
 
-            write_geotiff(tiff_file, values*255, self.__trans, self.__prj)
+            write_geotiff(tiff_file, values*255, dst_trans, self.dst_crs)
 
-    def write_isochrone(self):
+
+    def load_data_from_files(self):
         pass
+    
+    def load_data_from_tiles(self, easting, northing, zone_number):
+        logging.info('Loading VEGETATION from "' + self.settings.tileset + '" tileset')
+        veg, west, north, step_x, step_y = \
+            load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'prop', self.settings.tileset)
+        veg[:, (0, -1)] = 0
+        veg[(0, -1), :] = 0
+        self.veg = veg.astype('int8')
+        
+        logging.info('Loading DEM "default" tileset')
+        dem, west, north, step_x, step_y = \
+            load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'quo', 'default')
+        self.dem = dem.astype('float')
+
+        self.moist = np.zeros_like(veg, dtype='float')
+        rows, cols = veg.shape
+        south = north - (rows * step_y)
+        east = west + (cols * step_x)
+        self.__init_crs_from_bounds(west, south, east, north, cols, rows, step_x, step_y, zone_number)
 
     def __find_bc(self):
         last_bc = None
@@ -205,22 +215,21 @@ class PropagatorRun:
         return last_bc
 
     def __init_simulation(self, n_threads, initial_ignitions, active_ignitions):
-        self.f_global = np.zeros(initial_ignitions.shape + [n_threads])
+        self.f_global = np.zeros(initial_ignitions.shape + (n_threads,))
         for t in range(n_threads):
             self.f_global[:, :, t] = initial_ignitions.copy()
             for p in active_ignitions:
                 self.ps.push(array([p[0], p[1], t]), 0)
                 self.f_global[p[0], p[1], t] = 0
 
-    def __update_isochrones(self, isochrones, values):
+    def __update_isochrones(self, isochrones, values, dst_trans):
         isochrones[self.c_time] = extract_isochrone(
                 values, dst_trans,
                 thresholds=[0, 0.5, 0.75, 0.9],
-                simp_fact=self.settings.simp_fact
         )
 
     def __write_isochrones(self, isochrones):
-        isochrone_file = 'isochrones_' + str(c_time) + '.geojson'
+        isochrone_file = 'isochrones_' + str(self.c_time) + '.geojson'
         isochrone_path = os.path.join(self.settings.output_folder, isochrone_file)
         save_isochrones(isochrones, isochrone_path, format='geojson')
 
@@ -231,11 +240,11 @@ class PropagatorRun:
         veg_type = self.veg[u[:, 0], u[:, 1]]
         mask = np.logical_and(
             veg_type != 0,
-            f_global[u[:, 0], u[:, 1], u[:, 2]] == 0
+            self.f_global[u[:, 0], u[:, 1], u[:, 2]] == 0
         )
 
         r, c, t = u[mask, 0], u[mask, 1], u[mask, 2]
-        f_global[r, c, t] = 1
+        self.f_global[r, c, t] = 1
 
         nb_num = n_arr.shape[0]
         from_num = r.shape[0]
@@ -255,6 +264,8 @@ class PropagatorRun:
         veg_from = self.veg[r, c].repeat(nb_num)
         veg_to = self.veg[nr, nc]
         dem_to = self.dem[nr, nc]
+        moist_to = self.moist[nr, nc]
+
         angle_to = angle[nb_arr_r+1, nb_arr_c+1]
         dist_to = dist[nb_arr_r+1, nb_arr_c+1]
 
@@ -264,15 +275,17 @@ class PropagatorRun:
         veg_from = veg_from[n_mask]
         dem_to = dem_to[n_mask]
         veg_to = veg_to[n_mask]
+        moist_to = moist_to[n_mask]
         angle_to = angle_to[n_mask]
         dist_to = dist_to[n_mask]
         w_speed_r = w_speed_r[n_mask]
         w_dir_r = w_dir_r[n_mask]
+        
 
         nr, nc, nt = nr[n_mask], nc[n_mask], nt[n_mask]
 
         # get the probability for all the pixels
-        p_prob = p_probability(dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moist, w_dir_r, w_speed_r)
+        p_prob = p_probability(dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moist_to, w_dir_r, w_speed_r)
 
         # try the propagation
         p = p_prob > rand(p_prob.shape[0])
@@ -286,10 +299,10 @@ class PropagatorRun:
         transition_time = p_time(dem_from[p], dem_to[p],
                                     veg_from[p], veg_to[p],
                                     angle_to[p], dist_to[p],
-                                    moist,
+                                    moist_to[p],
                                     w_dir_r[p], w_speed_r[p])
 
-        prop_time = np.around(c_time + transition_time, decimals=1)
+        prop_time = np.around(self.c_time + transition_time, decimals=1)
 
         def extract_updates(t):
             idx = np.where(prop_time == t)
@@ -304,6 +317,11 @@ class PropagatorRun:
         
         return new_updates
 
+    def load_ignitions(self):
+        mid_lat, mid_lon, polys, lines, points = read_ignition(self.settings.ignition_string)
+        easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
+        return easting, northing, zone_number, zone_letter, polys, lines, points
+        
 
     def run(self):
         isochrones = {}
@@ -314,27 +332,37 @@ class PropagatorRun:
                 break
 
             self.c_time, updates = self.ps.pop()
-
-            bc = self.__get_bc()
-            
+            bc = self.__find_bc()
             w_dir_deg = float(bc.get('w_dir', 0))
             wdir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
             wspeed = float(bc.get('w_speed', 0))
 
-            updates = self.__apply_updates(updates, wspeed, wdir)
-            self.ps.push_all(updates)
+            new_updates = self.__apply_updates(updates, wspeed, wdir)
+            self.ps.push_all(new_updates)
+            
 
-            if c_time % self.settings.time_resolution == 0:
+            if self.c_time % self.settings.time_resolution == 0:
                 values = self.__compute_values()
                 stats = self.__compute_stats(values)
                 n_active, area_mean, area_50, area_75, area_90 = stats
-                self.__wite_output(values, 
-                    active=n_active, 
+                self.log(n_active, area_mean)
+
+                reprj_values, dst_trans = reproject(
+                    values,
+                    self.__trans,
+                    self.__prj.crs.srs,
+                    self.dst_crs
+                )
+
+                self.__write_output(
+                    reprj_values,
+                    dst_trans,
+                    active=n_active,
                     area_mean=area_mean,
                     area_50=area_50,
                     area_75=area_75,
                     area_90=area_90
                 )
                 
-                self.__update_isochrones(isochrones, values)
-                self.__write_isochrones(isochrones, values)
+                self.__update_isochrones(isochrones, reprj_values, dst_trans)
+                self.__write_isochrones(isochrones)
