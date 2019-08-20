@@ -1,4 +1,5 @@
 import numpy as np
+from numpy import pi, array
 
 '''
 D1 = 0.5
