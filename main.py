@@ -105,6 +105,8 @@ def main():
 
     time_resolution = float(d.get('time_resolution', 60))
 
+    isochrone_thresholds = d.get('isochrone_thresholds', [0.5, 0.75, 0.9])
+
     boundary_conditions = d.get('boundary_conditions', [{
         "w_dir": w_dir,
         "w_speed": w_speed,
@@ -146,6 +148,7 @@ def main():
             time_limit=time_limit_min,
             output_folder=args.output_folder,
             simp_fact=args.simp_fact,
+            isochrone_thresholds=isochrone_thresholds,
             debug_mode=args.debug_mode,
             write_vegetation=args.write_vegetation,
             save_realizations=args.save_realizations

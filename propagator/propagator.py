@@ -198,6 +198,7 @@ def run(run_id,
         time_resolution=60,
         output_folder='work',
         time_limit=2880,
+        isochrone_thresholds=(0.5, 0.75, 0.9),
         simp_fact=0.00001,
         debug_mode=False,
         write_vegetation=False,
@@ -329,7 +330,7 @@ def run(run_id,
 
             if c_time % time_resolution == 0:
                 isochrones[c_time] = extract_isochrone(values, dst_trans,
-                                                       thresholds=[0.5, 0.75, 0.9],
+                                                       thresholds=isochrone_thresholds,
                                                        simp_fact=simp_fact)
                 #save_isochrones(isochrones, 'images/isochrones_' + str(c_time) + '.shp')
                 isochrone_file = 'isochrones_' + str(c_time) + '.geojson'
