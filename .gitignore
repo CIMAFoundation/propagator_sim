@@ -1,3 +1,14 @@
+tmp/
+data/
+v0_table.txt
+work/
+.vscode/launch.json
+params.json
+
+.vscode/settings.json
+.DS_Store
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -123,11 +134,3 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-tmp/
-data/
-v0_table.txt
-work/
-.vscode/launch.json
-
-.vscode/settings.json
-.DS_Store

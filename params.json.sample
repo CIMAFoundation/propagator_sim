@@ -39,8 +39,9 @@
     }
   ],
   "ignitions":[
-    "POINT:41.584361105987384;1.9583789659528164"
+    "POINT:28.020265;-15.616062"
   ],
+  "isochrone_thresholds": [0.01, 0.5, 0.75, 0.9],
   "w_dir":0,
   "time_res":10,
   "grid_dim_km":20,
