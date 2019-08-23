@@ -89,11 +89,11 @@ def main():
     )
 
     try:
-        propagator_sim = Propagator(settings)
-        easting, northing, zone_number, zone_letter, polys, lines, points = propagator_sim.load_ignitions()
-        propagator_sim.load_data_from_tiles(easting, northing, zone_number)
-        propagator_sim.init_ignitions(polys, lines, points, zone_number)
-        propagator_sim.run()
+        sim = Propagator(settings)
+        easting, northing, zone_number, zone_letter, polys, lines, points = sim.load_ignitions()
+        sim.load_data_from_tiles(easting, northing, zone_number)
+        sim.init_ignitions(polys, lines, points, zone_number)
+        sim.run()
     except Exception as exp:
         traceback.print_exc()
         logging.info('error')
