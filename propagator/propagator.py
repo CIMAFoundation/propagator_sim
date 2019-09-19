@@ -96,7 +96,6 @@ class PropagatorSettings:
         self.n_threads = settings_dict['n_threads']
         self.boundary_conditions = settings_dict['boundary_conditions']
         self.init_date = settings_dict['init_date'] 
-        self.ignition_string = settings_dict['ignition_string']
         self.tileset = settings_dict['tileset']
         self.grid_dim = settings_dict['grid_dim']
         self.time_resolution = settings_dict['time_resolution']
