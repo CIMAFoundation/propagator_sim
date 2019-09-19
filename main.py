@@ -10,7 +10,7 @@ from datetime import datetime
 import numpy as np
 
 import propagator.logging_config
-from propagator import propagator
+from propagator.propagator import Propagator, PropagatorSettings
 from propagator.utils import normalize
 from propagator.args_parser import parse_params
 
@@ -72,18 +72,27 @@ def main():
         v0_file = d.get('v0_file', None)
         propagator.load_parameters(prob_file, v0_file)
 
+    settings = PropagatorSettings(
+        n_threads=n_threads,
+        boundary_conditions=boundary_conditions,
+        init_date=init_date,
+        tileset=tile_set,
+        grid_dim=grid_dim,
+        time_resolution=time_resolution,
+        output_folder=args.output_folder,
+        time_limit=time_limit_min,
+        simp_fact=args.simp_fact,
+        debug_mode=args.debug_mode,
+        write_vegetation=args.write_vegetation,
+        save_realizations=args.save_realizations
+    )
+
     try:
-        propagator.run(
-            args.run_id, n_threads, boundary_conditions,
-            init_date, ignition_string, tile_set, grid_dim,
-            time_resolution=time_resolution,
-            time_limit=time_limit_min,
-            output_folder=args.output_folder,
-            simp_fact=args.simp_fact,
-            debug_mode=args.debug_mode,
-            write_vegetation=args.write_vegetation,
-            save_realizations=args.save_realizations
-        )
+        sim = Propagator(settings)
+        easting, northing, zone_number, zone_letter, polys, lines, points = sim.load_ignitions_from_string(ignition_string)
+        sim.load_data_from_tiles(easting, northing, zone_number)
+        sim.init_ignitions(polys, lines, points, zone_number)
+        sim.run()
     except Exception as exp:
         traceback.print_exc()
         logging.info('error')
