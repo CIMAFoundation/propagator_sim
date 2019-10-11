@@ -4,18 +4,29 @@ __author__ = 'mirko'
 import json
 import logging
 import os
+import sys
 import traceback
+import enum
+
 from datetime import datetime
 
 import numpy as np
 
 import propagator.logging_config
-from propagator.propagator import Propagator, PropagatorSettings
-from propagator.utils import normalize
 from propagator.args_parser import parse_params
+from propagator.propagator import NoTilesError, Propagator, PropagatorSettings
+from propagator.utils import normalize
 
 
-def main():
+class ErrorCodes(enum.Enum):
+    OK = 0
+    GENERIC_ERROR = 1
+    DOMAIN_ERROR = 2
+    IGNITIONS_ERROR = 3
+    BC_ERROR = 4
+
+
+def main():  
     args = parse_params()
 
     if args.param_file is None:
@@ -50,9 +61,9 @@ def main():
     if 'ignitions' not in d:
         logging.critical('Error. Missing ignitions in parameter file')
         raise Exception('Error. Missing ignitions in parameter file')
-    else:
-        ignitions = d['ignitions']
-        ignition_string = '\n'.join(ignitions)
+    
+    ignitions = d['ignitions']
+    ignition_string = '\n'.join(ignitions)
 
     date_str = d.get('init_date')
     if date_str is None:
@@ -87,18 +98,24 @@ def main():
         save_realizations=args.save_realizations
     )
 
-    try:
-        sim = Propagator(settings)
-        easting, northing, zone_number, zone_letter, polys, lines, points = sim.load_ignitions_from_string(ignition_string)
-        sim.load_data_from_tiles(easting, northing, zone_number)
-        sim.init_ignitions(polys, lines, points, zone_number)
-        sim.run()
-    except Exception as exp:
-        traceback.print_exc()
-        logging.info('error')
-        raise exp
+    sim = Propagator(settings)    
+    easting, northing, zone_number, zone_letter, polys, lines, points = sim.load_ignitions_from_string(ignition_string)    
+    sim.load_data_from_tiles(easting, northing, zone_number)    
+    sim.init_ignitions(polys, lines, points, zone_number)
+    sim.run()
     logging.info('completed')
 
 
 if __name__ == '__main__':
-    main()
+    ERROR_CODE = ErrorCodes.OK
+    try:        
+        main()
+    except NoTilesError as no_tiles:
+        ERROR_CODE = ErrorCodes.DOMAIN_ERROR
+    
+    except Exception as exp:
+        traceback.print_exc()
+        ERROR_CODE = ErrorCodes.GENERIC_ERROR
+        raise
+    finally:
+        sys.exit(ERROR_CODE.value)
