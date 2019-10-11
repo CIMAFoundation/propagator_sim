@@ -88,6 +88,16 @@ def p_probability(dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moist, 
 
     return p_clip
 
+
+class PropagatorError(Exception):
+    pass
+
+class NoTilesError(PropagatorError):
+    def __init__(self):
+        self.message = '''Can't initialize simulation, no data on the selected area'''
+        super().__init__(self.message)
+
+
 class PropagatorConfig:
     pass
 
@@ -188,23 +198,26 @@ class Propagator:
         pass
     
     def load_data_from_tiles(self, easting, northing, zone_number):
-        logging.info('Loading VEGETATION from "' + self.settings.tileset + '" tileset')
-        veg, west, north, step_x, step_y = \
-            load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'prop', self.settings.tileset)
-        veg[:, (0, -1)] = 0
-        veg[(0, -1), :] = 0
-        self.veg = veg.astype('int8')
-        
-        logging.info('Loading DEM "default" tileset')
-        dem, west, north, step_x, step_y = \
-            load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'quo', 'default')
-        self.dem = dem.astype('float')
+        try:
+            logging.info('Loading VEGETATION from "' + self.settings.tileset + '" tileset')
+            veg, west, north, step_x, step_y = \
+                load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'prop', self.settings.tileset)
+            veg[:, (0, -1)] = 0
+            veg[(0, -1), :] = 0
+            self.veg = veg.astype('int8')
+            
+            logging.info('Loading DEM "default" tileset')
+            dem, west, north, step_x, step_y = \
+                load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'quo', 'default')
+            self.dem = dem.astype('float')
 
-        self.moist = np.zeros_like(veg, dtype='float')
-        rows, cols = veg.shape
-        south = north - (rows * step_y)
-        east = west + (cols * step_x)
-        self.__init_crs_from_bounds(west, south, east, north, cols, rows, step_x, step_y, zone_number)
+            self.moist = np.zeros_like(veg, dtype='float')
+            rows, cols = veg.shape
+            south = north - (rows * step_y)
+            east = west + (cols * step_x)
+            self.__init_crs_from_bounds(west, south, east, north, cols, rows, step_x, step_y, zone_number)
+        except FileNotFoundError:
+            raise NoTilesError()
 
     def __find_bc(self):
         last_bc = None
