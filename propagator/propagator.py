@@ -183,13 +183,9 @@ class Propagator:
 
         ref_date = str(self.settings.init_date + timedelta(minutes=self.c_time))
         with open(json_file, 'w') as fp:
-            json.dump(
-                dict(
-                    time=self.c_time,
-                    timeref=ref_date,
-                ).update(kwargs),
-                fp
-            )
+            meta = dict(time=self.c_time, timeref=ref_date)
+            meta.update(kwargs)
+            json.dump(meta, fp)
 
             write_geotiff(tiff_file, values*255, dst_trans, self.dst_crs)
 
