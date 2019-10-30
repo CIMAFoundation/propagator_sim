@@ -114,6 +114,15 @@ def main():
     }])
 
     boundary_conditions = sorted(boundary_conditions, key=lambda k: k['time'])
+    if boundary_conditions[0]['time'] > 0:
+        boundary_conditions.insert(
+            0,
+            {
+                "w_dir": 0.0,
+                "w_speed": 0.0,
+                "time": 0
+            }
+        )
 
     if 'ignitions' not in d:
         logging.critical('Error. Missing ignitions in parameter file')
