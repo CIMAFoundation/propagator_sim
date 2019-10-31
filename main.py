@@ -105,12 +105,19 @@ def main():
         simp_fact=args.simp_fact,
         debug_mode=args.debug_mode,
         write_vegetation=args.write_vegetation,
-        save_realizations=args.save_realizations
+        save_realizations=args.save_realizations,
     )
 
-    sim = Propagator(settings)    
-    easting, northing, zone_number, zone_letter, polys, lines, points = sim.load_ignitions_from_string(ignition_string)    
-    sim.load_data_from_tiles(easting, northing, zone_number)    
+    sim = Propagator(settings)
+    easting, northing, zone_number, zone_letter, polys, lines, points = sim.load_ignitions_from_string(ignition_string)
+    if args.veg_file is None and args.dem_file is None:
+        sim.load_data_from_tiles(easting, northing, zone_number)
+    else:
+        assert args.veg_file is not None, 'No veg_file parameter defined' 
+        assert args.dem_file is not None, 'No dem_file parameter defined'
+       
+        sim.load_data_from_files(args.veg_file, args.dem_file)
+
     sim.init_ignitions(polys, lines, points, zone_number)
     sim.run()
     logging.info('completed')
