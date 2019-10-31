@@ -146,7 +146,7 @@ class Propagator:
         west, south, east, north = self.__bounds
         
         img, active_ignitions = \
-            rasterize_ignitions((self.settings.grid_dim, self.settings.grid_dim),
+            rasterize_ignitions((self.__shape[0], self.__shape[1]),
                             points, lines, polys, west, north, self.step_x, self.step_y, zone_number)
         self.__init_simulation(self.settings.n_threads, img, active_ignitions)
 
@@ -189,10 +189,49 @@ class Propagator:
 
             write_geotiff(tiff_file, values*255, dst_trans, self.dst_crs)
 
+    def __check_input_files_consistency(self, dem_file, veg_file):
+        if dem_file.crs != veg_file.crs:
+            raise Exception(f'CRS of input files are inconsistent')
 
-    def load_data_from_files(self, vegetation_file, dem_file):
-        pass
+        err_res = abs(dem_file.res[0] - veg_file.res[0])/veg_file.res[0]
+        if err_res >  0.01:
+            raise Exception(f'Resolution of input files are not consistent')
+
+        bounds_err = np.array([
+            dem_file.bounds.left - veg_file.bounds.left,
+            dem_file.bounds.right - veg_file.bounds.right,
+            dem_file.bounds.top - veg_file.bounds.top,
+            dem_file.bounds.bottom - veg_file.bounds.bottom
+        ])
+        if np.linalg.norm(bounds_err,1) > veg_file.res[0]*2:
+            raise Exception(f'Bounding box of input files are not consistent')
+
+    def load_data_from_files(self, veg_filename, dem_filename):
+            with rio.open(veg_filename) as veg_file, rio.open(dem_filename) as dem_file:
+                self.__check_input_files_consistency(dem_file, veg_file)
+                try:
+                    self.dem = dem_file.read(1).astype('int16')
+                    self.veg = veg_file.read(1).astype('int8')
+                    
+                    self.veg[:, (0, -1)] = 0
+                    self.veg[(0, -1), :] = 0
+                    self.veg[(self.veg<0)|(self.veg>6)] = 0                    
+                    
+                    transform, crs, bounds, res = veg_file.transform, veg_file.crs, veg_file.bounds, veg_file.res
+
+                    self.__prj = Proj(crs.to_wkt())
+                    self.__trans = transform
+                    self.__bounds = bounds
+                    self.__shape = self.veg.shape
+                    self.step_x = res[0]
+                    self.step_y = res[1]
     
+                    self.moist = np.zeros_like(self.veg, dtype='float')
+
+                except IOError:
+                    logging.error('Error reading input files')
+                    raise
+
     def load_data_from_tiles(self, easting, northing, zone_number):
         try:
             logging.info('Loading VEGETATION from "' + self.settings.tileset + '" tileset')
@@ -223,7 +262,7 @@ class Propagator:
         return last_bc
 
     def __init_simulation(self, n_threads, initial_ignitions, active_ignitions):
-        self.f_global = np.zeros(initial_ignitions.shape + (n_threads,))
+        self.f_global = np.zeros(self.__shape + (n_threads,))
         for t in range(n_threads):
             self.f_global[:, :, t] = initial_ignitions.copy()
             for p in active_ignitions:
