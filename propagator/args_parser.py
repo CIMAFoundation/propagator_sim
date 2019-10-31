@@ -63,13 +63,11 @@ def parse_params():
 
     parser.add_argument('-dem', 
         dest='dem_file', 
-        type=argparse.FileType('r'),         
-        help='D.E.M. tiff file to load'
+        help='DEM tiff file to load'
     )
 
     parser.add_argument('-veg', 
-        dest='veg_file', 
-        type=argparse.FileType('r'),         
+        dest='veg_file',
         help='Vegetation tiff file to load'
     )
 
