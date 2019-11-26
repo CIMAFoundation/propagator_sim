@@ -34,22 +34,65 @@ def load_parameters(probability_file=None, v0_file=None):
     if probability_file:
         prob_table = np.loadtxt(probability_file)
 
+def get_p_time_fn(ros_model_code):
+    ros_models = {
+        'default' : p_time_standard,
+        'wang' : p_time_wang,
+        'rothermel' : p_time_rothermel,
+    }
+    p_time_function = ros_models.get(ros_model_code, p_time_standard)
+    return p_time_function
 
-def p_time(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
-    # velocità di base modulata con la densità(tempo di attraversamento)
+def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, w_dir, w_speed, moist):
     dh = (dem_to - dem_from)
-    # dir_to = np.stack((np.cos(angle_to), np.sin(angle_to)), axis=1)
-    wh = w_h_effect(angle_to, w_speed, w_dir, dh, dist)
-
-    # tempo in minuti di attraversamento di una cella 
     v = v0[veg_from-1] / 60
-    v_wh = np.clip(v * wh, 0.01, 100)
+    w_proj = np.cos(w_dir - angle_to) #wind component in propagation direction
+    w_spd = (w_speed * w_proj) / 3.6 #wind speed in the direction of propagation
+
+    teta_s_rad = np.arctan(dh / cellsize * dist) #slope angle [rad]
+    teta_s = np.degrees(teta_s_rad) #slope angle [°]
+
+    teta_f_rad = np.arctan(0.4226 * w_spd) #flame angle measured from the vertical in the direction of fire spread [rad]
+    teta_f = np.degrees(teta_f_rad) #flame angle [°]
+    v_wh_pre = v * np.exp(alpha1 * teta_s + alpha2 * teta_f) #Rate of Spread evaluate with Rothermel's model
+    v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
+
     real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
     t = real_dist / v_wh
     t[t>=1] = np.around(t[t>=1])
     t = np.clip(t, 0.1, np.inf)
     return t
 
+def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, w_dir, w_speed, moist):
+    dh = (dem_to - dem_from)
+    v = v0[veg_from-1] / 60
+    w_proj = np.cos(w_dir - angle_to) #wind component in propagation direction
+    w_spd = (w_speed * w_proj) / 3.6 #wind speed in the direction of propagation
+
+    teta_s_rad = np.arctan(dh / cellsize * dist) #slope angle [rad]
+    teta_s_pos = np.absolute(teta_s_rad) #absolute values of slope angle
+    p_reverse = np.sign(dh) # +1 if fire spreads upslope, -1 if fire spreads downslope
+
+    v_wh_pre = v * np.exp(beta1 * w_spd) * np.exp(p_reverse * beta2 * np.tan(teta_s_pos)**beta3) #Rate of Spread evaluate with Wang Zhengfei's model
+    v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
+
+    real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
+    t = real_dist / v_wh
+    t[t>=1] = np.around(t[t>=1])
+    t = np.clip(t, 0.1, np.inf)
+    return t
+
+def p_time_standard(dem_from, dem_to, veg_from, veg_to, angle_to, dist, w_dir, w_speed, moist):
+    dh = (dem_to - dem_from)
+    v = v0[veg_from-1] / 60
+    wh = w_h_effect(angle_to, w_speed, w_dir, dh, dist)
+    v_wh = np.clip(v * wh, 0.01, 100)
+
+    real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
+    t = real_dist / v_wh
+    t[t>=1] = np.around(t[t>=1])
+    t = np.clip(t, 0.1, np.inf)
+    return t
 
 def w_h_effect(angle_to, w_speed, w_dir, dh, dist):
     w_effect_module = (A + (D1 * (D2 * np.tanh((w_speed / D3) - D4))) + (w_speed / D5))
@@ -111,7 +154,10 @@ class PropagatorSettings:
         self.time_resolution = settings_dict['time_resolution']
         self.output_folder = settings_dict['output_folder']
         self.time_limit = settings_dict['time_limit']
+        self.p_time_fn = get_p_time_fn(settings_dict['ros_model_code'])
         
+        
+
         #self.simp_fact = settings_dict['simp_fact']
         #self.debug_mode = settings_dict['debug_mode']
         #self.write_vegetation = settings_dict['write_vegetation']
@@ -127,7 +173,7 @@ class Propagator:
         self.veg = None
         self.dem = None
         self.boundary_conditions = self.settings.boundary_conditions
-
+        self.p_time = settings.p_time_fn
         # make it configurable
         self.dst_crs = crs.CRS({'init': 'EPSG:4326', 'no_defs': True})
 
@@ -343,7 +389,7 @@ class Propagator:
         p_nt = nt[p]
 
         # get the propagation time for the propagating pixels
-        transition_time = p_time(dem_from[p], dem_to[p],
+        transition_time = self.p_time(dem_from[p], dem_to[p],
                                     veg_from[p], veg_to[p],
                                     angle_to[p], dist_to[p],
                                     moist_to[p],
