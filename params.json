@@ -1,50 +1,52 @@
 {
+  "time_limit":1440,
   "tileset":"default",
   "name":"test",
   "boundary_conditions":[
     {
-      "w_dir":335,
-      "w_speed":"9",
+      "w_dir":300,
+      "w_speed":"43",
       "tooltip_timer":{},
       "tooltip":false,
       "time":0
     },
     {
-      "w_dir":356,
-      "w_speed":"10",
+      "w_dir":280,
+      "w_speed":"36",
       "tooltip_timer":{},
       "tooltip":false,
-      "time":180
+      "time":1440
     },
     {
-      "w_dir":3,
-      "w_speed":"7",
+      "w_dir":340,
+      "w_speed":"43",
       "tooltip_timer":{},
       "tooltip":false,
-      "time":360
+      "time":2160
     },
     {
-      "w_dir":24,
-      "w_speed":"3",
+      "w_dir":290,
+      "w_speed":"14",
       "tooltip_timer":{},
       "tooltip":false,
-      "time":540
-    },
-    {
-      "w_dir":226,
-      "w_speed":"3",
-      "tooltip_timer":{},
-      "tooltip":false,
-      "time":720
+      "time":2880
     }
   ],
   "ignitions":[
-    "POINT:41.584361105987384;1.9583789659528164"
+    "POINT:45.15740671140068;7.030870206188601"
+  ],
+  "isochrone_thresholds":[
+    0.01,
+    0.5,
+    0.75,
+    0.9,
+    0.99
   ],
   "w_dir":0,
   "time_res":10,
   "grid_dim_km":20,
-  "init_date":"201802040000",
+  "init_date":"201710211057",
   "w_speed":0,
-  "n_threads":100
+  "n_threads":100,
+  "ros_model":"rothermellllll"
 }
