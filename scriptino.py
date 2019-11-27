@@ -132,11 +132,13 @@ angles_label = ["0", "1o3pi", "2o3pi", "pi"]
 speeds = [0.0,  30.0]  #km/h
 speeds_label = [str(i)for i in speeds]
 
-trials = list(itertools.product( list(range(len(vegetations))) , list(range(len(slopes))), list(range(len(angles))), list(range(len(speeds)))) )
+RoS = ['default' , 'wang' , 'rothermel'] #possible RoS
 
-#veg slope angle speed 
+trials = list(itertools.product( list(range(len(vegetations))) , list(range(len(slopes))), list(range(len(angles))), list(range(len(speeds))), list(range(len(RoS)))))
+
+#veg slope angle speed RoS
 for  item  in trials:
-	mylabel =    vegetations_labels[item[0]] +'_'+ slopes_label[item[1]] +'_'+ angles_label[item[2]] + '_' + speeds_label[item[3]] 
+	mylabel =    vegetations_labels[item[0]] +'_'+ slopes_label[item[1]] +'_'+ angles_label[item[2]] + '_' + speeds_label[item[3]] + '_' + RoS[item[4]]
 
 	if not os.path.exists("./test/"+mylabel):
 		os.makedirs("./test/"+mylabel)
@@ -149,10 +151,14 @@ for  item  in trials:
 
 	data["boundary_conditions"][0]["w_speed"] = speeds[item[3]]
 	data["boundary_conditions"][0]["w_dir"] = angles[item[2]]
+	data["ros_model"] = RoS[item[4]]
 	#data["boundary_conditions"][0]["ignitions"] = [str(lat_mid) , str(lon_mid)]
 
 	with open("./test/"+mylabel + "/" + mylabel+".json", "w") as jsonFile:
 		json.dump(data, jsonFile)
+
+	if not os.path.exists("./test/slopes_test"):
+		os.makedirs("./test/slopes_test")
 
 	create_slope_file(slopes[item[1]], mdata, "./test/slopes_test/" )
 	commandlist =  ["python","main.py","-f","./test/"+mylabel+"/"+mylabel+".json"]
