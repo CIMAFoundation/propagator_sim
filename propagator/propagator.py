@@ -44,8 +44,13 @@ def get_p_time_fn(ros_model_code):
     return p_time_function
 
 def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, w_dir, w_speed, moist):
+    # velocità di base modulata con la densità(tempo di attraversamento)
     dh = (dem_to - dem_from)
-    v = v0[veg_from-1] / 60
+    
+    v = v0[veg_from-1] / 60 # tempo in minuti di attraversamento di una cella
+    
+    real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
+    
     w_proj = np.cos(w_dir - angle_to) #wind component in propagation direction
     w_spd = (w_speed * w_proj) / 3.6 #wind speed in the direction of propagation
 
@@ -54,29 +59,44 @@ def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, w_dir, 
 
     teta_f_rad = np.arctan(0.4226 * w_spd) #flame angle measured from the vertical in the direction of fire spread [rad]
     teta_f = np.degrees(teta_f_rad) #flame angle [°]
-    v_wh_pre = v * np.exp(alpha1 * teta_s + alpha2 * teta_f) #Rate of Spread evaluate with Rothermel's model
+    
+    sf = np.exp(alpha1 * teta_s) #slope factor
+    sf_clip = np.clip(sf , 0.01 , 10) #slope factor clipped at 10
+    wf = np.exp(alpha2 * teta_f) #wind factor
+    wf_rescaled = wf / 13 #wind factor rescaled to have 10 as max value 
+    wf_clip = np.clip(wf_rescaled , 1 , 20) #max value is 20, min is 1
+
+    v_wh_pre = v * sf_clip * wf_clip #Rate of Spread evaluate with Rothermel's model
     v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
 
-    real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
     t = real_dist / v_wh
     t[t>=1] = np.around(t[t>=1])
     t = np.clip(t, 0.1, np.inf)
     return t
 
 def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, w_dir, w_speed, moist):
+  # velocità di base modulata con la densità(tempo di attraversamento)
     dh = (dem_to - dem_from)
-    v = v0[veg_from-1] / 60
-    w_proj = np.cos(w_dir - angle_to) #wind component in propagation direction
-    w_spd = (w_speed * w_proj) / 3.6 #wind speed in the direction of propagation
 
+    v = v0[veg_from-1] / 60 # tempo in minuti di attraversamento di una cella 
+    
+    real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
+    
+    w_proj = np.cos(w_dir - angle_to) #wind component in propagation direction
+    w_spd = (w_speed * w_proj)/3.6 #wind speed in the direction of propagation
+	
     teta_s_rad = np.arctan(dh / cellsize * dist) #slope angle [rad]
     teta_s_pos = np.absolute(teta_s_rad) #absolute values of slope angle
     p_reverse = np.sign(dh) # +1 if fire spreads upslope, -1 if fire spreads downslope
+	
+    wf = np.exp(beta1 * w_spd) #wind factor
+    wf_clip = np.clip(wf , 0.01 , 10) #clipped at 10
+    sf = np.exp(p_reverse * beta2 * np.tan(teta_s_pos)**beta3) #slope factor
+    sf_clip = np.clip(sf , 0.01 , 10)
 
-    v_wh_pre = v * np.exp(beta1 * w_spd) * np.exp(p_reverse * beta2 * np.tan(teta_s_pos)**beta3) #Rate of Spread evaluate with Wang Zhengfei's model
+    v_wh_pre = v * wf_clip * sf_clip #Rate of Spread evaluate with Wang Zhengfei's model
     v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
 
-    real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
     t = real_dist / v_wh
     t[t>=1] = np.around(t[t>=1])
     t = np.clip(t, 0.1, np.inf)
