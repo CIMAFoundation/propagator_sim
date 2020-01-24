@@ -47,7 +47,7 @@ def main():
 
     #controllo che sia stato richiesto il modello di RoS in maniera corretta
     if ros_model_code not in ['default' , 'wang' , 'rothermel']:
-        logging.info('WARNING: RoS function is not well defined, the model will use "default" configuration')
+        logging.info('WARNING: RoS function is not well defined, the model will use "wang" configuration')
 
     w_dir_deg = float(d.get('w_dir', 0))
     w_dir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
