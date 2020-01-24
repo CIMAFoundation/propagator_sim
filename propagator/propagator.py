@@ -40,7 +40,7 @@ def get_p_time_fn(ros_model_code):
         'wang' : p_time_wang,
         'rothermel' : p_time_rothermel,
     }
-    p_time_function = ros_models.get(ros_model_code, p_time_standard)
+    p_time_function = ros_models.get(ros_model_code, p_time_wang)
     return p_time_function
 
 def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, w_dir, w_speed, moist):
