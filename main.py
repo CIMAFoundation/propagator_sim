@@ -44,7 +44,7 @@ def main():
     grid_dim = np.floor(grid_dim_km / 20 * 1000)
     grid_dim = int(np.clip(np.floor(grid_dim), 300, 1500))
     tile_set = d.get('tileset', 'default')
-    ros_model_code = d.get('ros_model') #switch per scegliere se usare il modello di Rothermel (rothermel), Wang (wang) oppure il classico Propagator (default)
+    ros_model_code = d.get('ros_model', 'wang') #switch per scegliere se usare il modello di Rothermel (rothermel), Wang (wang) oppure il classico Propagator (default)
 
     #controllo che sia stato richiesto il modello di RoS in maniera corretta
     if ros_model_code not in ['default' , 'wang' , 'rothermel']:
