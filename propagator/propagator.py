@@ -217,7 +217,7 @@ def run(run_id,
 
     logging.info('Loading DEM "default" tileset')
     dem, west, north, step_x, step_y = load_tiles(zone_number, easting, northing, grid_dim, 'quo', 'default')
-
+    dem = dem.astype('float')
     moist = np.zeros_like(veg)
 
     img, active_ignitions = \
