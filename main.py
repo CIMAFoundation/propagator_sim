@@ -11,6 +11,7 @@ import enum
 from datetime import datetime
 
 import numpy as np
+np.random.seed(seed=42)
 
 import propagator.logging_config
 from propagator.args_parser import parse_params
