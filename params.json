@@ -1,51 +1,25 @@
 {
-  "time_limit":1440,
+  "time_limit":240,
   "tileset":"default",
   "name":"test",
   "boundary_conditions":[
     {
-      "w_dir":300,
-      "w_speed":"43",
+      "w_dir":0,
+      "w_speed":"0",
       "tooltip_timer":{},
       "tooltip":false,
       "time":0
-    },
-    {
-      "w_dir":280,
-      "w_speed":"36",
-      "tooltip_timer":{},
-      "tooltip":false,
-      "time":1440
-    },
-    {
-      "w_dir":340,
-      "w_speed":"43",
-      "tooltip_timer":{},
-      "tooltip":false,
-      "time":2160
-    },
-    {
-      "w_dir":290,
-      "w_speed":"14",
-      "tooltip_timer":{},
-      "tooltip":false,
-      "time":2880
     }
   ],
   "ignitions":[
-    "POINT:45.15740671140068;7.030870206188601"
+    "POINT:44.655;12"
   ],
-  "isochrone_thresholds":[
-    0.01,
-    0.5,
-    0.75,
-    0.9,
-    0.99
-  ],
+  "isochrone_thresholds": [0.01, 0.5, 0.75, 0.9],
   "w_dir":0,
+  "time_resolution":10,
   "time_res":10,
   "grid_dim_km":20,
-  "init_date":"201710211057",
+  "init_date":"202001300000",
   "w_speed":0,
   "n_threads":100,
   "ros_model":"wang"
