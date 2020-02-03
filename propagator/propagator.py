@@ -5,7 +5,9 @@ from datetime import timedelta
 
 # import utm
 from numpy import array, pi, sign, tanh, tile
-from numpy.random import rand
+#from numpy.random import rand
+from numpy import zeros as rand
+
 from pyproj import Proj
 from rasterio import crs, enums, transform, warp
 
@@ -43,7 +45,7 @@ def get_p_time_fn(ros_model_code):
     p_time_function = ros_models.get(ros_model_code, p_time_wang)
     return p_time_function
 
-def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, w_dir, w_speed, moist):
+def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
     # velocità di base modulata con la densità(tempo di attraversamento)
     dh = (dem_to - dem_from)
     
@@ -74,7 +76,7 @@ def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, w_dir, 
     t = np.clip(t, 0.1, np.inf)
     return t
 
-def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, w_dir, w_speed, moist):
+def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
   # velocità di base modulata con la densità(tempo di attraversamento)
     dh = (dem_to - dem_from)
 
@@ -102,7 +104,7 @@ def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, w_dir, w_spe
     t = np.clip(t, 0.1, np.inf)
     return t
 
-def p_time_standard(dem_from, dem_to, veg_from, veg_to, angle_to, dist, w_dir, w_speed, moist):
+def p_time_standard(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
     dh = (dem_to - dem_from)
     v = v0[veg_from-1] / 60
     wh = w_h_effect(angle_to, w_speed, w_dir, dh, dist)
