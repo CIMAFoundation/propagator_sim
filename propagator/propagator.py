@@ -5,8 +5,7 @@ from datetime import timedelta
 
 # import utm
 from numpy import array, pi, sign, tanh, tile
-#from numpy.random import rand
-from numpy import zeros as rand
+from numpy.random import rand
 
 from pyproj import Proj
 from rasterio import crs, enums, transform, warp
@@ -374,7 +373,7 @@ class Propagator:
         #let's apply a random noise to wind direction and speed for all the cells
         w_dir_r = (w_dir + (pi/16)*(0.5 - rand(from_num))).repeat(nb_num)
         w_speed_r = (w_speed * (1.2 - 0.4 * rand(from_num))).repeat(nb_num)
-
+        
         dem_from = self.dem[r, c].repeat(nb_num)
         veg_from = self.veg[r, c].repeat(nb_num)
         veg_to = self.veg[nr, nc]
