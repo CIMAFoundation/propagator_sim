@@ -1,5 +1,5 @@
 {
-  "time_limit":240,
+  "time_limit":720,
   "tileset":"default",
   "name":"test",
   "boundary_conditions":[
@@ -16,8 +16,8 @@
   ],
   "isochrone_thresholds": [0.01, 0.5, 0.75, 0.9],
   "w_dir":0,
-  "time_resolution":10,
-  "time_res":10,
+  "time_resolution":60,
+  "time_res":60,
   "grid_dim_km":20,
   "init_date":"202001300000",
   "w_speed":0,
