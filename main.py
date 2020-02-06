@@ -44,9 +44,7 @@ def main():
     grid_dim = int(np.clip(np.floor(grid_dim), 300, 1500))
     tile_set = d.get('tileset', 'default')
     ros_model_code = d.get('ros_model', 'wang') #switch per scegliere se usare il modello di Rothermel (rothermel), Wang (wang) oppure il classico Propagator (default)
-    moisture_100 = int(d.get('moisture', 0))
-    moisture = float(moisture_100 / 100)
-
+    
     #controllo che sia stato richiesto il modello di RoS in maniera corretta
     if ros_model_code not in ['default' , 'wang' , 'rothermel']:
         logging.info('WARNING: RoS function is not well defined, the model will use "wang" configuration')
@@ -54,12 +52,15 @@ def main():
     w_dir_deg = float(d.get('w_dir', 0))
     w_dir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
     w_speed = float(d.get('w_speed', 0))
+    moisture_100 = int(d.get('moisture', 0))
+    moisture = float(moisture_100 / 100)
 
     time_resolution = float(d.get('time_resolution', 60))
 
     boundary_conditions = d.get('boundary_conditions', [{
         "w_dir": w_dir,
         "w_speed": w_speed,
+        "moisture": moisture_100,
         "time": 0
     }])
 
@@ -70,6 +71,7 @@ def main():
             {
                 "w_dir": 0.0,
                 "w_speed": 0.0,
+                "moisture":0,
                 "time": 0
             }
         )
@@ -113,8 +115,7 @@ def main():
         debug_mode=args.debug_mode,
         write_vegetation=args.write_vegetation,
         save_realizations=args.save_realizations,
-        ros_model_code=ros_model_code,
-        moisture=moisture
+        ros_model_code=ros_model_code
     )
 
     sim = Propagator(settings)

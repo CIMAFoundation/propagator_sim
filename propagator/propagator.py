@@ -187,8 +187,6 @@ class PropagatorSettings:
         self.output_folder = settings_dict['output_folder']
         self.time_limit = settings_dict['time_limit']
         self.p_time_fn = get_p_time_fn(settings_dict['ros_model_code'])
-        self.moisture = settings_dict['moisture']
-        
 
         #self.simp_fact = settings_dict['simp_fact']
         #self.debug_mode = settings_dict['debug_mode']
@@ -206,7 +204,6 @@ class Propagator:
         self.dem = None
         self.boundary_conditions = self.settings.boundary_conditions
         self.p_time = settings.p_time_fn
-        self.moisture = self.settings.moisture
         # make it configurable
         self.dst_crs = crs.CRS({'init': 'EPSG:4326', 'no_defs': True})
 
@@ -305,9 +302,6 @@ class Propagator:
                     self.step_x = res[0]
                     self.step_y = res[1]
     
-                    #self.moist = np.zeros_like(self.veg, dtype='float')
-                    self.moist = np.full_like(self.veg, self.moisture, dtype='float')
-
                 except IOError:
                     logging.error('Error reading input files')
                     raise
@@ -326,8 +320,6 @@ class Propagator:
                 load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'quo', 'default')
             self.dem = dem.astype('float')
 
-            #self.moist = np.zeros_like(veg, dtype='float')
-            self.moist = np.full_like(veg, self.moisture, dtype='float')
             rows, cols = veg.shape
             south = north - (rows * step_y)
             east = west + (cols * step_x)
@@ -362,7 +354,7 @@ class Propagator:
         save_isochrones(isochrones, isochrone_path, format='geojson')
 
 
-    def __apply_updates(self, updates, w_speed, w_dir):
+    def __apply_updates(self, updates, w_speed, w_dir, moisture):
         # coordinates of the next updates
         u = np.vstack(updates)
         veg_type = self.veg[u[:, 0], u[:, 1]]
@@ -387,12 +379,12 @@ class Propagator:
         #let's apply a random noise to wind direction and speed for all the cells
         w_dir_r = (w_dir + (pi/16)*(0.5 - rand(from_num))).repeat(nb_num)
         w_speed_r = (w_speed * (1.2 - 0.4 * rand(from_num))).repeat(nb_num)
+        moisture_r = (moisture * (1.2 - 0.4 * rand(from_num))).repeat(nb_num)
         
         dem_from = self.dem[r, c].repeat(nb_num)
         veg_from = self.veg[r, c].repeat(nb_num)
         veg_to = self.veg[nr, nc]
         dem_to = self.dem[nr, nc]
-        moist_to = self.moist[nr, nc]
 
         angle_to = angle[nb_arr_r+1, nb_arr_c+1]
         dist_to = dist[nb_arr_r+1, nb_arr_c+1]
@@ -403,17 +395,17 @@ class Propagator:
         veg_from = veg_from[n_mask]
         dem_to = dem_to[n_mask]
         veg_to = veg_to[n_mask]
-        moist_to = moist_to[n_mask]
         angle_to = angle_to[n_mask]
         dist_to = dist_to[n_mask]
         w_speed_r = w_speed_r[n_mask]
         w_dir_r = w_dir_r[n_mask]
+        moisture_r = moisture_r[n_mask]
         
 
         nr, nc, nt = nr[n_mask], nc[n_mask], nt[n_mask]
 
         # get the probability for all the pixels
-        p_prob = p_probability(dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moist_to, w_dir_r, w_speed_r)
+        p_prob = p_probability(dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moisture_r, w_dir_r, w_speed_r)
 
         # try the propagation
         p = p_prob > rand(p_prob.shape[0])
@@ -427,7 +419,7 @@ class Propagator:
         transition_time = self.p_time(dem_from[p], dem_to[p],
                                     veg_from[p], veg_to[p],
                                     angle_to[p], dist_to[p],
-                                    moist_to[p],
+                                    moisture_r[p],
                                     w_dir_r[p], w_speed_r[p])
 
         prop_time = np.around(self.c_time + transition_time, decimals=1)
@@ -464,8 +456,10 @@ class Propagator:
             w_dir_deg = float(bc.get('w_dir', 0))
             wdir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
             wspeed = float(bc.get('w_speed', 0))
+            moisture_100 = float(bc.get('moisture', 0))
+            moisture = float(moisture_100 / 100)
 
-            new_updates = self.__apply_updates(updates, wspeed, wdir)
+            new_updates = self.__apply_updates(updates, wspeed, wdir, moisture)
             self.ps.push_all(new_updates)
             
 
