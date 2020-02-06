@@ -44,6 +44,8 @@ def main():
     grid_dim = int(np.clip(np.floor(grid_dim), 300, 1500))
     tile_set = d.get('tileset', 'default')
     ros_model_code = d.get('ros_model', 'wang') #switch per scegliere se usare il modello di Rothermel (rothermel), Wang (wang) oppure il classico Propagator (default)
+    moisture_100 = int(d.get('moisture', 0))
+    moisture = float(moisture_100 / 100)
 
     #controllo che sia stato richiesto il modello di RoS in maniera corretta
     if ros_model_code not in ['default' , 'wang' , 'rothermel']:
@@ -112,6 +114,7 @@ def main():
         write_vegetation=args.write_vegetation,
         save_realizations=args.save_realizations,
         ros_model_code=ros_model_code,
+        moisture=moisture
     )
 
     sim = Propagator(settings)

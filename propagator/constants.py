@@ -32,3 +32,12 @@ alpha2 = 0.0576
 beta1 = 0.1783
 beta2 = 3.533
 beta3 = 1.2
+
+####costanti per moisture
+# probabilità
+M1 = -3.5995
+M2 = 5.2389
+M3 = -2.6355
+M4 = 1.019
+# RoS
+c_moist = 0.14
