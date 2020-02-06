@@ -4,15 +4,15 @@
   "name":"test",
   "boundary_conditions":[
     {
-      "w_dir":0,
-      "w_speed":"0",
+      "w_dir":180,
+      "w_speed":"60",
       "tooltip_timer":{},
       "tooltip":false,
       "time":0
     }
   ],
   "ignitions":[
-    "POINT:44.655;12"
+    "POINT:40.43248942171313;8.771506459283538"
   ],
   "isochrone_thresholds": [0.01, 0.5, 0.75, 0.9],
   "w_dir":0,
@@ -22,5 +22,6 @@
   "init_date":"202001300000",
   "w_speed":0,
   "n_threads":100,
-  "ros_model":"wang"
+  "ros_model":"wang",
+  "moisture":10
 }

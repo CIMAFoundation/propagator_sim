@@ -68,7 +68,10 @@ def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, 
     wf_clip = np.clip(wf_rescaled , 1 , 20) #max value is 20, min is 1
 
     v_wh_pre = v * sf_clip * wf_clip #Rate of Spread evaluate with Rothermel's model
-    v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
+    moist_eff = np.exp(c_moist * moist) #moisture effect
+
+    #v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
+    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS
 
     t = real_dist / v_wh
     t[t>=1] = np.around(t[t>=1])
@@ -96,8 +99,11 @@ def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir
     sf_clip = np.clip(sf , 0.01 , 10)
 
     v_wh_pre = v * wf_clip * sf_clip #Rate of Spread evaluate with Wang Zhengfei's model
-    v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
-
+    moist_eff = np.exp(c_moist * moist) #moisture effect
+     
+    #v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
+    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS
+    
     t = real_dist / v_wh
     t[t>=1] = np.around(t[t>=1])
     t = np.clip(t, 0.1, np.inf)
@@ -107,7 +113,9 @@ def p_time_standard(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w
     dh = (dem_to - dem_from)
     v = v0[veg_from-1] / 60
     wh = w_h_effect(angle_to, w_speed, w_dir, dh, dist)
-    v_wh = np.clip(v * wh, 0.01, 100)
+    moist_eff = np.exp(c_moist * moist) #moisture effect
+    #v_wh = np.clip(v * wh, 0.01, 100)
+    v_wh = np.clip(v * wh * moist_eff, 0.01, 100)
 
     real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
     t = real_dist / v_wh
@@ -145,10 +153,13 @@ def p_probability(dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moist, 
     dh = (dem_to - dem_from)
     alpha_wh = w_h_effect_on_p(angle_to, w_speed, w_dir, dh, dist_to)
     
-    p_moist = 1
+    #p_moist = 1
+    p_moist = M1 * moist**3 + M2 * moist**2 + M3 * moist + M4
+    p_m = np.clip(p_moist , 0, 1.0)
     p_veg = prob_table[veg_to - 1, veg_from - 1]
     p = 1-(1-p_veg)**alpha_wh
-    p_clip = np.clip(p, 0, 1.0)
+    #p_clip = np.clip(p, 0, 1.0)
+    p_clip = np.clip(p * p_m, 0, 1.0)
 
     return p_clip
 
@@ -176,7 +187,7 @@ class PropagatorSettings:
         self.output_folder = settings_dict['output_folder']
         self.time_limit = settings_dict['time_limit']
         self.p_time_fn = get_p_time_fn(settings_dict['ros_model_code'])
-        
+        self.moisture = settings_dict['moisture']
         
 
         #self.simp_fact = settings_dict['simp_fact']
@@ -195,6 +206,7 @@ class Propagator:
         self.dem = None
         self.boundary_conditions = self.settings.boundary_conditions
         self.p_time = settings.p_time_fn
+        self.moisture = self.settings.moisture
         # make it configurable
         self.dst_crs = crs.CRS({'init': 'EPSG:4326', 'no_defs': True})
 
@@ -293,7 +305,8 @@ class Propagator:
                     self.step_x = res[0]
                     self.step_y = res[1]
     
-                    self.moist = np.zeros_like(self.veg, dtype='float')
+                    #self.moist = np.zeros_like(self.veg, dtype='float')
+                    self.moist = np.full_like(self.veg, self.moisture, dtype='float')
 
                 except IOError:
                     logging.error('Error reading input files')
@@ -313,7 +326,8 @@ class Propagator:
                 load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'quo', 'default')
             self.dem = dem.astype('float')
 
-            self.moist = np.zeros_like(veg, dtype='float')
+            #self.moist = np.zeros_like(veg, dtype='float')
+            self.moist = np.full_like(veg, self.moisture, dtype='float')
             rows, cols = veg.shape
             south = north - (rows * step_y)
             east = west + (cols * step_x)
