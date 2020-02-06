@@ -6,9 +6,18 @@
     {
       "w_dir":180,
       "w_speed":"60",
+      "moisture":5,
       "tooltip_timer":{},
       "tooltip":false,
       "time":0
+    },
+    {
+      "w_dir":180,
+      "w_speed":"60",
+      "moisture":70,
+      "tooltip_timer":{},
+      "tooltip":false,
+      "time":180
     }
   ],
   "ignitions":[
@@ -22,6 +31,6 @@
   "init_date":"202001300000",
   "w_speed":0,
   "n_threads":100,
-  "ros_model":"wang",
-  "moisture":10
+  "moisture":0,
+  "ros_model":"wang"
 }
