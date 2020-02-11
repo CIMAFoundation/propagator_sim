@@ -292,16 +292,9 @@ def read_actions(imp_points_string):
 
     return mid_lat, mid_lon, polys, lines, points 
 
-def image(dim, moist, activity):
-    if activity == 'ignition':
-        img = np.zeros(dim)
-    else:
-        moisture = float(moist/100)
-        img = np.ones(dim)*moisture
-    return img
 
-def rasterize_actions(dim, points, lines, polys, lonmin, latmax, stepx, stepy, zone_number, activity, moist):
-    img = image(dim, moist, activity)
+def rasterize_actions(dim, points, lines, polys, lonmin, latmax, stepx, stepy, zone_number, base_value=0, value=1):
+    img = np.ones(dim) * base_value
     active_points = []
     for line in lines:
         xs, ys, _, _ = zip(*[
@@ -327,7 +320,9 @@ def rasterize_actions(dim, points, lines, polys, lonmin, latmax, stepx, stepy, z
         y = np.floor((latmax - np.array(ys)) / stepy).astype('int')
         active = add_poly(img, x, y, 1)
         active_points.extend(active)
-    return img, active_points   
+
+    return img, active_points
+
 
 def trim_values(values, src_trans):
     rows, cols = values.shape
