@@ -10,6 +10,8 @@ from numpy.random import rand
 from pyproj import Proj
 from rasterio import crs, enums, transform, warp
 
+from scipy import ndimage
+
 from .constants import *
 from .utils import *
 
@@ -202,21 +204,18 @@ class Propagator:
         self.f_global = None
         self.veg = None
         self.dem = None
-        self.boundary_conditions = self.settings.boundary_conditions
-        #self.__preprocess_bc(self.settings.boundary_conditions)
-        
+        self.boundary_conditions = self.settings.boundary_conditions        
         self.p_time = settings.p_time_fn
         # make it configurable
         self.dst_crs = crs.CRS({'init': 'EPSG:4326', 'no_defs': True})
 
-    '''
     def __preprocess_bc(self, boundary_conditions):
         for bc in boundary_conditions:
             if 'fighting_action' in bc:
                 fighting_ignition_string = bc['fighting_action']
-                bc['fighting_action_raster'] = self.fighting_actions_rasterized(fighting_ignition_string)
+                bc['moist_mask'] , bc['fighting_action_raster'] = self.fighting_actions_rasterized(fighting_ignition_string)
         self.boundary_conditions = boundary_conditions
-    '''
+    
     def __init_crs_from_bounds(self, west:float, south:float, east:float, north:float, 
                             cols:int, rows:int, 
                             step_x:float, step_y:float,
@@ -231,10 +230,14 @@ class Propagator:
     def init_ignitions(self, polys, lines, points, zone_number):
         west, south, east, north = self.__bounds
         
+        activity = 'ignition'
+        moisture = self.boundary_conditions[0].get('moisture')
+
         img, active_ignitions = \
             rasterize_actions((self.__shape[0], self.__shape[1]), 
-                            points, lines, polys, west, north, self.step_x, self.step_y, zone_number)
+                            points, lines, polys, west, north, self.step_x, self.step_y, zone_number, activity, moisture)
         self.__init_simulation(self.settings.n_threads, img, active_ignitions)
+        self.__preprocess_bc(self.settings.boundary_conditions)
 
     def __compute_values(self):
         values = np.nanmean(self.f_global, 2)
@@ -364,7 +367,7 @@ class Propagator:
         save_isochrones(isochrones, isochrone_path, format='geojson')
 
 
-    def __apply_updates(self, updates, w_speed, w_dir, moisture, fighting_points):
+    def __apply_updates(self, updates, w_speed, w_dir, moisture, moisture_mask):
         # coordinates of the next updates
         u = np.vstack(updates)
         veg_type = self.veg[u[:, 0], u[:, 1]]
@@ -389,23 +392,13 @@ class Propagator:
         #let's apply a random noise to wind direction and speed for all the cells
         w_dir_r = (w_dir + (pi/16)*(0.5 - rand(from_num))).repeat(nb_num)
         w_speed_r = (w_speed * (1.2 - 0.4 * rand(from_num))).repeat(nb_num)
-        moisture_r = (moisture * (1.2 - 0.4 * rand(from_num))).repeat(nb_num)
-        
-        #inserisco le fighting actions
-        '''
-        for i in fighting_points:
-            if moisture_r[i]==True:
-                moisture_r[fighting_points] = 1    
-        '''
-        '''
-        for i in fighting_points:
-            if i in moisture_r:
-                moisture_r[fighting_points] = 1  
-        '''        
+        #moisture_r = (moisture * (1.2 - 0.4 * rand(from_num))).repeat(nb_num)
+  
         dem_from = self.dem[r, c].repeat(nb_num)
         veg_from = self.veg[r, c].repeat(nb_num)
         veg_to = self.veg[nr, nc]
         dem_to = self.dem[nr, nc]
+        moisture_r = moisture_mask[nr, nc]
 
         angle_to = angle[nb_arr_r+1, nb_arr_c+1]
         dist_to = dist[nb_arr_r+1, nb_arr_c+1]
@@ -470,11 +463,16 @@ class Propagator:
         mid_lat, mid_lon, polys, lines, points = read_actions(fighting_action_string)
         easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
 
+        activity = 'fighting'
+        moisture = self.boundary_conditions[0].get('moisture') #da risolvere il fatto che adesso uso solo la moisture iniziale
+
         img, fighting_points = \
         rasterize_actions((self.__shape[0], self.__shape[1]), 
-                        points, lines, polys, west, north, self.step_x, self.step_y, zone_number)
+                        points, lines, polys, west, north, self.step_x, self.step_y, zone_number, activity, moisture)
         
-        return fighting_points
+        #img = ndimage.binary_dilation(img_mask)
+
+        return img, fighting_points
     
 
     def run(self):
@@ -492,11 +490,11 @@ class Propagator:
             wspeed = float(bc.get('w_speed', 0))
             moisture_100 = float(bc.get('moisture', 0))
             moisture = float(moisture_100 / 100)
+            moisture_mask = bc.get('moist_mask')
+            #fighting_actions = bc.get('fighting_action_raster')
+            #fighting = ndimage.binary_dilation(moisture_mask)
 
-            fighting_actions = bc.get('fighting_action')
-            fighting_points = self.fighting_actions_rasterized(fighting_actions)
-
-            new_updates = self.__apply_updates(updates, wspeed, wdir, moisture, fighting_points)
+            new_updates = self.__apply_updates(updates, wspeed, wdir, moisture, moisture_mask)
             self.ps.push_all(new_updates)
             
 
