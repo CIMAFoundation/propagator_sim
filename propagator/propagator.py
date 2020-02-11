@@ -16,9 +16,6 @@ from .constants import *
 from .utils import *
 
 
-FIGHTING_ACTION_TAG = 'fighting_action'
-MOISTURE_TAG = 'moisture'
-
 # [latifoglie cespugli aree_nude erba conifere coltivi faggete]
 try:
     propagator_path = os.environ.get('PROPAGATOR_PATH', './')
@@ -43,9 +40,9 @@ def load_parameters(probability_file=None, v0_file=None):
 
 def get_p_time_fn(ros_model_code):
     ros_models = {
-        'default' : p_time_standard,
-        'wang' : p_time_wang,
-        'rothermel' : p_time_rothermel,
+        DEFAULT_TAG : p_time_standard,
+        WANG_TAG : p_time_wang,
+        ROTHERMEL_TAG : p_time_rothermel,
     }
     p_time_function = ros_models.get(ros_model_code, p_time_wang)
     return p_time_function
@@ -184,15 +181,15 @@ class PropagatorConfig:
 
 class PropagatorSettings:
     def __init__(self, **settings_dict):
-        self.n_threads = settings_dict['n_threads']
-        self.boundary_conditions = settings_dict['boundary_conditions']
-        self.init_date = settings_dict['init_date'] 
-        self.tileset = settings_dict['tileset']
-        self.grid_dim = settings_dict['grid_dim']
-        self.time_resolution = settings_dict['time_resolution']
-        self.output_folder = settings_dict['output_folder']
-        self.time_limit = settings_dict['time_limit']
-        self.p_time_fn = get_p_time_fn(settings_dict['ros_model_code'])
+        self.n_threads = settings_dict[N_THREADS_TAG]
+        self.boundary_conditions = settings_dict[BOUNDARY_CONDITIONS_TAG]
+        self.init_date = settings_dict[INIT_DATE_TAG] 
+        self.tileset = settings_dict[TILESET_TAG]
+        self.grid_dim = settings_dict[GRID_DIM_TAG]
+        self.time_resolution = settings_dict[TIME_RESOLUTION_TAG]
+        self.output_folder = settings_dict[OUTPUT_FOLDER_TAG]
+        self.time_limit = settings_dict[TIME_LIMIT_TAG]
+        self.p_time_fn = get_p_time_fn(settings_dict[ROS_MODEL_CODE_TAG])
 
         #self.simp_fact = settings_dict['simp_fact']
         #self.debug_mode = settings_dict['debug_mode']
@@ -329,7 +326,7 @@ class Propagator:
             
             logging.info('Loading DEM "default" tileset')
             dem, west, north, step_x, step_y = \
-                load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'quo', 'default')
+                load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'quo', DEFAULT_TAG)
             self.dem = dem.astype('float')
 
             rows, cols = veg.shape
@@ -342,7 +339,7 @@ class Propagator:
     def __find_bc(self):
         last_bc = None
         for bc in self.boundary_conditions:
-            if self.c_time >= bc['time']:
+            if self.c_time >= bc[TIME_TAG]:
                 #n_bc = -1
                 last_bc = bc
                 #n_bc +=1
@@ -477,7 +474,7 @@ class Propagator:
         else:
             img = np.ones((self.__shape[0], self.__shape[1])) * moisture_value
         
-        bc['moist_mask'] = img
+        bc[MOIST_RASTER_TAG] = img
 
     def run(self):
         isochrones = {}
@@ -488,13 +485,12 @@ class Propagator:
                 break
 
             self.c_time, updates = self.ps.pop()
-            #bc, n_bc = self.__find_bc()
             bc = self.__find_bc()
-            w_dir_deg = float(bc.get('w_dir', 0))
+            w_dir_deg = float(bc.get(W_DIR_TAG, 0))
             wdir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
-            wspeed = float(bc.get('w_speed', 0))
+            wspeed = float(bc.get(W_SPEED_TAG, 0))
             
-            moisture = bc.get('moist_mask', None)
+            moisture = bc.get(MOIST_RASTER_TAG, None)
 
             new_updates = self.__apply_updates(updates, wspeed, wdir, moisture)
             self.ps.push_all(new_updates)

@@ -41,3 +41,31 @@ M3 = -2.6355
 M4 = 1.019
 # RoS
 c_moist = -0.014
+
+
+#####   TAG   ####
+FIGHTING_ACTION_TAG = 'fighting_action'
+MOISTURE_TAG = 'moisture'
+MOIST_RASTER_TAG = 'moist_raster'
+N_THREADS_TAG = 'n_threads'
+BOUNDARY_CONDITIONS_TAG = 'boundary_conditions'
+INIT_DATE_TAG = 'init_date'
+TILESET_TAG = 'tileset'
+GRID_DIM_TAG = 'grid_dim'
+TIME_RESOLUTION_TAG = 'time_resolution'
+OUTPUT_FOLDER_TAG = 'output_folder'
+TIME_LIMIT_TAG = 'time_limit'
+ROS_MODEL_CODE_TAG = 'ros_model_code'
+TIME_TAG = 'time'
+W_DIR_TAG = 'w_dir'
+W_SPEED_TAG = 'w_speed'
+
+PROB_FILE_TAG = 'prob_file'
+V0_TABLE_TAG = 'v0_file'
+IGNITIONS_TAG = 'ignitions'
+GRID_DIM_KM_TAG = 'grid_dim_km'
+
+ROS_MODEL_TAG = 'ros_model'
+DEFAULT_TAG = 'default'
+WANG_TAG = 'wang'
+ROTHERMEL_TAG = 'rothermel'

@@ -75,7 +75,7 @@ class Scheduler:
             self.push_all(new_updates)
 
 
-def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset='default'):
+def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset=DEFAULT_TAG):
     filename = var + '_' + str(tile_j) + '_' + str(tile_i) + '.mat'
 
     filepath = join(DATA_DIR, tileset, str(zone_number), filename)
@@ -88,7 +88,7 @@ def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset='default'):
     return np.ascontiguousarray(m)
 
 
-def load_tile_ref(zone_number, var, tileset='default'):
+def load_tile_ref(zone_number, var, tileset=DEFAULT_TAG):
     filename = join(DATA_DIR, tileset, str(zone_number), var + '_ref.mat')
     logging.debug(filename)
     mat_file = scipy.io.loadmat(filename)
@@ -98,7 +98,7 @@ def load_tile_ref(zone_number, var, tileset='default'):
     return step_x, step_y, max_y, min_x, tile_dim
 
 
-def load_tiles(zone_number, x, y, dim, var, tileset='default'):
+def load_tiles(zone_number, x, y, dim, var, tileset=DEFAULT_TAG):
     step_x, step_y, max_y, min_x, tile_dim = load_tile_ref(zone_number, var, tileset)
     i = 1 + np.floor((max_y - y) / step_y)
     j = 1 + np.floor((x - min_x) / step_x)
@@ -474,7 +474,7 @@ def save_isochrones(results, filename, format='geojson'):
     if format == 'shp':
         schema = {
             'geometry': 'MultiLineString',
-            'properties': {'value': 'float', 'time': 'int'},
+            'properties': {'value': 'float', TIME_TAG: 'int'},
         }
         # Write a new Shapefile
         with fiona.open(filename, 'w', 'ESRI Shapefile', schema) as c:
@@ -485,7 +485,7 @@ def save_isochrones(results, filename, format='geojson'):
                             'geometry': mapping(results[t][p]),
                             'properties': {
                                 'value': p,
-                                'time': t
+                                TIME_TAG: t
                             },
                         })
 
@@ -501,7 +501,7 @@ def save_isochrones(results, filename, format='geojson'):
                         'geometry': mapping(results[t][p]),
                         'properties': {
                             'value': p,
-                            'time': t
+                            TIME_TAG: t
                         },
                     })
         with open(filename, "w") as f:
@@ -510,7 +510,7 @@ def save_isochrones(results, filename, format='geojson'):
 
 if __name__ == '__main__':
     grid_dim = 1000
-    tileset = 'default'
+    tileset = DEFAULT_TAG
     s1 = [
         "LINE:[44.3204247306364 44.320317268240956 ];[8.44812858849764 8.449995405972006 ]",
         "POLYGON:[44.32214410219511 44.320869929892176 44.32083922660368 44.32214410219511 ];[8.454050906002523 8.453171141445639 8.45463026314974 8.454050906002523 ]",
