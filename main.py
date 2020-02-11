@@ -53,14 +53,15 @@ def main():
     w_dir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
     w_speed = float(d.get('w_speed', 0))
     moisture_100 = int(d.get('moisture', 0))
-    moisture = float(moisture_100 / 100)
-
+    fighting_actions = d['fighting_action']
+            
     time_resolution = float(d.get('time_resolution', 60))
 
     boundary_conditions = d.get('boundary_conditions', [{
         "w_dir": w_dir,
         "w_speed": w_speed,
         "moisture": moisture_100,
+        "fighting_action": fighting_actions,  #fighting_action_string = '\n'.join(fighting_actions)
         "time": 0
     }])
 
@@ -72,6 +73,7 @@ def main():
                 "w_dir": 0.0,
                 "w_speed": 0.0,
                 "moisture":0,
+                "fighting_actions": None,
                 "time": 0
             }
         )

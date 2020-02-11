@@ -203,10 +203,20 @@ class Propagator:
         self.veg = None
         self.dem = None
         self.boundary_conditions = self.settings.boundary_conditions
+        #self.__preprocess_bc(self.settings.boundary_conditions)
+        
         self.p_time = settings.p_time_fn
         # make it configurable
         self.dst_crs = crs.CRS({'init': 'EPSG:4326', 'no_defs': True})
 
+    '''
+    def __preprocess_bc(self, boundary_conditions):
+        for bc in boundary_conditions:
+            if 'fighting_action' in bc:
+                fighting_ignition_string = bc['fighting_action']
+                bc['fighting_action_raster'] = self.fighting_actions_rasterized(fighting_ignition_string)
+        self.boundary_conditions = boundary_conditions
+    '''
     def __init_crs_from_bounds(self, west:float, south:float, east:float, north:float, 
                             cols:int, rows:int, 
                             step_x:float, step_y:float,
@@ -222,7 +232,7 @@ class Propagator:
         west, south, east, north = self.__bounds
         
         img, active_ignitions = \
-            rasterize_ignitions((self.__shape[0], self.__shape[1]),
+            rasterize_actions((self.__shape[0], self.__shape[1]), 
                             points, lines, polys, west, north, self.step_x, self.step_y, zone_number)
         self.__init_simulation(self.settings.n_threads, img, active_ignitions)
 
@@ -354,7 +364,7 @@ class Propagator:
         save_isochrones(isochrones, isochrone_path, format='geojson')
 
 
-    def __apply_updates(self, updates, w_speed, w_dir, moisture):
+    def __apply_updates(self, updates, w_speed, w_dir, moisture, fighting_points):
         # coordinates of the next updates
         u = np.vstack(updates)
         veg_type = self.veg[u[:, 0], u[:, 1]]
@@ -381,6 +391,17 @@ class Propagator:
         w_speed_r = (w_speed * (1.2 - 0.4 * rand(from_num))).repeat(nb_num)
         moisture_r = (moisture * (1.2 - 0.4 * rand(from_num))).repeat(nb_num)
         
+        #inserisco le fighting actions
+        '''
+        for i in fighting_points:
+            if moisture_r[i]==True:
+                moisture_r[fighting_points] = 1    
+        '''
+        '''
+        for i in fighting_points:
+            if i in moisture_r:
+                moisture_r[fighting_points] = 1  
+        '''        
         dem_from = self.dem[r, c].repeat(nb_num)
         veg_from = self.veg[r, c].repeat(nb_num)
         veg_to = self.veg[nr, nc]
@@ -438,10 +459,23 @@ class Propagator:
         return new_updates
 
     def load_ignitions_from_string(self, ignition_string):
-        mid_lat, mid_lon, polys, lines, points = read_ignition(ignition_string)
+        mid_lat, mid_lon, polys, lines, points = read_actions(ignition_string)
         easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
         return easting, northing, zone_number, zone_letter, polys, lines, points
+    
+
+    def fighting_actions_rasterized(self, fighting_actions):
+        west, south, east, north = self.__bounds
+        fighting_action_string = '\n'.join(fighting_actions)
+        mid_lat, mid_lon, polys, lines, points = read_actions(fighting_action_string)
+        easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
+
+        img, fighting_points = \
+        rasterize_actions((self.__shape[0], self.__shape[1]), 
+                        points, lines, polys, west, north, self.step_x, self.step_y, zone_number)
         
+        return fighting_points
+    
 
     def run(self):
         isochrones = {}
@@ -459,7 +493,10 @@ class Propagator:
             moisture_100 = float(bc.get('moisture', 0))
             moisture = float(moisture_100 / 100)
 
-            new_updates = self.__apply_updates(updates, wspeed, wdir, moisture)
+            fighting_actions = bc.get('fighting_action')
+            fighting_points = self.fighting_actions_rasterized(fighting_actions)
+
+            new_updates = self.__apply_updates(updates, wspeed, wdir, moisture, fighting_points)
             self.ps.push_all(new_updates)
             
 
