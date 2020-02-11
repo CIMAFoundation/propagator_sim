@@ -210,10 +210,12 @@ class Propagator:
         self.dst_crs = crs.CRS({'init': 'EPSG:4326', 'no_defs': True})
 
     def __preprocess_bc(self, boundary_conditions):
+        n_bc = -1
         for bc in boundary_conditions:
+            n_bc +=1
             if 'fighting_action' in bc:
                 fighting_ignition_string = bc['fighting_action']
-                bc['moist_mask'] , bc['fighting_action_raster'] = self.fighting_actions_rasterized(fighting_ignition_string)
+                bc['moist_mask'] , bc['fighting_action_raster'] = self.fighting_actions_rasterized(fighting_ignition_string, n_bc)
         self.boundary_conditions = boundary_conditions
     
     def __init_crs_from_bounds(self, west:float, south:float, east:float, north:float, 
@@ -344,8 +346,10 @@ class Propagator:
         last_bc = None
         for bc in self.boundary_conditions:
             if self.c_time >= bc['time']:
+                #n_bc = -1
                 last_bc = bc
-        return last_bc
+                #n_bc +=1
+        return last_bc #, n_bc
 
     def __init_simulation(self, n_threads, initial_ignitions, active_ignitions):
         self.f_global = np.zeros(self.__shape + (n_threads,))
@@ -457,20 +461,22 @@ class Propagator:
         return easting, northing, zone_number, zone_letter, polys, lines, points
     
 
-    def fighting_actions_rasterized(self, fighting_actions):
+    def fighting_actions_rasterized(self, fighting_actions, n_bc):
         west, south, east, north = self.__bounds
         fighting_action_string = '\n'.join(fighting_actions)
         mid_lat, mid_lon, polys, lines, points = read_actions(fighting_action_string)
         easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
 
         activity = 'fighting'
-        moisture = self.boundary_conditions[0].get('moisture') #da risolvere il fatto che adesso uso solo la moisture iniziale
+        moisture = self.boundary_conditions[n_bc].get('moisture') #da risolvere il fatto che adesso uso solo la moisture iniziale
 
         img, fighting_points = \
         rasterize_actions((self.__shape[0], self.__shape[1]), 
                         points, lines, polys, west, north, self.step_x, self.step_y, zone_number, activity, moisture)
         
-        #img = ndimage.binary_dilation(img_mask)
+        mask = (img==1)
+        img_mask = ndimage.binary_dilation(mask)
+        img[img_mask]=1
 
         return img, fighting_points
     
@@ -484,6 +490,7 @@ class Propagator:
                 break
 
             self.c_time, updates = self.ps.pop()
+            #bc, n_bc = self.__find_bc()
             bc = self.__find_bc()
             w_dir_deg = float(bc.get('w_dir', 0))
             wdir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
