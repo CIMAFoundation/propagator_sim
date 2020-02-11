@@ -254,9 +254,8 @@ def add_poly(img, cs, rs, val):
     img[img_temp > 0] = val
     return contour
 
-
-def read_ignition(ignition_string):
-    strings = ignition_string.split('\n')
+def read_actions(imp_points_string):
+    strings = imp_points_string.split('\n')
 
     polys, lines, points = [], [], []
     max_lat, max_lon, min_lat, min_lon = -np.Inf, -np.Inf, np.Inf, np.Inf
@@ -291,10 +290,9 @@ def read_ignition(ignition_string):
     mid_lat = (max_lat + min_lat) / 2
     mid_lon = (max_lon + min_lon) / 2
 
-    return mid_lat, mid_lon, polys, lines, points
+    return mid_lat, mid_lon, polys, lines, points 
 
-
-def rasterize_ignitions(dim, points, lines, polys, lonmin, latmax, stepx, stepy, zone_number):
+def rasterize_actions(dim, points, lines, polys, lonmin, latmax, stepx, stepy, zone_number):
     img = np.zeros(dim)
     active_points = []
     for line in lines:
@@ -321,7 +319,7 @@ def rasterize_ignitions(dim, points, lines, polys, lonmin, latmax, stepx, stepy,
         y = np.floor((latmax - np.array(ys)) / stepy).astype('int')
         active = add_poly(img, x, y, 1)
         active_points.extend(active)
-    return img, active_points
+    return img, active_points   
 
 def trim_values(values, src_trans):
     rows, cols = values.shape
@@ -515,7 +513,7 @@ if __name__ == '__main__':
         "POLYGON:[44.32214410219511 44.320869929892176 44.32083922660368 44.32214410219511 ];[8.454050906002523 8.453171141445639 8.45463026314974 8.454050906002523 ]",
         "POINT:44.32372526549074;8.45040310174227"]
     ignition_string = '\n'.join(s1)
-    mid_lat, mid_lon, polys, lines, points = read_ignition(ignition_string)
+    mid_lat, mid_lon, polys, lines, points = read_actions(ignition_string)
     easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
     src, west, north, step_x, step_y = load_tiles(zone_number, easting, northing, grid_dim, 'prop', tileset)
 
