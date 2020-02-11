@@ -292,8 +292,16 @@ def read_actions(imp_points_string):
 
     return mid_lat, mid_lon, polys, lines, points 
 
-def rasterize_actions(dim, points, lines, polys, lonmin, latmax, stepx, stepy, zone_number):
-    img = np.zeros(dim)
+def image(dim, moist, activity):
+    if activity == 'ignition':
+        img = np.zeros(dim)
+    else:
+        moisture = float(moist/100)
+        img = np.ones(dim)*moisture
+    return img
+
+def rasterize_actions(dim, points, lines, polys, lonmin, latmax, stepx, stepy, zone_number, activity, moist):
+    img = image(dim, moist, activity)
     active_points = []
     for line in lines:
         xs, ys, _, _ = zip(*[

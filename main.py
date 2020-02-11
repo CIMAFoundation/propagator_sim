@@ -12,6 +12,9 @@ from datetime import datetime
 
 import numpy as np
 
+from scipy import ndimage
+
+
 import propagator.logging_config
 from propagator.args_parser import parse_params
 from propagator.propagator import NoTilesError, Propagator, PropagatorSettings

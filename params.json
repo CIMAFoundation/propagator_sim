@@ -5,8 +5,8 @@
   "boundary_conditions":[
     {
       "w_dir":180,
-      "w_speed":"60",
-      "moisture":40,
+      "w_speed":"40",
+      "moisture":20,
       "fighting_action":["LINE:[40.4380 40.4380 ];[8.77 8.78 ]"],
       "tooltip_timer":{},
       "tooltip":false,
@@ -14,9 +14,9 @@
     },
     {
       "w_dir":270,
-      "w_speed":"60",
+      "w_speed":"50",
       "moisture":5,
-      "fighting_action":["LINE:[40.4380 40.4380 ];[8.77 8.78 ]"],
+      "fighting_action":["LINE:[40.425 40.435 ];[8.785 8.785 ]"],
       "tooltip_timer":{},
       "tooltip":false,
       "time":180
