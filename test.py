@@ -11,7 +11,7 @@ if __name__ == '__main__':
     wspeed = 90
     grid_dim = np.floor(grid_dim_km / 20 * 1000)
     grid_dim = int(max(min(np.floor(grid_dim), 1500), 300))
-    tileset = 'default'
+    tileset = DEFAULT_TAG
     init_date = datetime(2016, 1, 1, 0, 0)
     s1 = [
         #"LINE:[44.3204247306364 44.320317268240956 ];[8.44812858849764 8.449995405972006 ]",
