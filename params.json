@@ -6,23 +6,33 @@
     {
       "w_dir":180,
       "w_speed":"60",
-      "moisture":5,
+      "moisture":40,
+      "fighting_action":["LINE:[40.4380 40.4380 ];[8.77 8.78 ]"],
       "tooltip_timer":{},
       "tooltip":false,
       "time":0
     },
     {
-      "w_dir":180,
+      "w_dir":270,
       "w_speed":"60",
-      "moisture":70,
+      "moisture":5,
+      "fighting_action":["LINE:[40.4380 40.4380 ];[8.77 8.78 ]"],
       "tooltip_timer":{},
       "tooltip":false,
       "time":180
+    },
+    {
+      "w_dir":180,
+      "w_speed":"60",
+      "moisture":60,
+      "fighting_action":["LINE:[40.4380 40.4380 ];[8.77 8.78 ]"],
+      "tooltip_timer":{},
+      "tooltip":false,
+      "time":540
     }
+    
   ],
-  "ignitions":[
-    "POINT:40.43248942171313;8.771506459283538"
-  ],
+  "ignitions":["POINT:40.43248942171313;8.771506459283538"],
   "isochrone_thresholds": [0.01, 0.5, 0.75, 0.9],
   "w_dir":0,
   "time_resolution":60,
@@ -31,6 +41,7 @@
   "init_date":"202001300000",
   "w_speed":0,
   "n_threads":100,
+  "fighting_action":0,
   "moisture":0,
   "ros_model":"wang"
 }
