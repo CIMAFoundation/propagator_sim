@@ -56,7 +56,7 @@ def main():
     w_dir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
     w_speed = float(d.get('w_speed', 0))
     moisture_100 = int(d.get('moisture', 0))
-    fighting_actions = d['fighting_action']
+    fighting_actions = d.get('fighting_action', None)
             
     time_resolution = float(d.get('time_resolution', 60))
 
