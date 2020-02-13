@@ -58,7 +58,10 @@ def main():
     w_dir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
     w_speed = float(d.get(W_SPEED_TAG, 0))
     moisture_100 = int(d.get(MOISTURE_TAG, 0))
-    fighting_actions = d.get(FIGHTING_ACTION_TAG, None)
+    fighting_actions_fix = d.get(FIGHTING_ACTION_TAG, None)
+    if fighting_actions_fix == 0:
+        fighting_actions_fix = None
+    fighting_actions = None
             
     time_resolution = float(d.get(TIME_RESOLUTION_TAG, 60))
 
@@ -66,9 +69,20 @@ def main():
         "w_dir": w_dir,
         "w_speed": w_speed,
         "moisture": moisture_100,
-        "fighting_action": fighting_actions,  #fighting_action_string = '\n'.join(fighting_actions)
+        "fighting_action": fighting_actions,
         "time": 0
     }])
+
+    for i in np.arange(0 , len(boundary_conditions) , 1):
+        if boundary_conditions[i][FIGHTING_ACTION_TAG] == 0:
+            boundary_conditions[i][FIGHTING_ACTION_TAG] = None
+
+    if  fighting_actions_fix is not None and fighting_actions != 0:
+        for i in np.arange(0 , len(boundary_conditions) , 1):
+            if boundary_conditions[i][FIGHTING_ACTION_TAG] is not None:
+                boundary_conditions[i][FIGHTING_ACTION_TAG] = boundary_conditions[i][FIGHTING_ACTION_TAG] +  fighting_actions_fix
+            else:
+                boundary_conditions[i][FIGHTING_ACTION_TAG] = fighting_actions_fix
 
     boundary_conditions = sorted(boundary_conditions, key=lambda k: k[TIME_TAG])
     if boundary_conditions[0][TIME_TAG] > 0:

@@ -17,6 +17,8 @@ from shapely.geometry import mapping
 from shapely.geometry import shape, MultiLineString, LineString
 from sortedcontainers import SortedDict
 
+from .constants import *
+
 DATA_DIR = 'data'
 
 
