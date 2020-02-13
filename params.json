@@ -20,15 +20,6 @@
       "tooltip_timer":{},
       "tooltip":false,
       "time":180
-    },
-    {
-      "w_dir":180,
-      "w_speed":"60",
-      "moisture":60,
-      "fighting_action":["LINE:[40.4380 40.4380 ];[8.77 8.78 ]"],
-      "tooltip_timer":{},
-      "tooltip":false,
-      "time":540
     }
     
   ],
@@ -41,7 +32,7 @@
   "init_date":"202001300000",
   "w_speed":0,
   "n_threads":100,
-  "fighting_action":0,
+  "fighting_action":["LINE:[40.4390 40.4390 ];[8.775 8.785 ]"],
   "moisture":0,
   "ros_model":"wang"
 }
