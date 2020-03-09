@@ -8,8 +8,7 @@
       "w_speed":"40",
       "moisture":20,
       "fighting_action":["LINE:[40.4380 40.4380 ];[8.77 8.78 ]"],
-      "tooltip_timer":{},
-      "tooltip":false,
+      "ignitions": ["POINT:40.44;8.77"],
       "time":0
     },
     {
@@ -17,8 +16,7 @@
       "w_speed":"50",
       "moisture":5,
       "fighting_action":["LINE:[40.425 40.435 ];[8.785 8.785 ]"],
-      "tooltip_timer":{},
-      "tooltip":false,
+      "ignitions": 0,
       "time":180
     }
     

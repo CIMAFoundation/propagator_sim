@@ -64,6 +64,7 @@ PROB_FILE_TAG = 'prob_file'
 V0_TABLE_TAG = 'v0_file'
 IGNITIONS_TAG = 'ignitions'
 GRID_DIM_KM_TAG = 'grid_dim_km'
+IGNITIONS_RASTER_TAG = 'ignitions_raster'
 
 ROS_MODEL_TAG = 'ros_model'
 DEFAULT_TAG = 'default'
