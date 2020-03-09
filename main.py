@@ -62,6 +62,13 @@ def main():
     if fighting_actions_fix == 0:
         fighting_actions_fix = None
     fighting_actions = None
+
+    if IGNITIONS_TAG not in d:
+        logging.critical('Error. Missing ignitions in parameter file')
+        raise Exception('Error. Missing ignitions in parameter file')
+    
+    ignitions = d[IGNITIONS_TAG]
+    ignition_string_begin = '\n'.join(ignitions)
             
     time_resolution = float(d.get(TIME_RESOLUTION_TAG, 60))
 
@@ -70,19 +77,30 @@ def main():
         "w_speed": w_speed,
         "moisture": moisture_100,
         "fighting_action": fighting_actions,
+        "ignitions": ignitions,
         "time": 0
     }])
 
-    for i in np.arange(0 , len(boundary_conditions) , 1):
+    for i in range(len(boundary_conditions)):
         if boundary_conditions[i][FIGHTING_ACTION_TAG] == 0:
             boundary_conditions[i][FIGHTING_ACTION_TAG] = None
+        if boundary_conditions[i][IGNITIONS_TAG] == 0:
+            boundary_conditions[i][IGNITIONS_TAG] = None
 
     if  fighting_actions_fix is not None and fighting_actions != 0:
-        for i in np.arange(0 , len(boundary_conditions) , 1):
-            if boundary_conditions[i][FIGHTING_ACTION_TAG] is not None:
-                boundary_conditions[i][FIGHTING_ACTION_TAG] = boundary_conditions[i][FIGHTING_ACTION_TAG] +  fighting_actions_fix
+        for l in range(len(boundary_conditions)):
+            if boundary_conditions[l][FIGHTING_ACTION_TAG] is not None:
+                boundary_conditions[l][FIGHTING_ACTION_TAG] = boundary_conditions[l][FIGHTING_ACTION_TAG] +  fighting_actions_fix
             else:
-                boundary_conditions[i][FIGHTING_ACTION_TAG] = fighting_actions_fix
+                boundary_conditions[l][FIGHTING_ACTION_TAG] = fighting_actions_fix
+
+    for b in range(len(boundary_conditions)):
+        if boundary_conditions[b][IGNITIONS_TAG] == None:
+            pass
+        else:
+            for ign in range(len(d[BOUNDARY_CONDITIONS_TAG][b][IGNITIONS_TAG])):
+                new_ignitions = d[BOUNDARY_CONDITIONS_TAG][b][IGNITIONS_TAG]
+                ignitions.append(new_ignitions[ign])
 
     boundary_conditions = sorted(boundary_conditions, key=lambda k: k[TIME_TAG])
     if boundary_conditions[0][TIME_TAG] > 0:
@@ -93,16 +111,11 @@ def main():
                 "w_speed": 0.0,
                 "moisture":0,
                 "fighting_actions": None,
+                "ignitions": None,
                 "time": 0
             }
         )
 
-
-    if IGNITIONS_TAG not in d:
-        logging.critical('Error. Missing ignitions in parameter file')
-        raise Exception('Error. Missing ignitions in parameter file')
-    
-    ignitions = d[IGNITIONS_TAG]
     ignition_string = '\n'.join(ignitions)
 
     date_str = d.get(INIT_DATE_TAG)
@@ -141,6 +154,8 @@ def main():
 
     sim = Propagator(settings)
     easting, northing, zone_number, zone_letter, polys, lines, points = sim.load_ignitions_from_string(ignition_string)
+    easting_ign, northing_ign, zone_number_ign, zone_letter_ign, polys_ign, lines_ign, points_ign = sim.load_ignitions_from_string(ignition_string_begin)
+    
     if args.veg_file is None and args.dem_file is None:
         sim.load_data_from_tiles(easting, northing, zone_number)
     else:
@@ -149,7 +164,7 @@ def main():
        
         sim.load_data_from_files(args.veg_file, args.dem_file)
 
-    sim.init_ignitions(polys, lines, points, zone_number)
+    sim.init_ignitions(polys_ign, lines_ign, points_ign, zone_number_ign)
     sim.run()
     logging.info('completed')
 

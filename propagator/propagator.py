@@ -213,6 +213,7 @@ class Propagator:
     def __preprocess_bc(self, boundary_conditions):
         for bc in boundary_conditions:
             self.__rasterize_moisture(bc)
+            self.__rasterize_newignitions(bc)
 
     
     def __init_crs_from_bounds(self, west:float, south:float, east:float, north:float, 
@@ -353,6 +354,12 @@ class Propagator:
                 self.ps.push(array([p[0], p[1], t]), 0)
                 self.f_global[p[0], p[1], t] = 0
 
+    '''def __update_simulation(self, n_threads, new_ignitions):
+        for t in self.ps.list[0]:
+            for n in new_ignitions:
+                self.ps.push(array([n[0], n[1], t]), 0)
+                self.f_global[n[0], n[1], t] = 0'''
+
     def __update_isochrones(self, isochrones, values, dst_trans):
         isochrones[self.c_time] = extract_isochrone(
                 values, dst_trans,
@@ -470,11 +477,28 @@ class Propagator:
             
             mask = (img==1)
             img_mask = ndimage.binary_dilation(mask)
-            img[img_mask] = 1
+            img[img_mask] = 1  #mettere a 0.9 per le fighting actions con le water line
         else:
             img = np.ones((self.__shape[0], self.__shape[1])) * moisture_value
         
         bc[MOIST_RASTER_TAG] = img
+
+
+
+    def __rasterize_newignitions(self, bc):
+            west, south, east, north = self.__bounds
+            new_ignitions = bc.get(IGNITIONS_TAG, None)
+            
+            if new_ignitions:
+                new_ignitions_string = '\n'.join(new_ignitions)
+                mid_lat, mid_lon, polys, lines, points = read_actions(new_ignitions_string)
+                easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
+
+                img, new_ignitions = \
+                    rasterize_actions((self.__shape[0], self.__shape[1]), 
+                                points, lines, polys, west, north, self.step_x, self.step_y, zone_number)
+
+            bc[IGNITIONS_RASTER_TAG] = new_ignitions
 
     def run(self):
         isochrones = {}
@@ -484,7 +508,6 @@ class Propagator:
             if self.settings.time_limit and self.c_time > self.settings.time_limit:
                 break
 
-            self.c_time, updates = self.ps.pop()
             bc = self.__find_bc()
             w_dir_deg = float(bc.get(W_DIR_TAG, 0))
             wdir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
@@ -492,6 +515,12 @@ class Propagator:
             
             moisture = bc.get(MOIST_RASTER_TAG, None)
 
+            newignitions = bc.get(IGNITIONS_RASTER_TAG, None)
+
+            #self.__update_simulation(self.settings.n_threads, newignitions)
+
+            self.c_time, updates = self.ps.pop()
+            
             new_updates = self.__apply_updates(updates, wspeed, wdir, moisture)
             self.ps.push_all(new_updates)
             
