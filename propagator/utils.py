@@ -62,7 +62,6 @@ class Scheduler:
         get all the threads that have a scheduled update
         :return:
         """
-        import pdb; pdb.set_trace() # BREAKPOINT
         active_t = np.unique([e for k in self.list.keys() for c in self.list[k] for e in c[:, 2]])
         return active_t
 

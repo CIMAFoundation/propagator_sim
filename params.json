@@ -7,18 +7,23 @@
       "w_dir":180,
       "w_speed":"40",
       "moisture":20,
-      "fighting_action":0,
-      "ignitions": 0,
       "time":0
     },
     {
       "w_dir":270,
       "w_speed":"50",
       "moisture":5,
-      "fighting_action":0,
       "ignitions": ["POINT:40.44;8.77"],
       "time":180
+    },
+    {
+      "w_dir":270,
+      "w_speed":"50",
+      "moisture":5,
+      "ignitions": ["LINE:[40.435 40.445];[8.77 8.77]"],
+      "time":270
     }
+
     
   ],
   "ignitions":["POINT:40.43248942171313;8.771506459283538"],
