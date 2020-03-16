@@ -7,16 +7,16 @@
       "w_dir":180,
       "w_speed":"40",
       "moisture":20,
-      "fighting_action":["LINE:[40.4380 40.4380 ];[8.77 8.78 ]"],
-      "ignitions": ["POINT:40.44;8.77"],
+      "fighting_action":0,
+      "ignitions": 0,
       "time":0
     },
     {
       "w_dir":270,
       "w_speed":"50",
       "moisture":5,
-      "fighting_action":["LINE:[40.425 40.435 ];[8.785 8.785 ]"],
-      "ignitions": 0,
+      "fighting_action":0,
+      "ignitions": ["POINT:40.44;8.77"],
       "time":180
     }
     
@@ -30,7 +30,7 @@
   "init_date":"202001300000",
   "w_speed":0,
   "n_threads":100,
-  "fighting_action":["LINE:[40.4390 40.4390 ];[8.775 8.785 ]"],
+  "fighting_action":0,
   "moisture":0,
   "ros_model":"wang"
 }
