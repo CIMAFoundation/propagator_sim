@@ -80,27 +80,18 @@ def main():
         "ignitions": ignitions,
         "time": 0
     }])
-
-    for i in range(len(boundary_conditions)):
-        if boundary_conditions[i][FIGHTING_ACTION_TAG] == 0:
-            boundary_conditions[i][FIGHTING_ACTION_TAG] = None
-        if boundary_conditions[i][IGNITIONS_TAG] == 0:
-            boundary_conditions[i][IGNITIONS_TAG] = None
-
-    if  fighting_actions_fix is not None and fighting_actions != 0:
-        for l in range(len(boundary_conditions)):
-            if boundary_conditions[l][FIGHTING_ACTION_TAG] is not None:
-                boundary_conditions[l][FIGHTING_ACTION_TAG] = boundary_conditions[l][FIGHTING_ACTION_TAG] +  fighting_actions_fix
+  
+    for bc in boundary_conditions:
+        if  fighting_actions_fix is not None:
+            if bc[FIGHTING_ACTION_TAG] is not None:
+                bc[FIGHTING_ACTION_TAG] = bc[FIGHTING_ACTION_TAG] +  fighting_actions_fix
             else:
-                boundary_conditions[l][FIGHTING_ACTION_TAG] = fighting_actions_fix
+                bc[FIGHTING_ACTION_TAG] = fighting_actions_fix
 
-    for b in range(len(boundary_conditions)):
-        if boundary_conditions[b][IGNITIONS_TAG] == None:
-            pass
-        else:
-            for ign in range(len(d[BOUNDARY_CONDITIONS_TAG][b][IGNITIONS_TAG])):
-                new_ignitions = d[BOUNDARY_CONDITIONS_TAG][b][IGNITIONS_TAG]
-                ignitions.append(new_ignitions[ign])
+        if IGNITIONS_TAG in bc:
+            ignitions_bc = bc[IGNITIONS_TAG]
+            for ign in ignitions_bc:
+                ignitions.append(ign)
 
     boundary_conditions = sorted(boundary_conditions, key=lambda k: k[TIME_TAG])
     if boundary_conditions[0][TIME_TAG] > 0:

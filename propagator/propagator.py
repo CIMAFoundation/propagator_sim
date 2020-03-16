@@ -356,12 +356,13 @@ class Propagator:
             
             # add ignitions in future boundary conditions
             for conditions in self.boundary_conditions:
-                ignition_bc = conditions[IGNITIONS_RASTER_TAG]
-                time_bc = conditions[TIME_TAG]
-                if ignition_bc is not None:
-                    # print('adding bc', array([ ignition_bc[0][0], ignition_bc[0][1], t]), time_bc )
-                    self.ps.push(array([ ignition_bc[0][0], ignition_bc[0][1], t]), time_bc)
-                    # self.f_global[ ignition_bc[0][0], ignition_bc[0][1], t] = 0
+                if IGNITIONS_RASTER_TAG in conditions:
+                    ignition_bc = conditions[IGNITIONS_RASTER_TAG]
+                    time_bc = conditions[TIME_TAG]
+                    if ignition_bc is not None: 
+                        for ign in ignition_bc:
+                            self.ps.push(array([[ ign[0], ign[1], t]]), time_bc)
+                        
 
 
     def __update_isochrones(self, isochrones, values, dst_trans):
@@ -498,11 +499,12 @@ class Propagator:
                 mid_lat, mid_lon, polys, lines, points = read_actions(new_ignitions_string)
                 easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
 
-                img, new_ignitions = \
+                img, ignition_pixels = \
                     rasterize_actions((self.__shape[0], self.__shape[1]), 
                                 points, lines, polys, west, north, self.step_x, self.step_y, zone_number)
 
-            bc[IGNITIONS_RASTER_TAG] = new_ignitions
+                bc[IGNITIONS_RASTER_TAG] = ignition_pixels
+            
 
     def run(self):
         isochrones = {}
