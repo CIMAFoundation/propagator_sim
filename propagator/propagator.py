@@ -233,9 +233,9 @@ class Propagator:
         img, active_ignitions = \
             rasterize_actions((self.__shape[0], self.__shape[1]), 
                             points, lines, polys, west, north, self.step_x, self.step_y, zone_number)
-        self.__init_simulation(self.settings.n_threads, img, active_ignitions)
         self.__preprocess_bc(self.settings.boundary_conditions)
-
+        self.__init_simulation(self.settings.n_threads, img, active_ignitions)
+        
     def __compute_values(self):
         values = np.nanmean(self.f_global, 2)
         return values
@@ -353,12 +353,16 @@ class Propagator:
             for p in active_ignitions:
                 self.ps.push(array([p[0], p[1], t]), 0)
                 self.f_global[p[0], p[1], t] = 0
+            
+            # add ignitions in future boundary conditions
+            for conditions in self.boundary_conditions:
+                ignition_bc = conditions[IGNITIONS_RASTER_TAG]
+                time_bc = conditions[TIME_TAG]
+                if ignition_bc is not None:
+                    # print('adding bc', array([ ignition_bc[0][0], ignition_bc[0][1], t]), time_bc )
+                    self.ps.push(array([ ignition_bc[0][0], ignition_bc[0][1], t]), time_bc)
+                    # self.f_global[ ignition_bc[0][0], ignition_bc[0][1], t] = 0
 
-    '''def __update_simulation(self, n_threads, new_ignitions):
-        for t in self.ps.list[0]:
-            for n in new_ignitions:
-                self.ps.push(array([n[0], n[1], t]), 0)
-                self.f_global[n[0], n[1], t] = 0'''
 
     def __update_isochrones(self, isochrones, values, dst_trans):
         isochrones[self.c_time] = extract_isochrone(
