@@ -88,16 +88,22 @@ def main():
   
     for bc in boundary_conditions:
         if  waterline_actions_fixed is not None:
-            if bc[WATERLINE_ACTION_TAG] is not None:
-                bc[WATERLINE_ACTION_TAG] = bc[WATERLINE_ACTION_TAG] +  waterline_actions_fixed
+            if WATERLINE_ACTION_TAG in bc:
+                if bc[WATERLINE_ACTION_TAG] is not None:
+                    bc[WATERLINE_ACTION_TAG] = bc[WATERLINE_ACTION_TAG] +  waterline_actions_fixed
+                else:
+                    bc[WATERLINE_ACTION_TAG] = waterline_actions_fixed
             else:
-                bc[WATERLINE_ACTION_TAG] = waterline_actions_fixed
+                    bc[WATERLINE_ACTION_TAG] = waterline_actions_fixed
 
         if  heavy_actions_fixed is not None:
-            if bc[HEAVY_ACTION_TAG] is not None:
-                bc[HEAVY_ACTION_TAG] = bc[HEAVY_ACTION_TAG] +  heavy_actions_fixed
+            if HEAVY_ACTION_TAG in bc:
+                if bc[HEAVY_ACTION_TAG] is not None:
+                    bc[HEAVY_ACTION_TAG] = bc[HEAVY_ACTION_TAG] +  heavy_actions_fixed
+                else:
+                    bc[HEAVY_ACTION_TAG] = heavy_actions_fixed
             else:
-                bc[HEAVY_ACTION_TAG] = heavy_actions_fixed
+                    bc[HEAVY_ACTION_TAG] = heavy_actions_fixed
 
         if IGNITIONS_TAG in bc:
             ignitions_bc = bc[IGNITIONS_TAG]
@@ -113,7 +119,7 @@ def main():
                 "w_speed": 0.0,
                 "moisture":0,
                 "waterline_actions": None,
-                "heavy_actions": None,
+                "heavy_action": None,
                 "ignitions": None,
                 "time": 0
             }
