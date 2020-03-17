@@ -58,10 +58,14 @@ def main():
     w_dir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
     w_speed = float(d.get(W_SPEED_TAG, 0))
     moisture_100 = int(d.get(MOISTURE_TAG, 0))
-    fighting_actions_fix = d.get(FIGHTING_ACTION_TAG, None)
-    if fighting_actions_fix == 0:
-        fighting_actions_fix = None
-    fighting_actions = None
+    waterline_actions_fixed = d.get(WATERLINE_ACTION_TAG, None) #waterline actions means fire fighting actions made by the use of water
+    if waterline_actions_fixed == 0:
+        waterline_actions_fixed = None
+    waterline_actions = None
+    heavy_actions_fixed = d.get(HEAVY_ACTION_TAG, None) #heavy actions means fire fighting operations that act on the vegetation (use of earth-moving machines or firebreaks in general)
+    if heavy_actions_fixed == 0:
+        heavy_actions_fixed = None
+    heavy_actions = None
 
     if IGNITIONS_TAG not in d:
         logging.critical('Error. Missing ignitions in parameter file')
@@ -76,17 +80,24 @@ def main():
         "w_dir": w_dir,
         "w_speed": w_speed,
         "moisture": moisture_100,
-        "fighting_action": fighting_actions,
+        "waterline_action": waterline_actions,
+        "heavy_action": heavy_actions,
         "ignitions": ignitions,
         "time": 0
     }])
   
     for bc in boundary_conditions:
-        if  fighting_actions_fix is not None:
-            if bc[FIGHTING_ACTION_TAG] is not None:
-                bc[FIGHTING_ACTION_TAG] = bc[FIGHTING_ACTION_TAG] +  fighting_actions_fix
+        if  waterline_actions_fixed is not None:
+            if bc[WATERLINE_ACTION_TAG] is not None:
+                bc[WATERLINE_ACTION_TAG] = bc[WATERLINE_ACTION_TAG] +  waterline_actions_fixed
             else:
-                bc[FIGHTING_ACTION_TAG] = fighting_actions_fix
+                bc[WATERLINE_ACTION_TAG] = waterline_actions_fixed
+
+        if  heavy_actions_fixed is not None:
+            if bc[HEAVY_ACTION_TAG] is not None:
+                bc[HEAVY_ACTION_TAG] = bc[HEAVY_ACTION_TAG] +  heavy_actions_fixed
+            else:
+                bc[HEAVY_ACTION_TAG] = heavy_actions_fixed
 
         if IGNITIONS_TAG in bc:
             ignitions_bc = bc[IGNITIONS_TAG]
@@ -101,7 +112,8 @@ def main():
                 "w_dir": 0.0,
                 "w_speed": 0.0,
                 "moisture":0,
-                "fighting_actions": None,
+                "waterline_actions": None,
+                "heavy_actions": None,
                 "ignitions": None,
                 "time": 0
             }

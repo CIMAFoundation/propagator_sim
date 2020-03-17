@@ -44,7 +44,9 @@ c_moist = -0.014
 
 
 #####   TAG   ####
-FIGHTING_ACTION_TAG = 'fighting_action'
+WATERLINE_ACTION_TAG = 'waterline_action'
+HEAVY_ACTION_TAG = 'heavy_action'
+HEAVY_ACTION_RASTER_TAG = 'heavy_action_raster'
 MOISTURE_TAG = 'moisture'
 MOIST_RASTER_TAG = 'moist_raster'
 N_THREADS_TAG = 'n_threads'
