@@ -489,7 +489,7 @@ class Propagator:
             
             mask = (img==1)
             img_mask = ndimage.binary_dilation(mask)
-            img[img_mask] = 1  #mettere a 0.9 per le fighting actions con le water line
+            img[img_mask] = 0.9  #mettere a 0.9 per le fighting actions con le water line
         else:
             img = np.ones((self.__shape[0], self.__shape[1])) * moisture_value
         
