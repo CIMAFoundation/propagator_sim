@@ -212,7 +212,7 @@ class Propagator:
 
     def __preprocess_bc(self, boundary_conditions):
         for bc in boundary_conditions:
-            self.__rasterize_moisture(bc)
+            self.__rasterize_moisture_fighting_actions(bc)
             self.__rasterize_newignitions(bc)
 
     
@@ -379,6 +379,7 @@ class Propagator:
 
     def __apply_updates(self, updates, w_speed, w_dir, moisture):
         # coordinates of the next updates
+        bc = self.__find_bc()
         u = np.vstack(updates)
         veg_type = self.veg[u[:, 0], u[:, 1]]
         mask = np.logical_and(
@@ -388,6 +389,12 @@ class Propagator:
 
         r, c, t = u[mask, 0], u[mask, 1], u[mask, 2]
         self.f_global[r, c, t] = 1
+
+        #veg type modified due to the heavy fighting actions
+        heavy_acts = bc.get(HEAVY_ACTION_RASTER_TAG , None)
+        if heavy_acts:
+            for heavyy in heavy_acts:
+                self.veg[ heavyy[0] , heavyy[1] ] = 2
 
         nb_num = n_arr.shape[0]
         from_num = r.shape[0]
@@ -465,18 +472,18 @@ class Propagator:
         return easting, northing, zone_number, zone_letter, polys, lines, points
     
 
-    def __rasterize_moisture(self, bc):
+    def __rasterize_moisture_fighting_actions(self, bc):
         west, south, east, north = self.__bounds
-        fighting_actions = bc.get(FIGHTING_ACTION_TAG, None)
+        waterline_actionss = bc.get(WATERLINE_ACTION_TAG, None)
         moisture_value = bc.get(MOISTURE_TAG, 0)/100
+        heavy_actionss = bc.get(HEAVY_ACTION_TAG, None)
 
-
-        if fighting_actions:
-            fighting_action_string = '\n'.join(fighting_actions)
-            mid_lat, mid_lon, polys, lines, points = read_actions(fighting_action_string)
+        if waterline_actionss:
+            waterline_action_string = '\n'.join(waterline_actionss)
+            mid_lat, mid_lon, polys, lines, points = read_actions(waterline_action_string)
             easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
 
-            img, fighting_points = \
+            img, waterline_points = \
                 rasterize_actions((self.__shape[0], self.__shape[1]), 
                             points, lines, polys, west, north, self.step_x, self.step_y, zone_number, base_value=moisture_value)
             
@@ -488,6 +495,24 @@ class Propagator:
         
         bc[MOIST_RASTER_TAG] = img
 
+        if heavy_actionss:
+            heavy_action_string = '\n'.join(heavy_actionss)
+            mid_lat, mid_lon, polys, lines, points = read_actions(heavy_action_string)
+            easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
+
+            image, heavy_action_points = \
+                rasterize_actions((self.__shape[0], self.__shape[1]), 
+                            points, lines, polys, west, north, self.step_x, self.step_y, zone_number)
+
+            new_mask = ( image == 1 )
+            new_mask_dilated = ndimage.binary_dilation( new_mask )
+            heavy_points = np.where( new_mask_dilated == True )
+            heavy_action_points_enlarged = []
+            for i in range(len(heavy_points[0])):
+                heavies = add_point(new_mask_dilated, heavy_points[0][i], heavy_points[1][i], 1)
+                heavy_action_points_enlarged.extend(heavies)
+
+            bc[HEAVY_ACTION_RASTER_TAG] = heavy_action_points_enlarged
 
 
     def __rasterize_newignitions(self, bc):
