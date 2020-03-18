@@ -394,7 +394,7 @@ class Propagator:
         heavy_acts = bc.get(HEAVY_ACTION_RASTER_TAG , None)
         if heavy_acts:
             for heavyy in heavy_acts:
-                self.veg[ heavyy[0] , heavyy[1] ] = 2
+                self.veg[ heavyy[0] , heavyy[1] ] = 3 #da scegliere se mettere a 0 (impossibile che propaghi) 3 (non veg, quindi prova a propagare ma non riesce) o 7(faggete, quindi propaga con bassissima probabilità)
 
         nb_num = n_arr.shape[0]
         from_num = r.shape[0]
@@ -489,7 +489,7 @@ class Propagator:
             
             mask = (img==1)
             img_mask = ndimage.binary_dilation(mask)
-            img[img_mask] = 0.9  #mettere a 0.9 per le fighting actions con le water line
+            img[img_mask] = 0.8  #mettere a 0.9 per le fighting actions con le water line
         else:
             img = np.ones((self.__shape[0], self.__shape[1])) * moisture_value
         
@@ -509,7 +509,7 @@ class Propagator:
             heavy_points = np.where( new_mask_dilated == True )
             heavy_action_points_enlarged = []
             for i in range(len(heavy_points[0])):
-                heavies = add_point(new_mask_dilated, heavy_points[0][i], heavy_points[1][i], 1)
+                heavies = add_point(new_mask_dilated, heavy_points[1][i], heavy_points[0][i], 1)
                 heavy_action_points_enlarged.extend(heavies)
 
             bc[HEAVY_ACTION_RASTER_TAG] = heavy_action_points_enlarged
