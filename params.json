@@ -7,7 +7,6 @@
       "w_dir":180,
       "w_speed":"40",
       "moisture":20,
-      "heavy_action": ["LINE:[40.436 40.436];[8.76 8.78]"],
       "time":0
     },
     {
@@ -15,7 +14,6 @@
       "w_speed":"50",
       "moisture":5,
       "ignitions": ["POINT:40.44;8.77"],
-      "waterline_action": ["LINE:[40.430 40.465];[8.78 8.78]"],
       "time":180
     },
     {
@@ -23,7 +21,7 @@
       "w_speed":"50",
       "moisture":25,
       "ignitions": ["LINE:[40.435 40.445];[8.77 8.77]"],
-      "time":270
+      "time":240
     }
 
     
@@ -37,8 +35,8 @@
   "init_date":"202001300000",
   "w_speed":0,
   "n_threads":100,
-  "waterline_action":0,
-  "heavy_action":["LINE:[40.430 40.435];[8.795 8.795]" , "LINE:[40.440 40.445];[8.795 8.795]" , "LINE:[40.450 40.455];[8.795 8.795]"],
+  "heavy_action": ["LINE:[40.42336 40.450];[8.77504 8.77483]"],
+  "waterline_action": ["LINE:[40.45 40.44127];[8.75 8.78810]"],
   "moisture":0,
   "ros_model":"wang"
 }
