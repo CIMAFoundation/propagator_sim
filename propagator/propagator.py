@@ -167,6 +167,12 @@ def p_probability(dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moist, 
     return p_clip
 
 
+def fire_spotting(angle_to, w_dir, w_speed):
+    r_n = rand(w_speed.shape[0]) * 100
+    w_speed_ms = w_speed / 3.6
+    d_p = r_n * np.exp( w_speed_ms * c_2 *( np.cos( w_dir - angle_to ) - 1 ) )
+    return d_p
+
 class PropagatorError(Exception):
     pass
 
@@ -299,8 +305,8 @@ class Propagator:
                     self.dem = dem_file.read(1).astype('int16')
                     self.veg = veg_file.read(1).astype('int8')
                     
-                    self.veg[:, (0, -1)] = 0
-                    self.veg[(0, -1), :] = 0
+                    self.veg[:, (0, 1, 2, -3, -2, -1)] = 0
+                    self.veg[(0, 1, 2, -3, -2, -1), :] = 0
                     self.veg[(self.veg<0)|(self.veg>6)] = 0                    
                     
                     transform, crs, bounds, res = veg_file.transform, veg_file.crs, veg_file.bounds, veg_file.res
@@ -321,8 +327,8 @@ class Propagator:
             logging.info('Loading VEGETATION from "' + self.settings.tileset + '" tileset')
             veg, west, north, step_x, step_y = \
                 load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'prop', self.settings.tileset)
-            veg[:, (0, -1)] = 0
-            veg[(0, -1), :] = 0
+            veg[:, (0, 1, 2, -3, -2, -1)] = 0
+            veg[(0, 1, 2, -3, -2, -1), :] = 0
             self.veg = veg.astype('int8')
             
             logging.info('Loading DEM "default" tileset')
@@ -394,8 +400,8 @@ class Propagator:
         heavy_acts = bc.get(HEAVY_ACTION_RASTER_TAG , None)
         if heavy_acts:
             for heavyy in heavy_acts:
-                self.veg[ heavyy[0] , heavyy[1] ] = 3 #da scegliere se mettere a 0 (impossibile che propaghi) 3 (non veg, quindi prova a propagare ma non riesce) o 7(faggete, quindi propaga con bassissima probabilità)
-
+                self.veg[ heavyy[0] , heavyy[1] ] = 0 #da scegliere se mettere a 0 (impossibile che propaghi) 3 (non veg, quindi prova a propagare ma non riesce) o 7(faggete, quindi propaga con bassissima probabilità)
+        
         nb_num = n_arr.shape[0]
         from_num = r.shape[0]
 
@@ -450,6 +456,95 @@ class Propagator:
                                     angle_to[p], dist_to[p],
                                     moisture_r[p],
                                     w_dir_r[p], w_speed_r[p])
+
+        ###### materiale per fire spotting    ----> DA QUI
+        ##################################################
+        if w_speed >=50:
+            conifer_mask = (veg_type == 5) 
+            conifer_r , conifer_c , conifer_t = u[conifer_mask, 0], u[conifer_mask, 1], u[conifer_mask, 2]
+
+            nb2_num = n2_arr.shape[0]
+            nb3_num = n3_arr.shape[0]
+            from_num_spotting = conifer_r.shape[0]
+
+                #distanza = 2 celle
+            nb2_arr_r = tile(n2_arr[:, 0], from_num_spotting)
+            nb2_arr_c = tile(n2_arr[:, 1], from_num_spotting)
+
+            nr2 = conifer_r.repeat(nb2_num) + nb2_arr_r
+            nc2 = conifer_c.repeat(nb2_num) + nb2_arr_c
+            nt2 = conifer_t.repeat(nb2_num)
+
+            veg_to2 = self.veg[nr2, nc2]
+            angle_to2 = angle2[nb2_arr_r+2, nb2_arr_c+2]
+            dist_to2 = dist2[nb2_arr_r+2, nb2_arr_c+2]
+            w_dir_r2 = (w_dir + (pi/16)*(0.5 - rand(from_num_spotting))).repeat(nb2_num)
+            w_speed_r2 = (w_speed * (1.2 - 0.4 * rand(from_num_spotting))).repeat(nb2_num)
+                    #filtro celle non corrette
+            n_mask2 = np.logical_and(self.f_global[nr2, nc2, nt2] == 0, veg_to2 != {0, 3, 7} )# veg_to2 !=3, veg_to2 !=7 ) #aree nude e faggete sono impostate come impossibili da bruciare per spotting
+            veg_to2 = veg_to2[n_mask2]
+            angle_to2 = angle_to2[n_mask2]
+            dist_to2 = dist_to2[n_mask2]
+            w_dir_r2 = w_dir_r2[n_mask2]
+            w_speed_r2 = w_speed_r2[n_mask2]
+            
+            nr2, nc2, nt2 = nr2[n_mask2], nc2[n_mask2], nt2[n_mask2]
+
+            calc_dist2 = fire_spotting(angle_to2, w_dir_r2, w_speed_r2)
+
+            spotting2 = ( calc_dist2 >= ( dist_to2 * cellsize - 15 )) & ( calc_dist2 <= ( dist_to2 * cellsize + 15 ))
+
+            nr2, nc2, nt2 = nr2[spotting2], nc2[spotting2], nt2[spotting2]
+            veg_to2 = veg_to2[spotting2]
+
+            spotting_time2 = ( dist_to2[spotting2] * cellsize ) / ( w_speed_r2[spotting2] / 3.6 )
+
+                #distanza = 3 celle
+            nb3_arr_r = tile(n3_arr[:, 0], from_num_spotting)
+            nb3_arr_c = tile(n3_arr[:, 1], from_num_spotting)
+
+            nr3 = conifer_r.repeat(nb3_num) + nb3_arr_r
+            nc3 = conifer_c.repeat(nb3_num) + nb3_arr_c
+            nt3 = conifer_t.repeat(nb3_num)
+
+            veg_to3 = self.veg[nr3, nc3]
+            angle_to3 = angle3[nb3_arr_r+3, nb3_arr_c+3]
+            dist_to3 = dist3[nb3_arr_r+3, nb3_arr_c+3]
+            w_dir_r3 = (w_dir + (pi/16)*(0.5 - rand(from_num_spotting))).repeat(nb3_num)
+            w_speed_r3 = (w_speed * (1.2 - 0.4 * rand(from_num_spotting))).repeat(nb3_num)
+                    #filtro celle non corrette
+            n_mask3 = np.logical_and(self.f_global[nr3, nc3, nt3] == 0, veg_to3 != {0, 3, 7} )# veg_to2 !=3, veg_to2 !=7) #aree nude e faggete sono impostate come impossibili da bruciare per spotting
+            veg_to3 = veg_to3[n_mask3]
+            angle_to3 = angle_to3[n_mask3]
+            dist_to3 = dist_to3[n_mask3]
+            w_dir_r3 = w_dir_r3[n_mask3]
+            w_speed_r3 = w_speed_r3[n_mask3]
+
+            nr3, nc3, nt3 = nr3[n_mask3], nc3[n_mask3], nt3[n_mask3]
+
+            calc_dist3 = fire_spotting(angle_to3, w_dir_r3, w_speed_r3)
+
+            spotting3 = ( calc_dist3 >= ( dist_to3 * cellsize - 15 ) )
+
+            nr3, nc3, nt3 = nr3[spotting3], nc3[spotting3], nt3[spotting3]
+            veg_to3 = veg_to3[spotting3]
+
+            spotting_time3 = ( dist_to3[spotting3] * cellsize ) / ( w_speed_r3[spotting3] / 3.6 )
+        
+            if len(nr2) & len(nc2) & len(nt2):
+                p_nr = np.append( p_nr , nr2)
+                p_nc = np.append( p_nc , nc2)
+                p_nt = np.append( p_nt , nt2)
+                transition_time = np.append( transition_time , np.around( spotting_time2 ) )
+
+            if len(nr3) & len(nc3) & len(nt3):
+                p_nr = np.append( p_nr , nr3)
+                p_nc = np.append( p_nc , nc3)
+                p_nt = np.append( p_nt , nt3)
+                transition_time = np.append( transition_time , np.around( spotting_time3 ) )
+        
+        ######################################
+        #####################   A QUI  <------
 
         prop_time = np.around(self.c_time + transition_time, decimals=1)
 

@@ -1,42 +1,28 @@
 {
-  "time_limit":720,
+  "time_limit":30,
   "tileset":"default",
   "name":"test",
   "boundary_conditions":[
     {
-      "w_dir":180,
-      "w_speed":"40",
-      "moisture":20,
+      "w_dir":90,
+      "w_speed":"70",
+      "moisture":0,
       "time":0
-    },
-    {
-      "w_dir":270,
-      "w_speed":"50",
-      "moisture":5,
-      "ignitions": ["POINT:40.44;8.77"],
-      "time":180
-    },
-    {
-      "w_dir":270,
-      "w_speed":"50",
-      "moisture":25,
-      "ignitions": ["LINE:[40.435 40.445];[8.77 8.77]"],
-      "time":240
     }
 
     
   ],
-  "ignitions":["POINT:40.43248942171313;8.771506459283538"],
+  "ignitions":["POINT:44.4700;9.1050"],
   "isochrone_thresholds": [0.01, 0.5, 0.75, 0.9],
   "w_dir":0,
-  "time_resolution":60,
-  "time_res":60,
+  "time_resolution":5,
+  "time_res":5,
   "grid_dim_km":20,
   "init_date":"202001300000",
   "w_speed":0,
-  "n_threads":100,
-  "heavy_action": ["LINE:[40.42336 40.450];[8.77504 8.77483]"],
-  "waterline_action": ["LINE:[40.45 40.44127];[8.75 8.78810]"],
+  "n_threads":1,
+  "heavy_action": ["LINE:[44.472 44.468];[9.1030 9.1030]"],
+  "waterline_action": 0,
   "moisture":0,
   "ros_model":"wang"
 }
