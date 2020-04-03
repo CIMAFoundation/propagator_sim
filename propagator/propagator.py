@@ -167,10 +167,10 @@ def p_probability(dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moist, 
     return p_clip
 
 
-def fire_spotting(angle_to, w_dir, w_speed):
-    r_n = rand(w_speed.shape[0]) * 100
-    w_speed_ms = w_speed / 3.6
-    d_p = r_n * np.exp( w_speed_ms * c_2 *( np.cos( w_dir - angle_to ) - 1 ) )
+def fire_spotting(angle_to, w_dir, w_speed):            #è la funzione per calcolare la distanza delle celle che possono essere innnescate per spotting al variare dell'angolo delle celle in funzione di velocità e direzione del vento (modello dei greci)
+    r_n = rand(w_speed.shape[0]) * 100          #numero random da 0 a 100 che indica distanza massima raggiungibile
+    w_speed_ms = w_speed / 3.6                  #velocità del vento in m/s
+    d_p = r_n * np.exp( w_speed_ms * c_2 *( np.cos( w_dir - angle_to ) - 1 ) )          #formula per calcolare la distanza dello spotting in tutti i punti del vicinato a 2 e 3 celle (formulazione dei greci)
     return d_p
 
 class PropagatorError(Exception):
@@ -459,90 +459,103 @@ class Propagator:
 
         ###### materiale per fire spotting    ----> DA QUI
         ##################################################
-        if w_speed >=50:
-            conifer_mask = (veg_type == 5) 
-            conifer_r , conifer_c , conifer_t = u[conifer_mask, 0], u[conifer_mask, 1], u[conifer_mask, 2]
+        if w_speed >=50: #fire-spotting solo se vento > 50 km/h (soglia modificabile)     NB: se non ci fosse sogli minima, con formula usata da greci miniore è il vento e maggiore è possibilità di avere spotting lontano dalla cella che brucia...
+            conifer_mask = (veg_type == 5)                                                                      #seleziono i punti che hanno veg = fire-prone conifers
+            conifer_r , conifer_c , conifer_t = u[conifer_mask, 0], u[conifer_mask, 1], u[conifer_mask, 2]      #tra le celle che stanno bruciando, seleziono quelle che sono fire-prone conifers
 
-            nb2_num = n2_arr.shape[0]
-            nb3_num = n3_arr.shape[0]
-            from_num_spotting = conifer_r.shape[0]
+            nb2_num = n2_arr.shape[0]                       #numero celle a distanza 2
+            nb3_num = n3_arr.shape[0]                       #numero celle a distanza 3
+            from_num_spotting = conifer_r.shape[0]          #numero celle fire-prone conifers che stanno bruciando
 
                 #distanza = 2 celle
-            nb2_arr_r = tile(n2_arr[:, 0], from_num_spotting)
-            nb2_arr_c = tile(n2_arr[:, 1], from_num_spotting)
+            nb2_arr_r = tile(n2_arr[:, 0], from_num_spotting)       #coordinata-riga delle celle distanti 2 (generali)  
+            nb2_arr_c = tile(n2_arr[:, 1], from_num_spotting)       #coordinata-colonna delle celle distanti 2 (generali)
 
-            nr2 = conifer_r.repeat(nb2_num) + nb2_arr_r
-            nc2 = conifer_c.repeat(nb2_num) + nb2_arr_c
-            nt2 = conifer_t.repeat(nb2_num)
+            nr2 = conifer_r.repeat(nb2_num) + nb2_arr_r             #coordinata-riga delle celle distanti 2 (riferite al dominio)
+            nc2 = conifer_c.repeat(nb2_num) + nb2_arr_c             #coordinata-colonna delle celle distanti 2 (riferite al dominio)
+            nt2 = conifer_t.repeat(nb2_num)                         #tempo della simulazione della cella che brucia
 
-            veg_to2 = self.veg[nr2, nc2]
-            angle_to2 = angle2[nb2_arr_r+2, nb2_arr_c+2]
-            dist_to2 = dist2[nb2_arr_r+2, nb2_arr_c+2]
-            w_dir_r2 = (w_dir + (pi/16)*(0.5 - rand(from_num_spotting))).repeat(nb2_num)
-            w_speed_r2 = (w_speed * (1.2 - 0.4 * rand(from_num_spotting))).repeat(nb2_num)
+            #veg_to2 = self.veg[nr2, nc2]                            #vegetazione delle cella distanti 2
+            angle_to2 = angle2[nb2_arr_r+2, nb2_arr_c+2]            #angoli delle celle distanti 2
+            dist_to2 = dist2[nb2_arr_r+2, nb2_arr_c+2]              #distanza reale delle celle distanti 2
+            w_dir_r2 = (w_dir + (pi/16)*(0.5 - rand(from_num_spotting))).repeat(nb2_num)           #vettore direzione del vento con le dimensioni delle celle distanti 2 e lieve randomizzazione 
+            w_speed_r2 = (w_speed * (1.2 - 0.4 * rand(from_num_spotting))).repeat(nb2_num)         #vettore velocità del vento con le dimensioni delle celle distanti 2 e lieve randomizzazione
                     #filtro celle non corrette
-            n_mask2 = np.logical_and(self.f_global[nr2, nc2, nt2] == 0, veg_to2 != {0, 3, 7} )# veg_to2 !=3, veg_to2 !=7 ) #aree nude e faggete sono impostate come impossibili da bruciare per spotting
-            veg_to2 = veg_to2[n_mask2]
-            angle_to2 = angle_to2[n_mask2]
-            dist_to2 = dist_to2[n_mask2]
-            w_dir_r2 = w_dir_r2[n_mask2]
-            w_speed_r2 = w_speed_r2[n_mask2]
+            n_mask2 = np.logical_and(self.f_global[nr2, nc2, nt2] == 0, self.veg[nr2, nc2] != {0, 3, 7} )# veg_to2 !=3, veg_to2 !=7 ) #aree nude e faggete sono impostate come impossibili da bruciare per spotting
+            #veg_to2 = veg_to2[n_mask2]                  #seleziono veg_to dei punti che si possono innescare per spotting
+            angle_to2 = angle_to2[n_mask2]              #seleziono angle_to dei punti che si possono innescare per spotting
+            dist_to2 = dist_to2[n_mask2]                #seleziono dist_to dei punti che si possono innescare per spotting
+            w_dir_r2 = w_dir_r2[n_mask2]                #seleziono direzione del vento dei punti che si possono innescare per spotting
+            w_speed_r2 = w_speed_r2[n_mask2]            #seleziono velocità del vento dei punti che si possono innescare per spotting
             
-            nr2, nc2, nt2 = nr2[n_mask2], nc2[n_mask2], nt2[n_mask2]
+            nr2, nc2, nt2 = nr2[n_mask2], nc2[n_mask2], nt2[n_mask2]        #seleziono coordiate e tempo della simulazione dei punti che si possono innescare per spotting
 
-            calc_dist2 = fire_spotting(angle_to2, w_dir_r2, w_speed_r2)
+            calc_dist2 = fire_spotting(angle_to2, w_dir_r2, w_speed_r2)     #calcolo quali celle a distanza 2 si possono innescare per spotting 
 
-            spotting2 = ( calc_dist2 >= ( dist_to2 * cellsize - 15 )) & ( calc_dist2 <= ( dist_to2 * cellsize + 15 ))
+            spotting2 = ( calc_dist2 >= ( dist_to2 * cellsize - 15 )) & ( calc_dist2 <= ( dist_to2 * cellsize + 15 ))       #filtro per selezionare solo distanze attorno alle celle distanti 2
 
-            nr2, nc2, nt2 = nr2[spotting2], nc2[spotting2], nt2[spotting2]
-            veg_to2 = veg_to2[spotting2]
+            nr2, nc2, nt2 = nr2[spotting2], nc2[spotting2], nt2[spotting2]      #seleziono solo le celle distanti 2 che sono innescate dallo spotting
+            #veg_to2 = veg_to2[spotting2]                                        #seleziono solo le veg delle celle distanti 2 che sono innescate dallo spotting
 
-            spotting_time2 = ( dist_to2[spotting2] * cellsize ) / ( w_speed_r2[spotting2] / 3.6 )
+            #spotting_time2 = ( dist_to2[spotting2] * cellsize ) / ( w_speed_r2[spotting2] / 3.6 )           #calcolo il tempo che impiega il tizzone a raggiungere la cella (molto banale)
+
+            transition_time2 = self.p_time(self.dem[nr2, nc2], self.dem[nr2, nc2],              #calcolo quanto ci mettono a bruciare le celle innescate dallo spotting
+                                    self.veg[nr2, nc2], self.veg[nr2, nc2],                     #considero dh=0 (pianura) e veg_from=veg_to
+                                    angle_to2[spotting2], dist_to2[spotting2],
+                                    moisture[nr2, nc2],
+                                    w_dir_r2[spotting2], w_speed_r2[spotting2])
 
                 #distanza = 3 celle
-            nb3_arr_r = tile(n3_arr[:, 0], from_num_spotting)
-            nb3_arr_c = tile(n3_arr[:, 1], from_num_spotting)
+            nb3_arr_r = tile(n3_arr[:, 0], from_num_spotting)       #coordinata-riga delle celle distanti 3 (generali)
+            nb3_arr_c = tile(n3_arr[:, 1], from_num_spotting)       #coordinata-colonna delle celle distanti 3 (generali)
 
-            nr3 = conifer_r.repeat(nb3_num) + nb3_arr_r
-            nc3 = conifer_c.repeat(nb3_num) + nb3_arr_c
-            nt3 = conifer_t.repeat(nb3_num)
+            nr3 = conifer_r.repeat(nb3_num) + nb3_arr_r             #coordinata-riga delle celle distanti 3 (riferite al dominio)
+            nc3 = conifer_c.repeat(nb3_num) + nb3_arr_c             #coordinata-colonna delle celle distanti 3 (riferite al dominio)
+            nt3 = conifer_t.repeat(nb3_num)                         #tempo della simulazione della cella che brucia
 
-            veg_to3 = self.veg[nr3, nc3]
-            angle_to3 = angle3[nb3_arr_r+3, nb3_arr_c+3]
-            dist_to3 = dist3[nb3_arr_r+3, nb3_arr_c+3]
-            w_dir_r3 = (w_dir + (pi/16)*(0.5 - rand(from_num_spotting))).repeat(nb3_num)
-            w_speed_r3 = (w_speed * (1.2 - 0.4 * rand(from_num_spotting))).repeat(nb3_num)
+            #veg_to3 = self.veg[nr3, nc3]                            #vegetazione delle cella distanti 3
+            angle_to3 = angle3[nb3_arr_r+3, nb3_arr_c+3]            #angoli delle celle distanti 3
+            dist_to3 = dist3[nb3_arr_r+3, nb3_arr_c+3]              #distanza reale delle celle distanti 3
+            w_dir_r3 = (w_dir + (pi/16)*(0.5 - rand(from_num_spotting))).repeat(nb3_num)           #vettore direzione del vento con le dimensioni delle celle distanti 3 e lieve randomizzazione
+            w_speed_r3 = (w_speed * (1.2 - 0.4 * rand(from_num_spotting))).repeat(nb3_num)         #vettore velocità del vento con le dimensioni delle celle distanti 3 e lieve randomizzazione
                     #filtro celle non corrette
-            n_mask3 = np.logical_and(self.f_global[nr3, nc3, nt3] == 0, veg_to3 != {0, 3, 7} )# veg_to2 !=3, veg_to2 !=7) #aree nude e faggete sono impostate come impossibili da bruciare per spotting
-            veg_to3 = veg_to3[n_mask3]
-            angle_to3 = angle_to3[n_mask3]
-            dist_to3 = dist_to3[n_mask3]
-            w_dir_r3 = w_dir_r3[n_mask3]
-            w_speed_r3 = w_speed_r3[n_mask3]
+            n_mask3 = np.logical_and(self.f_global[nr3, nc3, nt3] == 0, self.veg[nr3, nc3] != {0, 3, 7} )# veg_to2 !=3, veg_to2 !=7) #aree nude e faggete sono impostate come impossibili da bruciare per spotting
+            #veg_to3 = veg_to3[n_mask3]                  #seleziono veg_to dei punti che si possono innescare per spotting
+            angle_to3 = angle_to3[n_mask3]              #seleziono angle_to dei punti che si possono innescare per spotting
+            dist_to3 = dist_to3[n_mask3]                #seleziono dist_to dei punti che si possono innescare per spotting
+            w_dir_r3 = w_dir_r3[n_mask3]                #seleziono direzione del vento dei punti che si possono innescare per spotting
+            w_speed_r3 = w_speed_r3[n_mask3]            #seleziono velocità del vento dei punti che si possono innescare per spotting
 
-            nr3, nc3, nt3 = nr3[n_mask3], nc3[n_mask3], nt3[n_mask3]
+            nr3, nc3, nt3 = nr3[n_mask3], nc3[n_mask3], nt3[n_mask3]        #seleziono coordiate e tempo della simulazione dei punti che si possono innescare per spotting
 
-            calc_dist3 = fire_spotting(angle_to3, w_dir_r3, w_speed_r3)
+            calc_dist3 = fire_spotting(angle_to3, w_dir_r3, w_speed_r3)     #calcolo quali celle a distanza 3 si possono innescare per spotting
 
-            spotting3 = ( calc_dist3 >= ( dist_to3 * cellsize - 15 ) )
+            spotting3 = ( calc_dist3 >= ( dist_to3 * cellsize - 15 ) )      #filtro per selezionare solo distanze attorno alle celle distanti 3
 
-            nr3, nc3, nt3 = nr3[spotting3], nc3[spotting3], nt3[spotting3]
-            veg_to3 = veg_to3[spotting3]
+            nr3, nc3, nt3 = nr3[spotting3], nc3[spotting3], nt3[spotting3]      #seleziono solo le celle distanti 3 che sono innescate dallo spotting
+            #veg_to3 = veg_to3[spotting3]                                        #seleziono solo le veg delle celle distanti 3 che sono innescate dallo spotting
 
-            spotting_time3 = ( dist_to3[spotting3] * cellsize ) / ( w_speed_r3[spotting3] / 3.6 )
-        
-            if len(nr2) & len(nc2) & len(nt2):
-                p_nr = np.append( p_nr , nr2)
-                p_nc = np.append( p_nc , nc2)
-                p_nt = np.append( p_nt , nt2)
-                transition_time = np.append( transition_time , np.around( spotting_time2 ) )
+            #spotting_time3 = ( dist_to3[spotting3] * cellsize ) / ( w_speed_r3[spotting3] / 3.6 )           #calcolo il tempo che impiega il tizzone a raggiungere la cella (molto banale)
 
-            if len(nr3) & len(nc3) & len(nt3):
-                p_nr = np.append( p_nr , nr3)
-                p_nc = np.append( p_nc , nc3)
-                p_nt = np.append( p_nt , nt3)
-                transition_time = np.append( transition_time , np.around( spotting_time3 ) )
-        
+            transition_time3 = self.p_time(self.dem[nr3, nc3] , self.dem[nr3, nc3] ,            #calcolo quanto ci mettono a bruciare le celle innescate dallo spotting
+                                    self.veg[nr3, nc3], self.veg[nr3, nc3],                     #considero dh=0 (pianura) e veg_from=veg_to
+                                    angle_to3[spotting3], dist_to3[spotting3],
+                                    moisture[nr3, nc3],
+                                    w_dir_r3[spotting3], w_speed_r3[spotting3])
+
+            if len(nr2) & len(nc2) & len(nt2):              #eseguo aggiunta dei punti solo se sono state create correttamente tutte le variabili
+                p_nr = np.append( p_nr , nr2)               #aggiungo le coordinate-riga dei punti innescati per spotting a quelli innescati "normalmente"
+                p_nc = np.append( p_nc , nc2)               #aggiungo le coordinate-colonna dei punti innescati per spotting a quelli innescati "normalmente"
+                p_nt = np.append( p_nt , nt2)               #aggiungo il tempo della simulazione dei punti innescati per spotting a quelli innescati "normalmente"
+                transition_time = np.append( transition_time , np.around( transition_time2 ) )        #aggiungo il tempo impiegato per innescare i punti con lo spotting al transition time calcolato per gli altri punti
+                #transition_time = np.append( transition_time , np.around( spotting_time2 + transition_time2 ) )
+
+            if len(nr3) & len(nc3) & len(nt3):              #eseguo aggiunta dei punti solo se sono state create correttamente tutte le variabili
+                p_nr = np.append( p_nr , nr3)               #aggiungo le coordinate-riga dei punti innescati per spotting a quelli innescati "normalmente"
+                p_nc = np.append( p_nc , nc3)               #aggiungo le coordinate-colonna dei punti innescati per spotting a quelli innescati "normalmente"
+                p_nt = np.append( p_nt , nt3)               #aggiungo il tempo della simulazione dei punti innescati per spotting a quelli innescati "normalmente"
+                transition_time = np.append( transition_time , np.around( transition_time3 ) )        #aggiungo il tempo impiegato per innescare i punti con lo spotting al transition time calcolato per gli altri punti
+                #transition_time = np.append( transition_time , np.around( spotting_time3 + transition_time3 ) )
         ######################################
         #####################   A QUI  <------
 

@@ -5,7 +5,7 @@
   "boundary_conditions":[
     {
       "w_dir":90,
-      "w_speed":"70",
+      "w_speed":"55",
       "moisture":0,
       "time":0
     }
