@@ -108,7 +108,10 @@ def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir
     v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS
     
     t = real_dist / v_wh
-    t[t>=1] = np.around(t[t>=1])
+    if t is np.float64()>1:
+        t = np.around(t)
+    else:
+        t[t>=1] = np.around(t[t>=1])
     t = np.clip(t, 0.1, np.inf)
     return t
 
@@ -168,7 +171,7 @@ def p_probability(dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moist, 
 
 
 def fire_spotting(angle_to, w_dir, w_speed):            #è la funzione per calcolare la distanza delle celle che possono essere innnescate per spotting al variare dell'angolo delle celle in funzione di velocità e direzione del vento (modello dei greci)
-    r_n = rand(w_speed.shape[0]) * 100          #numero random da 0 a 100 che indica distanza massima raggiungibile
+    r_n = np.random.normal( spotting_rn_mean , spotting_rn_std )  # r_n = (w_speed.shape[0]) * 100 
     w_speed_ms = w_speed / 3.6                  #velocità del vento in m/s
     d_p = r_n * np.exp( w_speed_ms * c_2 *( np.cos( w_dir - angle_to ) - 1 ) )          #formula per calcolare la distanza dello spotting in tutti i punti del vicinato a 2 e 3 celle (formulazione dei greci)
     return d_p
@@ -459,12 +462,70 @@ class Propagator:
 
         ###### materiale per fire spotting    ----> DA QUI
         ##################################################
-        if w_speed >=50: #fire-spotting solo se vento > 50 km/h (soglia modificabile)     NB: se non ci fosse sogli minima, con formula usata da greci miniore è il vento e maggiore è possibilità di avere spotting lontano dalla cella che brucia...
+        conifer_mask = (veg_type == 5)                                                                      #seleziono i punti che hanno veg = fire-prone conifers
+        conifer_r , conifer_c , conifer_t = u[conifer_mask, 0], u[conifer_mask, 1], u[conifer_mask, 2] 
+        
+        N_spotters = conifer_r.shape[0] #tipo questo?? esatto!   #numero celle fire-prone conifers che stanno bruciando
+        
+        for spotting_source in range(N_spotters):
+            print("fare cose relative alla fonte di spotting selezionata")
+            # definire lambda = 3.0 da qualche parte su constants.py. 
+            N_embers = np.random.poisson(lambda_spotting)
+            N_embers =  int(N_embers)
+            for ember in range(N_embers):
+                print("Sono un ember, viaggio  e brucio.")            
+                #angle of spotting for the considered ember. In radians (?) 
+                ember_angle = np.random.uniform(0 , 2.0*np.pi)
+                # we need to  compute the angle between the wind direction and the ember_angle...
+                ember_distance  = fire_spotting(ember_angle,  w_dir, w_speed)
+                    
+                if  ember_distance < cellsize:
+                    pass
+                elif ember_distance > cellsize * 3:  #provvisorio, da rivedere con molta attenzione!!!!!
+                    pass
+                else:
+                    #here we  need to  compute the number of horizontal and vertical cells that the ember is  actually travelling.
+                    #i_ember = 0  
+                    #j_ember = 0
+                    
+                    delta_r = ember_distance * np.cos(ember_angle)  #vertical delta [meters]
+                    delta_c = ember_distance * np.sin(ember_angle)  #horizontal delta [meters]
+
+                    nb_spot_r = int( delta_r / cellsize )   #number of vertical cells 
+                    nb_spot_c = int( delta_c / cellsize )   #number of horizontal cells  
+                    #queste cose sono tutte in modalita' "liste ed operazioni collettive"
+                    #vanno rimesse in modalita' "singolo ember lanciato dal singolo spot"
+                    nr_spot = conifer_r[spotting_source] + nb_spot_r         #vertical location of the cell to be ignited by the ember
+                    nc_spot = conifer_c[spotting_source] + nb_spot_c         #horizontal location of the cell to be ignited by the ember
+                    nt_spot = conifer_t[spotting_source]
+                    #vediamo! bisogna cambiare il tempo usando una funzione di tipo Ros...
+                    # dobbiamo ora fare due controlli: 1) se  non spariamo fuori  dal campo di gioco     ###se stiamo sotto le 3 celle, non usciamo perchè avevo aumentato il bordo di 0 a 3 celle
+                    #2) se  spariamo sopra ad  una vegetazione compatibile. in quel caso si lancia ancora uan moneta con
+                    # la formula P_0 ( 1 + P_vegetazionericevente)  
+                    ## possiamo adattare questa per il punto 2:
+                    #n_mask = np.logical_and(self.f_global[nr_spot, nc_spot, nt_spot] == 0, self.veg[nr_spot, nc_spot] != {0, 3, 7} )
+                    transition_time_spot = self.p_time(self.dem[nr_spot, nc_spot], self.dem[nr_spot, nc_spot],              #calcolo quanto ci mettono a bruciare le celle innescate dallo spotting
+                                    self.veg[nr_spot, nc_spot], self.veg[nr_spot, nc_spot],                     #considero dh=0 (pianura) e veg_from=veg_to
+                                    ember_angle, ember_distance, 
+                                    moisture[nr_spot, nc_spot],
+                                    w_dir, w_speed)
+                    
+                    p_nr = np.append( p_nr , nr_spot)               #aggiungo le coordinate-riga dei punti innescati per spotting a quelli innescati "normalmente"
+                    p_nc = np.append( p_nc , nc_spot)               #aggiungo le coordinate-colonna dei punti innescati per spotting a quelli innescati "normalmente"
+                    p_nt = np.append( p_nt , nt_spot)               #aggiungo il tempo della simulazione dei punti innescati per spotting a quelli innescati "normalmente"
+                    transition_time = np.append( transition_time , np.around( transition_time_spot ) )
+                # main thrust  of the ember: sampled from a Gaussian Distribution (Alexandridis et al, 2008 and 2011)
+
+
+
+        
+        
+        '''if w_speed >=50: #fire-spotting solo se vento > 50 km/h (soglia modificabile)     NB: se non ci fosse sogli minima, con formula usata da greci miniore è il vento e maggiore è possibilità di avere spotting lontano dalla cella che brucia...
             conifer_mask = (veg_type == 5)                                                                      #seleziono i punti che hanno veg = fire-prone conifers
             conifer_r , conifer_c , conifer_t = u[conifer_mask, 0], u[conifer_mask, 1], u[conifer_mask, 2]      #tra le celle che stanno bruciando, seleziono quelle che sono fire-prone conifers
 
-            nb2_num = n2_arr.shape[0]                       #numero celle a distanza 2
-            nb3_num = n3_arr.shape[0]                       #numero celle a distanza 3
+            nb2_num = n2_arr.shape[0]           #vecchia implem.#numero celle a distanza 2
+            nb3_num = n3_arr.shape[0]           #vecchia implem. #numero celle a distanza 3
             from_num_spotting = conifer_r.shape[0]          #numero celle fire-prone conifers che stanno bruciando
 
                 #distanza = 2 celle
@@ -555,7 +616,7 @@ class Propagator:
                 p_nc = np.append( p_nc , nc3)               #aggiungo le coordinate-colonna dei punti innescati per spotting a quelli innescati "normalmente"
                 p_nt = np.append( p_nt , nt3)               #aggiungo il tempo della simulazione dei punti innescati per spotting a quelli innescati "normalmente"
                 transition_time = np.append( transition_time , np.around( transition_time3 ) )        #aggiungo il tempo impiegato per innescare i punti con lo spotting al transition time calcolato per gli altri punti
-                #transition_time = np.append( transition_time , np.around( spotting_time3 + transition_time3 ) )
+                #transition_time = np.append( transition_time , np.around( spotting_time3 + transition_time3 ) )'''
         ######################################
         #####################   A QUI  <------
 
