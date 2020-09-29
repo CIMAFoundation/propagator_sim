@@ -56,6 +56,12 @@ M4 = 1.019
 # RoS
 c_moist = -0.014
 
+# costanti per spotting! ACHTUNG
+
+lambda_spotting   = 2.0
+spotting_rn_mean  = 100
+spotting_rn_std   = 25
+
 
 #####   TAG   ####
 WATERLINE_ACTION_TAG = 'waterline_action'

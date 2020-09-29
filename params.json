@@ -1,5 +1,5 @@
 {
-  "time_limit":30,
+  "time_limit":300,
   "tileset":"default",
   "name":"test",
   "boundary_conditions":[
@@ -15,13 +15,13 @@
   "ignitions":["POINT:44.4700;9.1050"],
   "isochrone_thresholds": [0.01, 0.5, 0.75, 0.9],
   "w_dir":0,
-  "time_resolution":5,
-  "time_res":5,
+  "time_resolution":15,
+  "time_res":15,
   "grid_dim_km":20,
   "init_date":"202001300000",
   "w_speed":0,
-  "n_threads":1,
-  "heavy_action": ["LINE:[44.472 44.468];[9.1030 9.1030]"],
+  "n_threads":100,
+  "heavy_action": ["LINE:[44.49 44.45];[9.1030 9.1030]"],
   "waterline_action": 0,
   "moisture":0,
   "ros_model":"wang"
