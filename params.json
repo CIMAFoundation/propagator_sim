@@ -1,5 +1,5 @@
 {
-  "time_limit":300,
+  "time_limit":1440,
   "tileset":"default",
   "name":"test",
   "boundary_conditions":[
@@ -12,11 +12,11 @@
 
     
   ],
-  "ignitions":["POINT:44.4700;9.1050"],
+  "ignitions":["POINT:44.4700;9.110"],
   "isochrone_thresholds": [0.01, 0.5, 0.75, 0.9],
   "w_dir":0,
-  "time_resolution":15,
-  "time_res":15,
+  "time_resolution":30,
+  "time_res":30,
   "grid_dim_km":20,
   "init_date":"202001300000",
   "w_speed":0,
