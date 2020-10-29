@@ -56,11 +56,15 @@ M4 = 1.019
 # RoS
 c_moist = -0.014
 
-# costanti per spotting! ACHTUNG
+# The following constants are used in the Fire-Spotting model. Alexandridis et al. (2009,2011)
 
 lambda_spotting   = 2.0
 spotting_rn_mean  = 100
 spotting_rn_std   = 25
+# P_c = P_c0 (1 + P_cd), where P_c0 constant probability of ignition by spotting and P_cd is a correction factor that 
+#depends on vegetation type and density...
+P_cd_conifer = 0.3 
+P_c0 = 0.3
 
 
 #####   TAG   ####
@@ -92,3 +96,9 @@ ROS_MODEL_TAG = 'ros_model'
 DEFAULT_TAG = 'default'
 WANG_TAG = 'wang'
 ROTHERMEL_TAG = 'rothermel'
+
+PROB_MOIST_CODE_TAG = 'prob_moist_model'
+NEW_FORMULATION_TAG = 'new_formula'
+STD_FORMULATION_TAG = 'rothermel'
+
+SPOT_FLAG_TAG = 'do_spotting'

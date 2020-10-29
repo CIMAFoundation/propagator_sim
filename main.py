@@ -49,7 +49,7 @@ def main():
     grid_dim = int(np.clip(np.floor(grid_dim), 300, 1500))
     tile_set = d.get(TILESET_TAG, DEFAULT_TAG)
     ros_model_code = d.get(ROS_MODEL_TAG, WANG_TAG) #switch per scegliere se usare il modello di Rothermel (rothermel), Wang (wang) oppure il classico Propagator (default)
-    
+    prob_moist_model = d.get(PROB_MOIST_CODE_TAG,NEW_FORMULATION_TAG)
     #controllo che sia stato richiesto il modello di RoS in maniera corretta
     if ros_model_code not in [DEFAULT_TAG , WANG_TAG , ROTHERMEL_TAG]:
         logging.info('WARNING: RoS function is not well defined, the model will use "wang" configuration')
@@ -145,6 +145,19 @@ def main():
         v0_file = d.get(V0_TABLE_TAG, None)
         propagator.load_parameters(prob_file, v0_file)
 
+
+# we pass the flag for the spotting model. the value from input line (args)
+#  can be overrided by the SPOT_FLAG_TAG inside of the input params json...
+    do_spotting = False 
+    
+    if args.do_spot is not None:
+        do_spotting = args.do_spot
+        logging.info('The spotting model flag from command line is...' + str(do_spotting))
+
+    if SPOT_FLAG_TAG in d:
+        do_spotting = d.get(SPOT_FLAG_TAG, False)
+        logging.info('The spotting model flag from parameter file  is...' + str(do_spotting))
+
     settings = PropagatorSettings(
         n_threads=n_threads,
         boundary_conditions=boundary_conditions,
@@ -158,7 +171,9 @@ def main():
         debug_mode=args.debug_mode,
         write_vegetation=args.write_vegetation,
         save_realizations=args.save_realizations,
-        ros_model_code=ros_model_code
+        ros_model_code=ros_model_code,
+        prob_moist_model=prob_moist_model,
+        do_spotting = do_spotting
     )
 
     sim = Propagator(settings)
