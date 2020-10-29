@@ -4,7 +4,7 @@
   "name":"test",
   "boundary_conditions":[
     {
-      "w_dir":90,
+      "w_dir":270,
       "w_speed":"30",
       "moisture":0,
       "time":0
@@ -24,5 +24,7 @@
   "heavy_action": ["LINE:[44.49 44.45];[9.1030 9.1030]"],
   "waterline_action": 0,
   "moisture":0,
-  "ros_model":"wang"
+  "ros_model":"wang",
+  "prob_moist_model":"new_formula",
+  "do_spotting" : true
 }

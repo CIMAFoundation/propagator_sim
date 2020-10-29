@@ -47,6 +47,15 @@ def get_p_time_fn(ros_model_code):
     p_time_function = ros_models.get(ros_model_code, p_time_wang)
     return p_time_function
 
+def get_p_moist_fn(moist_model_code):
+    moist_models = {
+        DEFAULT_TAG : moist_proba_correction_1,
+        NEW_FORMULATION_TAG : moist_proba_correction_1,
+        ROTHERMEL_TAG : moist_proba_correction_2,
+    }
+    p_moist_function = moist_models.get(moist_model_code, moist_proba_correction_1)
+    return p_moist_function
+
 def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
     # velocità di base modulata con la densità(tempo di attraversamento)
     dh = (dem_to - dem_from)
@@ -153,12 +162,13 @@ def w_h_effect_on_p(angle_to, w_speed, w_dir, dh, dist_to):
     return wh
 
 
-def p_probability(dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moist, w_dir, w_speed):
+def p_probability(self, dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moist, w_dir, w_speed):
     dh = (dem_to - dem_from)
     alpha_wh = w_h_effect_on_p(angle_to, w_speed, w_dir, dh, dist_to)
     
     #p_moist = 1
-    p_moist = M1 * moist**3 + M2 * moist**2 + M3 * moist + M4
+    p_moist = self.p_moist(moist)  #era self.p_moist
+    #p_moist = M1 * moist**3 + M2 * moist**2 + M3 * moist + M4
     p_m = np.clip(p_moist , 0, 1.0)
     p_veg = prob_table[veg_to - 1, veg_from - 1]
     p = 1-(1-p_veg)**alpha_wh
@@ -167,7 +177,27 @@ def p_probability(dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moist, 
 
     return p_clip
 
+
+def moist_proba_correction_1(moist):
+    """ 
+    e_m is the moinsture correction to the transition probability p_{i,j}.  e_m = f(m), with m the Fine Fuel Moisture Content
+    e_m = -11,507x5 + 22,963x4 - 17,331x3 + 6,598x2 - 1,7211x + 1,0003, where x is moisture / moisture of extintion (Mx).  Mx = 0.3 (Trucchia et al, Fire 2020 )
+    """
+    #polynomial fit coefficient vector
+    M = [1.0003,  -1.7211, 6.598 , -17.331,  22.963,   -11.507 ]
+    p_moist = M[0]+  moist*M[1] + (moist**2)*M[2] + (moist**3)*M[3] + (moist**4)*M[4] + (moist**5)*M[5]
+    return p_moist
     
+def moist_proba_correction_2(moist):
+    """
+    e_m is the moinsture correction to the transition probability p_{i,j}. e_m = f(m), with m the Fine Fuel Moisture Content
+    Old formulation by Baghino, adopted in Trucchia et al, Fire 2020.
+    Here, the parameters come straight from constants.py.
+    """
+    p_moist = M1 * moist**3 + M2 * moist**2 + M3 * moist + M4
+    return p_moist
+
+
 def fire_spotting(angle_to, w_dir, w_speed): #this function evaluates the distance that an ember can reach, by the use of the Alexandridis' formulation
     r_n = np.random.normal( spotting_rn_mean , spotting_rn_std , size=angle_to.shape ) # main thrust of the ember: sampled from a Gaussian Distribution (Alexandridis et al, 2008 and 2011)
     w_speed_ms = w_speed / 3.6                  #wind speed [m/s]
@@ -197,6 +227,8 @@ class PropagatorSettings:
         self.output_folder = settings_dict[OUTPUT_FOLDER_TAG]
         self.time_limit = settings_dict[TIME_LIMIT_TAG]
         self.p_time_fn = get_p_time_fn(settings_dict[ROS_MODEL_CODE_TAG])
+        self.p_moist_fn = get_p_moist_fn(settings_dict[PROB_MOIST_CODE_TAG])
+        self.do_spotting = settings_dict[SPOT_FLAG_TAG]
 
         #self.simp_fact = settings_dict['simp_fact']
         #self.debug_mode = settings_dict['debug_mode']
@@ -214,6 +246,7 @@ class Propagator:
         self.dem = None
         self.boundary_conditions = self.settings.boundary_conditions        
         self.p_time = settings.p_time_fn
+        self.p_moist = settings.p_moist_fn #print("p_moist is ...", self.p_moist)
         # make it configurable
         self.dst_crs = crs.CRS({'init': 'EPSG:4326', 'no_defs': True})
 
@@ -311,8 +344,8 @@ class Propagator:
                     self.veg[(self.veg<0)|(self.veg>6)] = 0                    
                     
                     transform, crs, bounds, res = veg_file.transform, veg_file.crs, veg_file.bounds, veg_file.res
-
-                    self.__prj = Proj(crs.to_wkt())
+                    #self.__prj = Proj(crs.to_wkt()) this was not working anymore
+                    self.__prj = Proj(crs.to_proj4()) #it works for pyproj 2.6.1.post1 and rasterio 1.1.7
                     self.__trans = transform
                     self.__bounds = bounds
                     self.__shape = self.veg.shape
@@ -441,7 +474,7 @@ class Propagator:
         nr, nc, nt = nr[n_mask], nc[n_mask], nt[n_mask]
 
         # get the probability for all the pixels
-        p_prob = p_probability(dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moisture_r, w_dir_r, w_speed_r)
+        p_prob = p_probability(self,dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, moisture_r, w_dir_r, w_speed_r)
 
         # try the propagation
         p = p_prob > rand(p_prob.shape[0])
@@ -460,54 +493,84 @@ class Propagator:
 
         ###### fire spotting    ----> FROM HERE
         ##################################################
-        conifer_mask = (veg_type == 5)      #only cells that have veg = fire-prone conifers are selected
-        conifer_r , conifer_c , conifer_t = u[conifer_mask, 0], u[conifer_mask, 1], u[conifer_mask, 2] 
-        
-        N_spotters = conifer_r.shape[0]    #number of  fire-prone conifers cells that are  burning
-        
-        #calculate number of embers per emitter
-        N_embers = np.random.poisson( lambda_spotting , size=conifer_r.shape )
+        if self.settings.do_spotting == True:
+            #print("I will do spotting!")
+            conifer_mask = (veg_type == 5)      #only cells that have veg = fire-prone conifers are selected
+            conifer_r , conifer_c , conifer_t = u[conifer_mask, 0], u[conifer_mask, 1], u[conifer_mask, 2] 
+            
+            #N_spotters = conifer_r.shape[0]    #number of  fire-prone conifers cells that are  burning
+            
+            #calculate number of embers per emitter
+            N_embers = np.random.poisson( lambda_spotting , size=conifer_r.shape )
 
-        # create list of source points for each ember
-        conifer_arr_r = conifer_r.repeat(repeats=N_embers)
-        conifer_arr_c = conifer_c.repeat(repeats=N_embers)
-        conifer_arr_t = conifer_t.repeat(repeats=N_embers)
-        # calculate angle and distance
-        ember_angle = np.random.uniform(0 , 2.0*np.pi, size=conifer_arr_r.shape)
-        ember_distance  = fire_spotting(ember_angle,  w_dir, w_speed)  
+            # create list of source points for each ember
+            conifer_arr_r = conifer_r.repeat(repeats=N_embers)
+            conifer_arr_c = conifer_c.repeat(repeats=N_embers)
+            conifer_arr_t = conifer_t.repeat(repeats=N_embers)
+            # calculate angle and distance
+            ember_angle = np.random.uniform(0 , 2.0*np.pi, size=conifer_arr_r.shape)
+            ember_distance  = fire_spotting(ember_angle,  w_dir, w_speed)  
 
-        # filter out short embers
-        idx_long_embers = ember_distance > 2*cellsize
-        conifer_arr_r = conifer_arr_r[idx_long_embers]
-        conifer_arr_c = conifer_arr_c[idx_long_embers]
-        conifer_arr_t = conifer_arr_t[idx_long_embers]
-        ember_angle = ember_angle[idx_long_embers]
-        ember_distance = ember_distance[idx_long_embers]
+            # filter out short embers
+            idx_long_embers = ember_distance > 2*cellsize
+            conifer_arr_r = conifer_arr_r[idx_long_embers]
+            conifer_arr_c = conifer_arr_c[idx_long_embers]
+            conifer_arr_t = conifer_arr_t[idx_long_embers]
+            ember_angle = ember_angle[idx_long_embers]
+            ember_distance = ember_distance[idx_long_embers]
 
-        # calculate landing locations
-        delta_r = ember_distance * np.cos(ember_angle)  #vertical delta [meters]
-        delta_c = ember_distance * np.sin(ember_angle)  #horizontal delta [meters]
-        nb_spot_r = delta_r / cellsize     #number of vertical cells
-        nb_spot_r = nb_spot_r.astype(int)
-        nb_spot_c = delta_c / cellsize     #number of horizontal cells
-        nb_spot_c = nb_spot_c.astype(int) 
 
-        nr_spot = conifer_arr_r + nb_spot_r         #vertical location of the cell to be ignited by the ember
-        nc_spot = conifer_arr_c + nb_spot_c         #horizontal location of the cell to be ignited by the ember
-        nt_spot = conifer_arr_t
+            # calculate landing locations
+            delta_r = ember_distance * np.cos(ember_angle)  #vertical delta [meters]
+            delta_c = ember_distance * np.sin(ember_angle)  #horizontal delta [meters]
+            nb_spot_r = delta_r / cellsize     #number of vertical cells
+            nb_spot_r = nb_spot_r.astype(int)
+            nb_spot_c = delta_c / cellsize     #number of horizontal cells
+            nb_spot_c = nb_spot_c.astype(int) 
 
-        transition_time_spot = self.p_time(self.dem[nr_spot, nc_spot], self.dem[nr_spot, nc_spot], #evaluation of the propagation time of the "spotted cells"
-                        self.veg[nr_spot, nc_spot], self.veg[nr_spot, nc_spot],   #dh=0 (no slope) and veg_from=veg_to to simplify the phenomenon
-                        ember_angle, ember_distance, 
-                        moisture[nr_spot, nc_spot],
-                        w_dir, w_speed)
-        
-        p_nr = np.append( p_nr , nr_spot)               #row-coordinates of the "spotted cells" added to the other ones
-        p_nc = np.append( p_nc , nc_spot)               #column-coordinates of the "spotted cells" added to the other ones
-        p_nt = np.append( p_nt , nt_spot)               #time propagation of "spotted cells" added to the other ones 
-        transition_time = np.append( transition_time , np.around( transition_time_spot ) )
+            nr_spot = conifer_arr_r + nb_spot_r         #vertical location of the cell to be ignited by the ember
+            nc_spot = conifer_arr_c + nb_spot_c         #horizontal location of the cell to be ignited by the ember
+            nt_spot = conifer_arr_t
+
+            #if I surpass the bounds, I stick to them. This way I don't have to reshape anything.
+            nr_spot[nr_spot > self.__shape[0] -1 ] = self.__shape[0] -1 
+            nc_spot[nc_spot > self.__shape[1] -1 ] = self.__shape[1] -1 
+            nr_spot[nr_spot < 0 ] = 0
+            nc_spot[nc_spot < 0 ] = 0           
+
+
+
+            # we want to put another probabilistic filter in order to assess the success of ember ignition. 
+            # 
+            #Formula (10) of Alexandridis et al IJWLF 2011
+            # P_c = P_c0 (1 + P_cd), where P_c0 constant probability of ignition by spotting and P_cd is a correction factor that 
+            #depends on vegetation type and density...
+            # In this case, we put P_cd = 0.3 for conifers and 0 for the rest. but it can be generalized..
+
+            P_c = P_c0 * (1+ P_cd_conifer*(self.veg[nr_spot,nc_spot] == 5)) # + 0.4 * bushes_mask.... etc etc 
+
+            success_spot_mask = np.random.uniform(  size=P_c.shape ) <  P_c 
+            nr_spot = nr_spot[success_spot_mask]
+            nc_spot = nc_spot[success_spot_mask]
+            nt_spot = nt_spot[success_spot_mask]        
+            # A little more debug on the previous part is advised
+
+            #the following function evalates the time that the embers  will need to burn the entire cell  they land into
+            transition_time_spot = self.p_time(self.dem[nr_spot, nc_spot], self.dem[nr_spot, nc_spot], #evaluation of the propagation time of the "spotted cells"
+                            self.veg[nr_spot, nc_spot], self.veg[nr_spot, nc_spot],   #dh=0 (no slope) and veg_from=veg_to to simplify the phenomenon
+                            np.zeros(nr_spot.shape), cellsize*np.ones(nr_spot.shape), #ember_angle, ember_distance, 
+                            moisture[nr_spot, nc_spot],
+                            w_dir, w_speed)
+            
+            p_nr = np.append( p_nr , nr_spot)               #row-coordinates of the "spotted cells" added to the other ones
+            p_nc = np.append( p_nc , nc_spot)               #column-coordinates of the "spotted cells" added to the other ones
+            p_nt = np.append( p_nt , nt_spot)               #time propagation of "spotted cells" added to the other ones 
+            transition_time = np.append( transition_time , np.around( transition_time_spot ) )
+        #else:
+        #    print("I am not going to spot...")
+
         ######################################
-        #####################   TO HERE  <------
+        ##################### UP TO HERE  <------
 
         prop_time = np.around(self.c_time + transition_time, decimals=1)
 
@@ -621,7 +684,7 @@ class Propagator:
                 reprj_values, dst_trans = reproject(
                     values,
                     self.__trans,
-                    self.__prj.crs.srs,
+                    self.__prj.srs,  #self.__prj,  crs.srs #changed due to updates in Pyproj and-or Rasterio...
                     self.dst_crs
                 )
 
