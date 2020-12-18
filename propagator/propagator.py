@@ -598,6 +598,8 @@ class Propagator:
         waterline_actionss = bc.get(WATERLINE_ACTION_TAG, None)
         moisture_value = bc.get(MOISTURE_TAG, 0)/100
         heavy_actionss = bc.get(HEAVY_ACTION_TAG, None)
+        canadairs = bc.get(CANADAIR_TAG, None)          #select canadair actions from boundary conditions
+        helicopters = bc.get(HELICOPTER_TAG, None)      #select helicopter actions from boundary conditions
 
         if waterline_actionss:
             waterline_action_string = '\n'.join(waterline_actionss)
@@ -610,11 +612,54 @@ class Propagator:
             
             mask = (img==1)
             img_mask = ndimage.binary_dilation(mask)
-            img[img_mask] = 0.8  #mettere a 0.9 per le fighting actions con le water line
+            img[img_mask] = 0.8
         else:
             img = np.ones((self.__shape[0], self.__shape[1])) * moisture_value
         
-        bc[MOIST_RASTER_TAG] = img
+        ####canadair actions
+        if canadairs:
+            canadairs_string = '\n'.join(canadairs)
+            mid_lat, mid_lon, polys, lines, points = read_actions(canadairs_string)
+            easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
+
+            if len(polys)!=0 or len(points)!=0 :
+                raise Exception(f'ERROR: Canadair actions must be lines')
+
+            img_can, canadair_points = \
+                rasterize_actions((self.__shape[0], self.__shape[1]), 
+                            points, lines, polys, west, north, self.step_x, self.step_y, zone_number, base_value=moisture_value)
+            
+            mask_can = (img_can==1)                                 #select points that are directly interested by canadair actions
+            img_can_mask = ndimage.binary_dilation(mask_can)        #create a 1 pixel buffer around the selected points
+            img[img_can_mask] = 0.4                 #moisture value of the points of the buffer
+            img[mask_can] = 0.9                     #moisture value of the points directly interested by the canadair actions
+        
+        ####helicopter actions
+        if helicopters:
+            helicopters_string = '\n'.join(helicopters)
+            mid_lat, mid_lon, polys, lines, points = read_actions(helicopters_string)
+            easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
+
+            if len(polys)!=0 or len(lines)!=0 :
+                raise Exception(f'ERROR: Helicopter actions must be points')
+            
+            img_heli, helicopter_points = \
+                rasterize_actions((self.__shape[0], self.__shape[1]), 
+                            points, lines, polys, west, north, self.step_x, self.step_y, zone_number, base_value=moisture_value)
+          
+            new_heli_point = []
+            for ep in helicopter_points:                #create a randomness in the points where the helicopter acts
+                new_x = ep[0] - 1 + round(2*np.random.uniform())
+                new_y = ep[1] - 1 + round(2*np.random.uniform())
+                new_point = add_point(img_heli, new_y, new_x, 0.6)
+                new_heli_point.extend(new_point)
+
+            mask_newheli = (img_heli==0.6)                                  #select points that are directly interested by helicopter actions
+            img_new_heli_mask = ndimage.binary_dilation(mask_newheli)       #create a 1 pixel buffer around the selected points
+            img[img_new_heli_mask] = 0.3                #moisture value of the points of the buffer
+            img[mask_newheli] = 0.6                     #moisture value of the points directly interested by the helicopter actions
+        
+        bc[MOIST_RASTER_TAG] = img 
 
         if heavy_actionss:
             heavy_action_string = '\n'.join(heavy_actionss)

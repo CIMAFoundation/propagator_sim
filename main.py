@@ -66,6 +66,14 @@ def main():
     if heavy_actions_fixed == 0:
         heavy_actions_fixed = None
     heavy_actions = None
+    canadair_fixed = d.get(CANADAIR_TAG, None) #canadair means fire fighting actions made by canadairs
+    if canadair_fixed == 0:
+        canadair_fixed = None
+    canadair = None
+    helicopter_fixed = d.get(HELICOPTER_TAG, None) #helicopter means fire fighting actions made by helicopters
+    if helicopter_fixed == 0:
+        helicopter_fixed = None
+    helicopter = None
 
     if IGNITIONS_TAG not in d:
         logging.critical('Error. Missing ignitions in parameter file')
@@ -81,6 +89,8 @@ def main():
         "w_speed": w_speed,
         "moisture": moisture_100,
         "waterline_action": waterline_actions,
+        "canadair": canadair,
+        "helicopter": helicopter,
         "heavy_action": heavy_actions,
         "ignitions": ignitions,
         "time": 0
@@ -90,7 +100,7 @@ def main():
         if  waterline_actions_fixed is not None:
             if WATERLINE_ACTION_TAG in bc:
                 if bc[WATERLINE_ACTION_TAG] is not None:
-                    bc[WATERLINE_ACTION_TAG] = bc[WATERLINE_ACTION_TAG] +  waterline_actions_fixed
+                    bc[WATERLINE_ACTION_TAG] = bc[WATERLINE_ACTION_TAG] + waterline_actions_fixed
                 else:
                     bc[WATERLINE_ACTION_TAG] = waterline_actions_fixed
             else:
@@ -99,11 +109,27 @@ def main():
         if  heavy_actions_fixed is not None:
             if HEAVY_ACTION_TAG in bc:
                 if bc[HEAVY_ACTION_TAG] is not None:
-                    bc[HEAVY_ACTION_TAG] = bc[HEAVY_ACTION_TAG] +  heavy_actions_fixed
+                    bc[HEAVY_ACTION_TAG] = bc[HEAVY_ACTION_TAG] + heavy_actions_fixed
                 else:
                     bc[HEAVY_ACTION_TAG] = heavy_actions_fixed
             else:
                     bc[HEAVY_ACTION_TAG] = heavy_actions_fixed
+        if  canadair_fixed is not None:
+            if CANADAIR_TAG in bc:
+                if bc[CANADAIR_TAG] is not None:
+                    bc[CANADAIR_TAG] = bc[CANADAIR_TAG] + canadair_fixed
+                else:
+                    bc[CANADAIR_TAG] = canadair_fixed
+            else:
+                    bc[CANADAIR_TAG] = canadair_fixed
+        if  helicopter_fixed is not None:
+            if HELICOPTER_TAG in bc:
+                if bc[HELICOPTER_TAG] is not None:
+                    bc[HELICOPTER_TAG] = bc[HELICOPTER_TAG] + helicopter_fixed
+                else:
+                    bc[HELICOPTER_TAG] = helicopter_fixed
+            else:
+                    bc[HELICOPTER_TAG] = helicopter_fixed
 
         if IGNITIONS_TAG in bc:
             ignitions_bc = bc[IGNITIONS_TAG]
@@ -120,6 +146,8 @@ def main():
                 "moisture":0,
                 "waterline_actions": None,
                 "heavy_action": None,
+                "canadair": None,
+                "helicopter": None,
                 "ignitions": None,
                 "time": 0
             }

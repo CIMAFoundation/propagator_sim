@@ -63,14 +63,16 @@ spotting_rn_mean  = 100
 spotting_rn_std   = 25
 # P_c = P_c0 (1 + P_cd), where P_c0 constant probability of ignition by spotting and P_cd is a correction factor that 
 #depends on vegetation type and density...
-P_cd_conifer = 0.3 
-P_c0 = 0.3
+P_cd_conifer = 0.4
+P_c0 = 0.6
 
 
 #####   TAG   ####
 WATERLINE_ACTION_TAG = 'waterline_action'
 HEAVY_ACTION_TAG = 'heavy_action'
 HEAVY_ACTION_RASTER_TAG = 'heavy_action_raster'
+HELICOPTER_TAG = 'helicopter'
+CANADAIR_TAG = 'canadair'
 MOISTURE_TAG = 'moisture'
 MOIST_RASTER_TAG = 'moist_raster'
 N_THREADS_TAG = 'n_threads'
