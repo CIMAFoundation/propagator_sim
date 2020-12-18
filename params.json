@@ -1,13 +1,21 @@
 {
-  "time_limit":1440,
+  "time_limit":600,
   "tileset":"default",
   "name":"test",
   "boundary_conditions":[
     {
-      "w_dir":270,
+      "w_dir":90,
       "w_speed":"30",
-      "moisture":0,
-      "time":0
+      "moisture":10,
+      "helicopter": ["POINT:44.48;9.1025"],
+      "time":60
+    },
+    {
+      "w_dir":0,
+      "w_speed":"30",
+      "moisture":6,
+      "canadair": ["LINE:[44.49 44.45];[9.10230 9.10230]"],
+      "time":300
     }
 
     
@@ -21,10 +29,12 @@
   "init_date":"202001300000",
   "w_speed":0,
   "n_threads":100,
-  "heavy_action": ["LINE:[44.49 44.45];[9.1030 9.1030]"],
+  "heavy_action": ["LINE:[44.49 44.45];[9.090 9.090]"],
   "waterline_action": 0,
-  "moisture":0,
+  "canadair": 0,
+  "helicopter": 0,
+  "moisture":26,
   "ros_model":"wang",
   "prob_moist_model":"new_formula",
-  "do_spotting" : true
+  "do_spotting" : false
 }
