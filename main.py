@@ -45,7 +45,7 @@ def main():
 
     n_threads = int(d.get(N_THREADS_TAG, 10))
     grid_dim_km = float(d.get(GRID_DIM_KM_TAG, 10))
-    grid_dim = np.floor(grid_dim_km / 20 * 1000)
+    grid_dim = np.floor(grid_dim_km / cellsize * 1000)
     grid_dim = int(np.clip(np.floor(grid_dim), 300, 1500))
     tile_set = d.get(TILESET_TAG, DEFAULT_TAG)
     ros_model_code = d.get(ROS_MODEL_TAG, WANG_TAG) #switch per scegliere se usare il modello di Rothermel (rothermel), Wang (wang) oppure il classico Propagator (default)

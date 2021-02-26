@@ -640,8 +640,8 @@ class Propagator:
             mid_lat, mid_lon, polys, lines, points = read_actions(helicopters_string)
             easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
 
-            if len(polys)!=0 or len(lines)!=0 :
-                raise Exception(f'ERROR: Helicopter actions must be points')
+            ##if len(polys)!=0 or len(lines)!=0 :
+            ##    raise Exception(f'ERROR: Helicopter actions must be points')
             
             img_heli, helicopter_points = \
                 rasterize_actions((self.__shape[0], self.__shape[1]), 

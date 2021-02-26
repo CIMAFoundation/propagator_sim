@@ -4,36 +4,29 @@
   "name":"test",
   "boundary_conditions":[
     {
-      "w_dir":90,
-      "w_speed":"30",
-      "moisture":10,
-      "helicopter": ["POINT:44.48;9.1025"],
-      "time":60
-    },
-    {
-      "w_dir":0,
-      "w_speed":"30",
-      "moisture":6,
-      "canadair": ["LINE:[44.49 44.45];[9.10230 9.10230]"],
-      "time":300
+      "w_dir":116,
+      "w_speed":"43",
+      "moisture":0,
+      "helicopter": ["LINE:[42.69841 42.70345];[11.02154 11.02864]","LINE:[42.70345 42.69710];[11.02864 11.03851]","LINE:[42.69710 42.69084];[11.03851 11.02670]","LINE:[42.69084 42.69841];[11.02670 11.02154]"],
+      "time":0
     }
 
     
   ],
-  "ignitions":["POINT:44.4700;9.110"],
+  "ignitions":["POINT:42.698584;11.02906"],
   "isochrone_thresholds": [0.01, 0.5, 0.75, 0.9],
   "w_dir":0,
-  "time_resolution":30,
-  "time_res":30,
+  "time_resolution":60,
+  "time_res":60,
   "grid_dim_km":20,
   "init_date":"202001300000",
   "w_speed":0,
   "n_threads":100,
-  "heavy_action": ["LINE:[44.49 44.45];[9.090 9.090]"],
+  "heavy_action": 0,
   "waterline_action": 0,
   "canadair": 0,
   "helicopter": 0,
-  "moisture":26,
+  "moisture":0,
   "ros_model":"wang",
   "prob_moist_model":"new_formula",
   "do_spotting" : false
