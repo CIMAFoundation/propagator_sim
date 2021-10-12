@@ -71,6 +71,13 @@ def parse_params():
         help='Vegetation tiff file to load'
     )
 
+    parser.add_argument('-spo',
+        dest='do_spot',
+        action='store_true', 
+        help='flag to use fire-spotting model',
+        default=False
+    )
+    
     args = parser.parse_args()
     
     return args

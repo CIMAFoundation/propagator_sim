@@ -1,3 +1,8 @@
+test/
+scriptino.py
+scriptPlot.py
+script_watervalue.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
