@@ -8,13 +8,16 @@ import scipy.io
 import utm
 from numpy import pi
 from pyproj import Proj
-from rasterio import crs, enums, transform, warp
+from rasterio import crs, transform, warp, enums
 from rasterio.features import shapes
 from scipy.ndimage import filters
-from scipy.ndimage.morphology import binary_dilation, binary_erosion
+from scipy.ndimage.morphology import binary_erosion, binary_dilation
 from scipy.signal.signaltools import medfilt2d
-from shapely.geometry import LineString, MultiLineString, mapping, shape
+from shapely.geometry import mapping
+from shapely.geometry import shape, MultiLineString, LineString
 from sortedcontainers import SortedDict
+
+from .constants import *
 
 DATA_DIR = 'data'
 
@@ -74,7 +77,7 @@ class Scheduler:
             self.push_all(new_updates)
 
 
-def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset='default'):
+def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset=DEFAULT_TAG):
     filename = var + '_' + str(tile_j) + '_' + str(tile_i) + '.mat'
 
     filepath = join(DATA_DIR, tileset, str(zone_number), filename)
@@ -87,7 +90,7 @@ def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset='default'):
     return np.ascontiguousarray(m)
 
 
-def load_tile_ref(zone_number, var, tileset='default'):
+def load_tile_ref(zone_number, var, tileset=DEFAULT_TAG):
     filename = join(DATA_DIR, tileset, str(zone_number), var + '_ref.mat')
     logging.debug(filename)
     mat_file = scipy.io.loadmat(filename)
@@ -97,7 +100,7 @@ def load_tile_ref(zone_number, var, tileset='default'):
     return step_x, step_y, max_y, min_x, tile_dim
 
 
-def load_tiles(zone_number, x, y, dim, var, tileset='default'):
+def load_tiles(zone_number, x, y, dim, var, tileset=DEFAULT_TAG):
     step_x, step_y, max_y, min_x, tile_dim = load_tile_ref(zone_number, var, tileset)
     i = 1 + np.floor((max_y - y) / step_y)
     j = 1 + np.floor((x - min_x) / step_x)
@@ -253,9 +256,8 @@ def add_poly(img, cs, rs, val):
     img[img_temp > 0] = val
     return contour
 
-
-def read_ignition(ignition_string):
-    strings = ignition_string.split('\n')
+def read_actions(imp_points_string):
+    strings = imp_points_string.split('\n')
 
     polys, lines, points = [], [], []
     max_lat, max_lon, min_lat, min_lon = -np.Inf, -np.Inf, np.Inf, np.Inf
@@ -290,11 +292,11 @@ def read_ignition(ignition_string):
     mid_lat = (max_lat + min_lat) / 2
     mid_lon = (max_lon + min_lon) / 2
 
-    return mid_lat, mid_lon, polys, lines, points
+    return mid_lat, mid_lon, polys, lines, points 
 
 
-def rasterize_ignitions(dim, points, lines, polys, lonmin, latmax, stepx, stepy, zone_number):
-    img = np.zeros(dim)
+def rasterize_actions(dim, points, lines, polys, lonmin, latmax, stepx, stepy, zone_number, base_value=0, value=1):
+    img = np.ones(dim) * base_value
     active_points = []
     for line in lines:
         xs, ys, _, _ = zip(*[
@@ -320,59 +322,70 @@ def rasterize_ignitions(dim, points, lines, polys, lonmin, latmax, stepx, stepy,
         y = np.floor((latmax - np.array(ys)) / stepy).astype('int')
         active = add_poly(img, x, y, 1)
         active_points.extend(active)
+
     return img, active_points
 
 
-def reproject(src, reference, zone_number, zone_letter, trim=True):
+def trim_values(values, src_trans):
+    rows, cols = values.shape
+    min_row, max_row = int(rows / 2 - 1), int(rows / 2 + 1)
+    min_col, max_col = int(cols / 2 - 1), int(cols / 2 + 1)
+
+    v_rows = np.where(values.sum(axis=1) > 0)[0]
+    if len(v_rows) > 0:
+        min_row, max_row = v_rows[0] - 1, v_rows[-1] + 2
+
+    v_cols = np.where(values.sum(axis=0) > 0)[0]
+    if len(v_cols) > 0:
+        min_col, max_col = v_cols[0] - 1, v_cols[-1] + 2
+
+    trim_values = values[min_row:max_row, min_col:max_col]    
+    rows, cols = trim_values.shape
+
+    (west, east), (north, south) = rio.transform.xy(
+        src_trans, [min_row, max_row], [min_col, max_col],
+        offset='ul'
+    )
+    trim_trans = transform.from_bounds(west, south, east, north, cols, rows)
+    return trim_values, trim_trans
+
+
+def reproject(values, src_trans, src_crs, dst_crs, trim=True):
     if trim:
-        v_rows = np.where(src.sum(axis=1) > 0)[0]
-        v_cols = np.where(src.sum(axis=0) > 0)[0]
-        if len(v_rows) > 0:
-            min_row, max_row = v_rows[0] - 1, v_rows[-1] + 2
-        else:
-            n_rows = src.shape[0]
-            min_row, max_row = int(n_rows / 2 - 1), int(n_rows / 2 + 1)
+        values, src_trans = trim_values(values, src_trans)
 
-        if len(v_cols) > 0:
-            min_col, max_col = v_cols[0] - 1, v_cols[-1] + 2
-        else:
-            n_cols = src.shape[1]
-            min_col, max_col = int(n_cols / 2 - 1), int(n_cols / 2 + 1)
-
-        src = src[min_row:max_row, min_col:max_col]
-        step_x, step_y = reference[2], reference[3]
-        west = reference[0] + min_col * step_x
-        north = reference[1] - min_row * step_y
-    else:
-        west, north, step_x, step_y = reference
-
-    rows, cols = src.shape
-    south = north - (rows * step_y)
-    east = west + (cols * step_x)
+    rows, cols = values.shape
+    (west, east), (north, south) = rio.transform.xy(
+        src_trans, [0, rows], [0, cols],
+        offset='ul'
+    )
 
     with rio.Env():
-        src_prj = Proj(proj="utm", zone=zone_number, datum='WGS84')
-        dst_crs = crs.CRS({'init': 'EPSG:4326', 'no_defs': True})
-
-        src_trans = transform.from_bounds(west, south, east, north, cols, rows)
         dst_trans, dw, dh = warp.calculate_default_transform(
-            src_crs=src_prj.srs, dst_crs=dst_crs,
-            width=cols, height=rows,
-            left=west, bottom=south,
-            right=east, top=north, resolution=None
+            src_crs=src_crs,
+            dst_crs=dst_crs,
+            width=cols,
+            height=rows,
+            left=west,
+            bottom=south,
+            right=east,
+            top=north,
+            resolution=None
         )
         dst = np.empty((dh, dw))
 
         warp.reproject(
-            source=np.ascontiguousarray(src), destination=dst,
-            src_crs=src_prj.srs, dst_crs=dst_crs,
-            dst_transform=dst_trans, src_transform=src_trans,
+            source=np.ascontiguousarray(values), 
+            destination=dst,
+            src_crs=src_crs, 
+            dst_crs=dst_crs,
+            dst_transform=dst_trans, 
+            src_transform=src_trans,
             resampling=enums.Resampling.nearest,
             num_threads=1
         )
-
-        return dst, dst_trans, dst_crs
-
+    
+    return dst, dst_trans
 
 def write_geotiff(filename, values, dst_trans, dst_crs, dtype=np.uint8):
     with rio.Env():
@@ -420,7 +433,7 @@ def smooth_linestring(linestring, smooth_sigma):
 def extract_isochrone(values, transf,
                       thresholds=[0.5, 0.75, 0.9],
                       med_filt_val=9, min_length=0.0001,
-                      smooth_sigma=1.0, simp_fact=0.00001):
+                      smooth_sigma=0.8, simp_fact=0.00001):
     '''
     extract isochrone from the propagation probability map values at the probanilities thresholds,
      applying filtering to smooth out the result
@@ -448,14 +461,11 @@ def extract_isochrone(values, transf,
             for s, v in shapes(over_t, transform=transf):
                 sh = shape(s)
 
-                # if len(sh.interiors):
                 ml = [
-                    smooth_linestring(l, smooth_sigma).simplify(simp_fact)
+                    smooth_linestring(l, smooth_sigma) # .simplify(simp_fact)
                     for l in sh.interiors
                     if l.length > min_length
                 ]
-                # else:
-                #    ml = [smooth_linestring(sh.exterior, smooth_sigma).simplify(simp_fact)]
 
                 results[t] = MultiLineString(ml)
 
@@ -466,7 +476,7 @@ def save_isochrones(results, filename, format='geojson'):
     if format == 'shp':
         schema = {
             'geometry': 'MultiLineString',
-            'properties': {'value': 'float', 'time': 'int'},
+            'properties': {'value': 'float', TIME_TAG: 'int'},
         }
         # Write a new Shapefile
         with fiona.open(filename, 'w', 'ESRI Shapefile', schema) as c:
@@ -477,7 +487,7 @@ def save_isochrones(results, filename, format='geojson'):
                             'geometry': mapping(results[t][p]),
                             'properties': {
                                 'value': p,
-                                'time': t
+                                TIME_TAG: t
                             },
                         })
 
@@ -493,7 +503,7 @@ def save_isochrones(results, filename, format='geojson'):
                         'geometry': mapping(results[t][p]),
                         'properties': {
                             'value': p,
-                            'time': t
+                            TIME_TAG: t
                         },
                     })
         with open(filename, "w") as f:
@@ -502,13 +512,13 @@ def save_isochrones(results, filename, format='geojson'):
 
 if __name__ == '__main__':
     grid_dim = 1000
-    tileset = 'default'
+    tileset = DEFAULT_TAG
     s1 = [
         "LINE:[44.3204247306364 44.320317268240956 ];[8.44812858849764 8.449995405972006 ]",
         "POLYGON:[44.32214410219511 44.320869929892176 44.32083922660368 44.32214410219511 ];[8.454050906002523 8.453171141445639 8.45463026314974 8.454050906002523 ]",
         "POINT:44.32372526549074;8.45040310174227"]
     ignition_string = '\n'.join(s1)
-    mid_lat, mid_lon, polys, lines, points = read_ignition(ignition_string)
+    mid_lat, mid_lon, polys, lines, points = read_actions(ignition_string)
     easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
     src, west, north, step_x, step_y = load_tiles(zone_number, easting, northing, grid_dim, 'prop', tileset)
 

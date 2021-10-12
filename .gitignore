@@ -1,13 +1,7 @@
-tmp/
-data/
-v0_table.txt
-work/
-.vscode/launch.json
-params.json
-
-.vscode/settings.json
-.DS_Store
-
+test/
+scriptino.py
+scriptPlot.py
+script_watervalue.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -134,3 +128,11 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+tmp/
+data/
+v0_table.txt
+work/
+.vscode/launch.json
+
+.vscode/settings.json
+.DS_Store
