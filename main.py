@@ -58,6 +58,7 @@ def main():
     w_dir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
     w_speed = float(d.get(W_SPEED_TAG, 0))
     moisture_100 = int(d.get(MOISTURE_TAG, 0))
+    humidity = int(d.get(HUMIDITY_TAG, 0))
     waterline_actions_fixed = d.get(WATERLINE_ACTION_TAG, None) #waterline actions means fire fighting actions made by the use of water
     if waterline_actions_fixed == 0:
         waterline_actions_fixed = None
@@ -88,6 +89,7 @@ def main():
         "w_dir": w_dir,
         "w_speed": w_speed,
         "moisture": moisture_100,
+        "humidity": humidity,
         "waterline_action": waterline_actions,
         "canadair": canadair,
         "helicopter": helicopter,
@@ -144,6 +146,7 @@ def main():
                 "w_dir": 0.0,
                 "w_speed": 0.0,
                 "moisture":0,
+                "humidity":0,
                 "waterline_actions": None,
                 "heavy_action": None,
                 "canadair": None,
@@ -168,10 +171,11 @@ def main():
     if time_limit_min is None and args.time_limit:
         time_limit_min = args.time_limit*60
 
-    if PROB_FILE_TAG in d or V0_TABLE_TAG in d:
+    if PROB_FILE_TAG in d or V0_TABLE_TAG in d or P_VEGETATION_TAG in d:
         prob_file = d.get(PROB_FILE_TAG, None)
         v0_file = d.get(V0_TABLE_TAG, None)
-        propagator.load_parameters(prob_file, v0_file)
+        p_veg = d.get(P_VEGETATION_TAG, None)
+        propagator.load_parameters(prob_file, v0_file, p_veg)
 
 
 # we pass the flag for the spotting model. the value from input line (args)

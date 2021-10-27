@@ -66,6 +66,9 @@ spotting_rn_std   = 25
 P_cd_conifer = 0.4
 P_c0 = 0.6
 
+# variable for fireline intensity
+Q = 2442.0
+
 
 #####   TAG   ####
 WATERLINE_ACTION_TAG = 'waterline_action'
@@ -74,7 +77,9 @@ HEAVY_ACTION_RASTER_TAG = 'heavy_action_raster'
 HELICOPTER_TAG = 'helicopter'
 CANADAIR_TAG = 'canadair'
 MOISTURE_TAG = 'moisture'
+HUMIDITY_TAG = 'humidity'
 MOIST_RASTER_TAG = 'moist_raster'
+HUMIDITY_RASTER_TAG = 'humidity_raster'
 N_THREADS_TAG = 'n_threads'
 BOUNDARY_CONDITIONS_TAG = 'boundary_conditions'
 INIT_DATE_TAG = 'init_date'
@@ -90,6 +95,7 @@ W_SPEED_TAG = 'w_speed'
 
 PROB_FILE_TAG = 'prob_file'
 V0_TABLE_TAG = 'v0_file'
+P_VEGETATION_TAG = 'p_vegetation'
 IGNITIONS_TAG = 'ignitions'
 GRID_DIM_KM_TAG = 'grid_dim_km'
 IGNITIONS_RASTER_TAG = 'ignitions_raster'
