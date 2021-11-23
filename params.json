@@ -5,23 +5,23 @@
   "boundary_conditions":[
     {
       "w_dir":350,
-      "w_speed":"65",
+      "w_speed":"50",
       "moisture":5,
-      "humidity":0,
+      "humidity":5,
       "time":0
     },
 	{
       "w_dir":10,
-      "w_speed":"60",
+      "w_speed":"45",
       "moisture":5,
-      "humidity":0,
+      "humidity":5,
       "time":720
     },
 	{
       "w_dir":320,
-      "w_speed":"55",
+      "w_speed":"60",
       "moisture":5,
-      "humidity":0,
+      "humidity":5,
       "time":1200
     }
 

@@ -87,7 +87,7 @@ def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, 
     moist_eff = np.exp(c_moist * moist) #moisture effect
 
     #v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
-    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS
+    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS [m/min]
 
     t = real_dist / v_wh
     t[t>=1] = np.around(t[t>=1])
@@ -119,7 +119,7 @@ def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir
     moist_eff = np.exp(c_moist * moist) #moisture effect
      
     #v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
-    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS
+    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS [m/min]
     
     t = real_dist / v_wh
 
@@ -211,7 +211,7 @@ def fire_spotting(angle_to, w_dir, w_speed): #this function evaluates the distan
     d_p = r_n * np.exp( w_speed_ms * c_2 *( np.cos( w_dir - angle_to ) - 1 ) )  #Alexandridis' formulation for spotting distance
     return d_p
 
-
+# functions useful for evaluating the fire line intensity
 def lhv_dead_fuel(hhv, dffm):
     lhv = hhv * (1.0 - (dffm / 100.0)) - Q * (dffm / 100.0)
     return lhv
@@ -222,20 +222,20 @@ def lhv_canopy(hhv, hum):
     lhv[np.isnan(lhv)] = 0
     return lhv
 
-
+  
 def fireline_intensity(d0, d1, ros, lhv_dead_fuel, lhv_canopy, rg=None):
     intensity = np.full(ros.shape[0], np.nan, dtype='float32')
     if rg is not None:
         rg_idx = ~np.isnan(rg)
         d1_idx = (d1 != 0.0) & rg_idx
         d0_idx = (d1 == 0.0) & rg_idx
-        intensity[d0_idx] = ros[d0_idx] * ( lhv_dead_fuel[d0_idx] * d0[d0_idx] * (1.0 - rg[d0_idx])) / 3600.0
-        intensity[d1_idx] = ros[d1_idx] * ( lhv_dead_fuel[d1_idx] * d0[d1_idx] + lhv_canopy[d1_idx] * (d1[d1_idx] * (1 - rg[d1_idx]))) / 3600.0
-        intensity[~rg_idx] = ros[~rg_idx] * ( lhv_dead_fuel[~rg_idx] * d0[~rg_idx] + lhv_canopy[~rg_idx] * d1[~rg_idx]) / 3600.0
+        intensity[d0_idx] = ros[d0_idx] * ( lhv_dead_fuel[d0_idx] * d0[d0_idx] * (1.0 - rg[d0_idx])) / 60.0
+        intensity[d1_idx] = ros[d1_idx] * ( lhv_dead_fuel[d1_idx] * d0[d1_idx] + lhv_canopy[d1_idx] * (d1[d1_idx] * (1 - rg[d1_idx]))) / 60.0
+        intensity[~rg_idx] = ros[~rg_idx] * ( lhv_dead_fuel[~rg_idx] * d0[~rg_idx] + lhv_canopy[~rg_idx] * d1[~rg_idx]) / 60.0
     else:
-        intensity = ros * ( lhv_dead_fuel * d0 + lhv_canopy * d1 ) / 3600.0
+        intensity = ros * ( lhv_dead_fuel * d0 + lhv_canopy * d1 ) / 60.0 #divided by 60 instead of 3600 because RoS is required in m/h and it is given in m/min (so it has to be multiplied by 60)
     return intensity
-    
+
 
 class PropagatorError(Exception):
     pass
@@ -601,9 +601,9 @@ class Propagator:
                                     moisture_r[p],
                                     w_dir_r[p], w_speed_r[p])
 
-        hhv = p_veg[veg_to[p]-1,0]
-        d0 = p_veg[veg_to[p]-1,1]
-        d1 = p_veg[veg_to[p]-1,2]
+        d0 = p_veg[veg_to[p]-1,0]
+        d1 = p_veg[veg_to[p]-1,1]
+        hhv = p_veg[veg_to[p]-1,2]
 
         # evaluate LHV of dead fuel
         lhv_dead_fuel_value = lhv_dead_fuel(hhv, moisture_r[p])

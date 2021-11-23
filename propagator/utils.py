@@ -1,3 +1,4 @@
+from itertools import count
 import logging
 from os.path import join
 
@@ -8,7 +9,7 @@ import scipy.io
 import utm
 from numpy import pi
 from pyproj import Proj
-from rasterio import crs, transform, warp, enums
+from rasterio import band, crs, transform, warp, enums
 from rasterio.features import shapes
 from scipy.ndimage import filters
 from scipy.ndimage.morphology import binary_erosion, binary_dilation
