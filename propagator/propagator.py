@@ -23,7 +23,6 @@ try:
     prob_table = np.loadtxt(os.path.join(propagator_path, 'prob_table.txt'))
     p_veg = np.loadtxt(os.path.join(propagator_path, 'p_vegetation.txt'))
 except Exception:
-    #v0, prob_table = None, None
     v0, prob_table, p_veg = None, None, None
 
 
@@ -126,7 +125,6 @@ def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir
     t[t>=1] = np.around(t[t>=1])
     t = np.clip(t, 0.1, np.inf)
     return t , v_wh
-    #return t
 
 def p_time_standard(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
     dh = (dem_to - dem_from)
@@ -141,7 +139,6 @@ def p_time_standard(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w
     t[t>=1] = np.around(t[t>=1])
     t = np.clip(t, 0.1, np.inf)
     return t , v_wh
-    #return t
 
 def w_h_effect(angle_to, w_speed, w_dir, dh, dist):
     w_effect_module = (A + (D1 * (D2 * np.tanh((w_speed / D3) - D4))) + (w_speed / D5))
