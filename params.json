@@ -1,39 +1,31 @@
 {
   "time_limit":1440,
   "tileset":"default",
-  "name":"Casarza_supsceptibility",
+  "name":"name",
   "boundary_conditions":[
     {
-      "w_dir":350,
-      "w_speed":"50",
+      "w_dir":270,
+      "w_speed":"15",
       "moisture":5,
-      "humidity":5,
+      "humidity":15,
       "time":0
-    },
-	{
-      "w_dir":10,
-      "w_speed":"45",
+    },{
+      "w_dir":0,
+      "w_speed":"20",
       "moisture":5,
-      "humidity":5,
+      "humidity":15,
       "time":720
-    },
-	{
-      "w_dir":320,
-      "w_speed":"60",
-      "moisture":5,
-      "humidity":5,
-      "time":1200
     }
 
     
   ],
-  "ignitions":["POINT:44.30247;9.47183"],
+  "ignitions":["POINT:42.41656;13.08678"],
   "isochrone_thresholds": [0.01, 0.5, 0.75, 0.9],
   "w_dir":0,
   "time_resolution":60,
   "time_res":60,
   "grid_dim_km":20,
-  "init_date":"202001300000",
+  "init_date":"201708220000",
   "w_speed":0,
   "n_threads":100,
   "heavy_action": 0,
@@ -44,5 +36,5 @@
   "humidity":0,
   "ros_model":"wang",
   "prob_moist_model":"new_formula",
-  "do_spotting" : false
+  "do_spotting" : true
 }

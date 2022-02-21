@@ -229,11 +229,11 @@ def fireline_intensity(d0, d1, ros, lhv_dead_fuel, lhv_canopy, rg=None):
         rg_idx = ~np.isnan(rg)
         d1_idx = (d1 != 0.0) & rg_idx
         d0_idx = (d1 == 0.0) & rg_idx
-        intensity[d0_idx] = ros[d0_idx] * ( lhv_dead_fuel[d0_idx] * d0[d0_idx] * (1.0 - rg[d0_idx])) / 60.0
-        intensity[d1_idx] = ros[d1_idx] * ( lhv_dead_fuel[d1_idx] * d0[d1_idx] + lhv_canopy[d1_idx] * (d1[d1_idx] * (1 - rg[d1_idx]))) / 60.0
-        intensity[~rg_idx] = ros[~rg_idx] * ( lhv_dead_fuel[~rg_idx] * d0[~rg_idx] + lhv_canopy[~rg_idx] * d1[~rg_idx]) / 60.0
+        intensity[d0_idx] = ros[d0_idx] * (( lhv_dead_fuel[d0_idx] * d0[d0_idx] * (1.0 - rg[d0_idx])) / 2 ) / 60.0
+        intensity[d1_idx] = ros[d1_idx] * (( lhv_dead_fuel[d1_idx] * d0[d1_idx] + lhv_canopy[d1_idx] * (d1[d1_idx] * (1 - rg[d1_idx]))) / 2 ) / 60.0
+        intensity[~rg_idx] = ros[~rg_idx] * (( lhv_dead_fuel[~rg_idx] * d0[~rg_idx] + lhv_canopy[~rg_idx] * d1[~rg_idx]) / 2 ) / 60.0
     else:
-        intensity = ros * ( lhv_dead_fuel * d0 + lhv_canopy * d1 ) / 60.0 #divided by 60 instead of 3600 because RoS is required in m/h and it is given in m/min (so it has to be multiplied by 60)
+        intensity = ros * (( lhv_dead_fuel * d0 + lhv_canopy * d1 ) ) / 60.0 #divided by 60 instead of 3600 because RoS is required in m/s and it is given in m/min (so it has to be divided by 60)
     return intensity
 
 
@@ -320,7 +320,9 @@ class Propagator:
         return RoS_max
     
     def __compute_RoS_mean(self):
-        RoS_mean = np.nanmean(self.ros, 2)
+        RoS_m = np.where(self.ros>0, self.ros, np.NaN)
+        RoS_mean = np.nanmean(RoS_m, 2)
+        RoS_mean = np.where(RoS_mean > 0, RoS_mean, 0)
         return RoS_mean
     
     def __compute_fireline_int_max(self):
@@ -328,7 +330,9 @@ class Propagator:
         return fl_I_max
     
     def __compute_fireline_int_mean(self):
-        fl_I_mean = np.nanmean(self.fireline_int, 2)
+        fl_I_m = np.where(self.fireline_int>0, self.fireline_int, np.NaN)
+        fl_I_mean = np.nanmean(fl_I_m, 2)
+        fl_I_mean = np.where(fl_I_mean > 0, fl_I_mean, 0)
         return fl_I_mean
 
     def __compute_stats(self, values):
