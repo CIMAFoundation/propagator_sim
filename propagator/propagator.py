@@ -723,11 +723,11 @@ class Propagator:
     def __rasterize_moisture_fighting_actions(self, bc):
         west, south, east, north = self.__bounds
         waterline_actionss = bc.get(WATERLINE_ACTION_TAG, None)
-        moisture_value = bc.get(MOISTURE_TAG, 0)/100
-        humidity_value = bc.get(HUMIDITY_TAG)
+        moisture_value = bc.get(MOISTURE_TAG, 0)/100    # defaults to FFMC 0%
+        humidity_value = bc.get(HUMIDITY_TAG, 10)       # defaults to low air humidity level of 10%
         heavy_actionss = bc.get(HEAVY_ACTION_TAG, None)
-        canadairs = bc.get(CANADAIR_TAG, None)          #select canadair actions from boundary conditions
-        helicopters = bc.get(HELICOPTER_TAG, None)      #select helicopter actions from boundary conditions
+        canadairs = bc.get(CANADAIR_TAG, None)          # select canadair actions from boundary conditions
+        helicopters = bc.get(HELICOPTER_TAG, None)      # select helicopter actions from boundary conditions
 
         hum_img = np.ones((self.__shape[0], self.__shape[1])) * humidity_value
         bc[HUMIDITY_RASTER_TAG] = hum_img
