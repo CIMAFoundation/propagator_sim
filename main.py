@@ -85,6 +85,28 @@ def main():
             
     time_resolution = float(d.get(TIME_RESOLUTION_TAG, 60))
 
+    veg_become_broadleaves = d.get(VEG_BROADLEAVES_TAG, None)
+    if veg_become_broadleaves == 0:
+        veg_become_broadleaves = None
+    veg_become_shrubs = d.get(VEG_SHRUBS_TAG, None)
+    if veg_become_shrubs == 0:
+        veg_become_shrubs = None
+    veg_become_bare_soil = d.get(VEG_BARE_SOIL_TAG, None)
+    if veg_become_bare_soil == 0:
+        veg_become_bare_soil = None
+    veg_become_grass =d.get(VEG_GRASS_TAG, None)
+    if veg_become_grass == 0:
+        veg_become_grass = None
+    veg_become_conifers = d.get(VEG_CONIFERS_TAG, None)
+    if veg_become_conifers == 0:
+        veg_become_conifers = None
+    veg_become_crops = d.get(VEG_CROPS_TAG, None)
+    if veg_become_crops == 0:
+        veg_become_crops = None
+    veg_become_no_fire_broadleaves = d.get(VEG_NO_FIRE_BROADLEAVES_TAG, None)
+    if veg_become_no_fire_broadleaves == 0:
+        veg_become_no_fire_broadleaves = None
+
     boundary_conditions = d.get(BOUNDARY_CONDITIONS_TAG, [{
         "w_dir": w_dir,
         "w_speed": w_speed,
@@ -155,6 +177,15 @@ def main():
                 "time": 0
             }
         )
+    veg_modification = {
+        "veg_broadleaves":veg_become_broadleaves,
+        "veg_shrubs":veg_become_shrubs,
+        "veg_bare_soil":veg_become_bare_soil,
+        "veg_grass":veg_become_grass,
+        "veg_conifers":veg_become_conifers,
+        "veg_crops":veg_become_crops,
+        "veg_no_fire_broadleaves":veg_become_no_fire_broadleaves
+    }
 
     ignition_string = '\n'.join(ignitions)
 
@@ -205,7 +236,8 @@ def main():
         save_realizations=args.save_realizations,
         ros_model_code=ros_model_code,
         prob_moist_model=prob_moist_model,
-        do_spotting = do_spotting
+        do_spotting = do_spotting,
+        veg_modification = veg_modification
     )
 
     sim = Propagator(settings)
@@ -221,6 +253,8 @@ def main():
         sim.load_data_from_files(args.veg_file, args.dem_file)
 
     sim.init_ignitions(polys_ign, lines_ign, points_ign, zone_number_ign)
+    if (veg_become_broadleaves is not None) and (veg_become_shrubs is not None) and (veg_become_bare_soil is not None) and (veg_become_grass is not None) and (veg_become_conifers is not None) and (veg_become_crops is not None) and (veg_become_broadleaves is not None):
+        sim.modify_vegetation()
     sim.run()
     logging.info('completed')
 

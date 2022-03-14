@@ -259,7 +259,7 @@ class PropagatorSettings:
         self.p_time_fn = get_p_time_fn(settings_dict[ROS_MODEL_CODE_TAG])
         self.p_moist_fn = get_p_moist_fn(settings_dict[PROB_MOIST_CODE_TAG])
         self.do_spotting = settings_dict[SPOT_FLAG_TAG]
-
+        self.veg_modification = settings_dict[VEG_MODIFICATION_TAG]
         #self.simp_fact = settings_dict['simp_fact']
         #self.debug_mode = settings_dict['debug_mode']
         #self.write_vegetation = settings_dict['write_vegetation']
@@ -279,6 +279,7 @@ class Propagator:
         self.p_moist = settings.p_moist_fn #print("p_moist is ...", self.p_moist)
         self.ros = None
         self.fireline_int = None
+        self.veg_modification = settings.veg_modification
         # make it configurable
         self.dst_crs = crs.CRS({'init': 'EPSG:4326', 'no_defs': True})
 
@@ -482,6 +483,33 @@ class Propagator:
             self.__init_crs_from_bounds(west, south, east, north, cols, rows, step_x, step_y, zone_number)
         except FileNotFoundError:
             raise NoTilesError()
+
+    def modify_vegetation(self):
+        west, south, east, north = self.__bounds
+        veg_modifications = self.veg_modification
+        count = 0
+        for v_mod in veg_modifications:
+            count = count + 1
+            mod_cond = veg_modifications[v_mod]
+            string = '\n'.join(mod_cond)
+            mid_lat, mid_lon, polys, lines, points = read_actions(string)
+            easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
+
+            image, modification_points = \
+                rasterize_actions((self.__shape[0], self.__shape[1]), 
+                            points, lines, polys, west, north, self.step_x, self.step_y, zone_number)
+            
+            new_mask = ( image == 1 )
+            #new_mask_dilated = ndimage.binary_dilation( new_mask )
+            mod_points = np.where( new_mask == True )#mod_points = np.where( new_mask_dilated == True )
+            mod_points_enlarged = []
+            for i in range(len(mod_points[0])):
+                mods = add_point(new_mask, mod_points[1][i], mod_points[0][i], 1) #mods = add_point(new_mask_dilated, mod_points[1][i], mod_points[0][i], 1)
+                mod_points_enlarged.extend(mods)
+            
+            for points in mod_points_enlarged:
+                self.veg[ points[0] , points[1] ] = count
+
 
     def __find_bc(self):
         last_bc = None
