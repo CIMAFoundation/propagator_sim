@@ -1,7 +1,11 @@
 test/
-scriptino.py
-scriptPlot.py
-script_watervalue.py
+tmp/
+data/
+work/
+.vscode/launch.json
+.vscode/settings.json
+.DS_Store
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -130,7 +134,7 @@ dmypy.json
 
 tmp/
 data/
-#v0_table.txt
+v0_table.txt
 work/
 .vscode/launch.json
 

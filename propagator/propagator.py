@@ -724,8 +724,8 @@ class Propagator:
         waterline_actionss = bc.get(WATERLINE_ACTION_TAG, None)
         moisture_value = bc.get(MOISTURE_TAG, 0)/100
         heavy_actionss = bc.get(HEAVY_ACTION_TAG, None)
-        canadairs = bc.get(CANADAIR_TAG, None)          #select canadair actions from boundary conditions
-        helicopters = bc.get(HELICOPTER_TAG, None)      #select helicopter actions from boundary conditions
+        canadairs = bc.get(CANADAIR_TAG, None)          # select canadair actions from boundary conditions
+        helicopters = bc.get(HELICOPTER_TAG, None)      # select helicopter actions from boundary conditions
 
         if waterline_actionss:
             waterline_action_string = '\n'.join(waterline_actionss)
