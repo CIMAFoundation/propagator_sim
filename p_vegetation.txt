@@ -1,9 +1,9 @@
-#d0	d1	hhv
-1.5	3	20000	# latifoglie_soggette_al_fuoco
-1	3	21000	# vegetazione_arbustiva
-0.1	0	17000	# suolo_nudo
-0.5	0	17000	# praterie_o_coltivi_assimilabili
-1	4	21000	# resinose_soggette_al_fuoco
-0.5	2	19000	# coltivazioni_arboree
-1	2	18000	# latifoglie_poco_soggete_al_fuoco
-#1	2	18000	# resinose_poco_soggette_al_fuoco
+#d0	d1	hhv     umid
+1.5	3	20000	60      # fire-prone broadleaves
+1	3	21000	45      # shrubs
+0.1	0	100	    -9999   # bare soil
+0.5	0	17000	-9999   # grassland
+1	4	21000	55      # fire-prone conifers
+0.5	2	19000	60      # agro-forestry areas
+1	2	18000	65      # non fire-prone broadleaves
+#1	2	18000	65      # non fire-prone conifers

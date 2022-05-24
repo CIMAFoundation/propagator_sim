@@ -525,7 +525,7 @@ class Propagator:
         save_isochrones(isochrones, isochrone_path, format='geojson')
 
 
-    def __apply_updates(self, updates, w_speed, w_dir, moisture, humidity):
+    def __apply_updates(self, updates, w_speed, w_dir, moisture):
         # coordinates of the next updates
         bc = self.__find_bc()
         u = np.vstack(updates)
@@ -563,7 +563,6 @@ class Propagator:
         veg_to = self.veg[nr, nc]
         dem_to = self.dem[nr, nc]
         moisture_r = moisture[nr, nc]
-        humidity_r = humidity[nr, nc]
         angle_to = angle[nb_arr_r+1, nb_arr_c+1]
         dist_to = dist[nb_arr_r+1, nb_arr_c+1]
 
@@ -578,7 +577,6 @@ class Propagator:
         w_speed_r = w_speed_r[n_mask]
         w_dir_r = w_dir_r[n_mask]
         moisture_r = moisture_r[n_mask]
-        humidity_r = humidity_r[n_mask]
         
 
         nr, nc, nt = nr[n_mask], nc[n_mask], nt[n_mask]
@@ -605,11 +603,12 @@ class Propagator:
         d0 = p_veg[veg_to[p]-1,0]
         d1 = p_veg[veg_to[p]-1,1]
         hhv = p_veg[veg_to[p]-1,2]
+        humidity = p_veg[veg_to[p]-1,3]
 
         # evaluate LHV of dead fuel
         lhv_dead_fuel_value = lhv_dead_fuel(hhv, moisture_r[p])
         # evaluate LHV of the canopy
-        lhv_canopy_value = lhv_canopy(hhv, humidity_r[p])
+        lhv_canopy_value = lhv_canopy(hhv, humidity)
         # evaluate fireline intensity
         fireline_intensity_value = fireline_intensity(d0, d1, ros, lhv_dead_fuel_value, lhv_canopy_value)
 
@@ -724,13 +723,9 @@ class Propagator:
         west, south, east, north = self.__bounds
         waterline_actionss = bc.get(WATERLINE_ACTION_TAG, None)
         moisture_value = bc.get(MOISTURE_TAG, 0)/100
-        humidity_value = bc.get(HUMIDITY_TAG)
         heavy_actionss = bc.get(HEAVY_ACTION_TAG, None)
         canadairs = bc.get(CANADAIR_TAG, None)          #select canadair actions from boundary conditions
         helicopters = bc.get(HELICOPTER_TAG, None)      #select helicopter actions from boundary conditions
-
-        hum_img = np.ones((self.__shape[0], self.__shape[1])) * humidity_value
-        bc[HUMIDITY_RASTER_TAG] = hum_img
 
         if waterline_actionss:
             waterline_action_string = '\n'.join(waterline_actionss)
@@ -843,13 +838,11 @@ class Propagator:
             
             moisture = bc.get(MOIST_RASTER_TAG, None)
 
-            humidity = bc.get(HUMIDITY_RASTER_TAG, None)
-
             newignitions = bc.get(IGNITIONS_RASTER_TAG, None)
 
             self.c_time, updates = self.ps.pop()
             
-            new_updates = self.__apply_updates(updates, wspeed, wdir, moisture, humidity)
+            new_updates = self.__apply_updates(updates, wspeed, wdir, moisture)
             self.ps.push_all(new_updates)
             
 

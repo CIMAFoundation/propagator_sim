@@ -58,7 +58,6 @@ def main():
     w_dir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
     w_speed = float(d.get(W_SPEED_TAG, 0))
     moisture_100 = int(d.get(MOISTURE_TAG, 0))
-    humidity = int(d.get(HUMIDITY_TAG, 0))
     waterline_actions_fixed = d.get(WATERLINE_ACTION_TAG, None) #waterline actions means fire fighting actions made by the use of water
     if waterline_actions_fixed == 0:
         waterline_actions_fixed = None
@@ -89,7 +88,6 @@ def main():
         "w_dir": w_dir,
         "w_speed": w_speed,
         "moisture": moisture_100,
-        "humidity": humidity,
         "waterline_action": waterline_actions,
         "canadair": canadair,
         "helicopter": helicopter,
@@ -146,7 +144,6 @@ def main():
                 "w_dir": 0.0,
                 "w_speed": 0.0,
                 "moisture":0,
-                "humidity":0,
                 "waterline_actions": None,
                 "heavy_action": None,
                 "canadair": None,
