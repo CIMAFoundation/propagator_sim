@@ -43,21 +43,21 @@ def main():
         traceback.print_exc(file=open("errlog.txt", "a"))
         raise exp
 
-    n_threads = int(d.get(N_THREADS_TAG, 10))
-    grid_dim_km = float(d.get(GRID_DIM_KM_TAG, 10))
+    n_threads = int(d.get(N_THREADS_TAG, 10))   #number of threads (number of parallel simulation)
+    grid_dim_km = float(d.get(GRID_DIM_KM_TAG, 10))     #dimention of the domain in km
     grid_dim = np.floor(grid_dim_km / cellsize * 1000)
     grid_dim = int(np.clip(np.floor(grid_dim), 300, 1500))
-    tile_set = d.get(TILESET_TAG, DEFAULT_TAG)
-    ros_model_code = d.get(ROS_MODEL_TAG, WANG_TAG) #switch per scegliere se usare il modello di Rothermel (rothermel), Wang (wang) oppure il classico Propagator (default)
-    prob_moist_model = d.get(PROB_MOIST_CODE_TAG,NEW_FORMULATION_TAG)
-    #controllo che sia stato richiesto il modello di RoS in maniera corretta
-    if ros_model_code not in [DEFAULT_TAG , WANG_TAG , ROTHERMEL_TAG]:
+    tile_set = d.get(TILESET_TAG, DEFAULT_TAG)  #tileset to be used
+    ros_model_code = d.get(ROS_MODEL_TAG, WANG_TAG) #switch that allow to choose the required RoS model (Rothermel, Wang or the old version)
+    prob_moist_model = d.get(PROB_MOIST_CODE_TAG,NEW_FORMULATION_TAG)   #switch that allow to choose the required moisture formulation
+    
+    if ros_model_code not in [DEFAULT_TAG , WANG_TAG , ROTHERMEL_TAG]:  #check if the RoS model has been correctly defined
         logging.info('WARNING: RoS function is not well defined, the model will use "wang" configuration')
 
-    w_dir_deg = float(d.get(W_DIR_TAG, 0))
+    w_dir_deg = float(d.get(W_DIR_TAG, 0))  #wind direction [° clockwise from North]
     w_dir = normalize((180 - w_dir_deg + 90) * np.pi / 180.0)
-    w_speed = float(d.get(W_SPEED_TAG, 0))
-    moisture_100 = int(d.get(MOISTURE_TAG, 0))
+    w_speed = float(d.get(W_SPEED_TAG, 0))  #wind speed [km/h]
+    moisture_100 = int(d.get(MOISTURE_TAG, 0))  #fine fuel moisture content (FFMC)
     waterline_actions_fixed = d.get(WATERLINE_ACTION_TAG, None) #waterline actions means fire fighting actions made by the use of water
     if waterline_actions_fixed == 0:
         waterline_actions_fixed = None

@@ -15,13 +15,12 @@ from scipy import ndimage
 from .constants import *
 from .utils import *
 
-
-# [latifoglie cespugli aree_nude erba conifere coltivi faggete]
+# [fire-prone_broadleaves shrubs bare_soil grassland conifers cultivated_area non_fire-prone_broadleaves]
 try:
     propagator_path = os.environ.get('PROPAGATOR_PATH', './')
-    v0 = np.loadtxt(os.path.join(propagator_path, 'v0_table.txt'))
-    prob_table = np.loadtxt(os.path.join(propagator_path, 'prob_table.txt'))
-    p_veg = np.loadtxt(os.path.join(propagator_path, 'p_vegetation.txt'))
+    v0 = np.loadtxt(os.path.join(propagator_path, 'v0_table.txt'))  #table with v0 rate of spread (no wind and no slope)
+    prob_table = np.loadtxt(os.path.join(propagator_path, 'prob_table.txt')) #probability table
+    p_veg = np.loadtxt(os.path.join(propagator_path, 'p_vegetation.txt'))  #table with vegetation characteristics (from RISICO) 
 except Exception:
     v0, prob_table, p_veg = None, None, None
 
@@ -59,11 +58,10 @@ def get_p_moist_fn(moist_model_code):
     p_moist_function = moist_models.get(moist_model_code, moist_proba_correction_1)
     return p_moist_function
 
-def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
-    # velocità di base modulata con la densità(tempo di attraversamento)
+def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed): #rate of spread evaluated with Rothermel's equation
     dh = (dem_to - dem_from)
     
-    v = v0[veg_from-1] / 60 # tempo in minuti di attraversamento di una cella
+    v = v0[veg_from-1] / 60 # burning cell's time [mins]
     
     real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
     
@@ -85,20 +83,17 @@ def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, 
     v_wh_pre = v * sf_clip * wf_clip #Rate of Spread evaluate with Rothermel's model
     moist_eff = np.exp(c_moist * moist) #moisture effect
 
-    #v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
     v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS [m/min]
 
     t = real_dist / v_wh
     t[t>=1] = np.around(t[t>=1])
     t = np.clip(t, 0.1, np.inf)
     return t , v_wh
-    #return t
 
-def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
-  # velocità di base modulata con la densità(tempo di attraversamento)
+def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed): #rate of spread evaluated with Wang Zhengfei's equation
     dh = (dem_to - dem_from)
 
-    v = v0[veg_from-1] / 60 # tempo in minuti di attraversamento di una cella 
+    v = v0[veg_from-1] / 60 # burning cell's time [mins]
     
     real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
     
@@ -117,7 +112,6 @@ def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir
     v_wh_pre = v * wf_clip * sf_clip #Rate of Spread evaluate with Wang Zhengfei's model
     moist_eff = np.exp(c_moist * moist) #moisture effect
      
-    #v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
     v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS [m/min]
     
     t = real_dist / v_wh
@@ -126,9 +120,9 @@ def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir
     t = np.clip(t, 0.1, np.inf)
     return t , v_wh
 
-def p_time_standard(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
+def p_time_standard(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed): #rate of spread evaluated with the old Propagator's equation
     dh = (dem_to - dem_from)
-    v = v0[veg_from-1] / 60
+    v = v0[veg_from-1] / 60 # burning cell's time [mins]
     wh = w_h_effect(angle_to, w_speed, w_dir, dh, dist)
     moist_eff = np.exp(c_moist * moist) #moisture effect
     #v_wh = np.clip(v * wh, 0.01, 100)
@@ -170,13 +164,12 @@ def p_probability(self, dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, m
     dh = (dem_to - dem_from)
     alpha_wh = w_h_effect_on_p(angle_to, w_speed, w_dir, dh, dist_to)
     
-    #p_moist = 1
-    p_moist = self.p_moist(moist)  #era self.p_moist
+    p_moist = self.p_moist(moist)
     #p_moist = M1 * moist**3 + M2 * moist**2 + M3 * moist + M4
     p_m = np.clip(p_moist , 0, 1.0)
     p_veg = prob_table[veg_to - 1, veg_from - 1]
     p = 1-(1-p_veg)**alpha_wh
-    #p_clip = np.clip(p, 0, 1.0)
+    
     p_clip = np.clip(p * p_m, 0, 1.0)
 
     return p_clip
@@ -207,6 +200,7 @@ def fire_spotting(angle_to, w_dir, w_speed): #this function evaluates the distan
     w_speed_ms = w_speed / 3.6                  #wind speed [m/s]
     d_p = r_n * np.exp( w_speed_ms * c_2 *( np.cos( w_dir - angle_to ) - 1 ) )  #Alexandridis' formulation for spotting distance
     return d_p
+
 
 # functions useful for evaluating the fire line intensity
 def lhv_dead_fuel(hhv, dffm):
@@ -279,6 +273,8 @@ class Propagator:
         self.p_moist = settings.p_moist_fn #print("p_moist is ...", self.p_moist)
         self.ros = None
         self.fireline_int = None
+        self.dir_prop_x = None
+        self.dir_prop_y = None
         # make it configurable
         self.dst_crs = crs.CRS({'init': 'EPSG:4326', 'no_defs': True})
 
@@ -307,7 +303,72 @@ class Propagator:
                             points, lines, polys, west, north, self.step_x, self.step_y, zone_number)
         self.__preprocess_bc(self.settings.boundary_conditions)
         self.__init_simulation(self.settings.n_threads, img, active_ignitions)
+
+    def spotting(self, veg, u, w_dir, w_speed, moisture, p_nr, p_nc, p_nt, transition_time):
+        conifer_mask = (veg == 5)      #only cells that have veg = fire-prone conifers are selected
+        conifer_r , conifer_c , conifer_t = u[conifer_mask, 0], u[conifer_mask, 1], u[conifer_mask, 2] 
         
+        #calculate number of embers per emitter
+        N_embers = np.random.poisson( lambda_spotting , size=conifer_r.shape )
+
+        # create list of source points for each ember
+        conifer_arr_r = conifer_r.repeat(repeats=N_embers)
+        conifer_arr_c = conifer_c.repeat(repeats=N_embers)
+        conifer_arr_t = conifer_t.repeat(repeats=N_embers)
+        # calculate angle and distance
+        ember_angle = np.random.uniform(0 , 2.0*np.pi, size=conifer_arr_r.shape)
+        ember_distance  = fire_spotting(ember_angle,  w_dir, w_speed)  
+
+        # filter out short embers
+        idx_long_embers = ember_distance > 2*cellsize
+        conifer_arr_r = conifer_arr_r[idx_long_embers]
+        conifer_arr_c = conifer_arr_c[idx_long_embers]
+        conifer_arr_t = conifer_arr_t[idx_long_embers]
+        ember_angle = ember_angle[idx_long_embers]
+        ember_distance = ember_distance[idx_long_embers]
+
+        # calculate landing locations
+        delta_r = ember_distance * np.cos(ember_angle)  #vertical delta [meters]
+        delta_c = ember_distance * np.sin(ember_angle)  #horizontal delta [meters]
+        nb_spot_r = delta_r / cellsize     #number of vertical cells
+        nb_spot_r = nb_spot_r.astype(int)
+        nb_spot_c = delta_c / cellsize     #number of horizontal cells
+        nb_spot_c = nb_spot_c.astype(int) 
+
+        nr_spot = conifer_arr_r + nb_spot_r         #vertical location of the cell to be ignited by the ember
+        nc_spot = conifer_arr_c + nb_spot_c         #horizontal location of the cell to be ignited by the ember
+        nt_spot = conifer_arr_t
+
+        #if I surpass the bounds, I stick to them. This way I don't have to reshape anything.
+        nr_spot[nr_spot > self.__shape[0] -1 ] = self.__shape[0] -1 
+        nc_spot[nc_spot > self.__shape[1] -1 ] = self.__shape[1] -1 
+        nr_spot[nr_spot < 0 ] = 0
+        nc_spot[nc_spot < 0 ] = 0           
+
+        # we want to put another probabilistic filter in order to assess the success of ember ignition. 
+        # 
+        #Formula (10) of Alexandridis et al IJWLF 2011
+        # P_c = P_c0 (1 + P_cd), where P_c0 constant probability of ignition by spotting and P_cd is a correction factor that 
+        #depends on vegetation type and density...
+        # In this case, we put P_cd = 0.3 for conifers and 0 for the rest. but it can be generalized..
+
+        P_c = P_c0 * (1+ P_cd_conifer*(self.veg[nr_spot,nc_spot] == 5)) # + 0.4 * bushes_mask.... etc etc 
+
+        success_spot_mask = np.random.uniform(  size=P_c.shape ) <  P_c 
+        nr_spot = nr_spot[success_spot_mask]
+        nc_spot = nc_spot[success_spot_mask]
+        nt_spot = nt_spot[success_spot_mask]        
+        # A little more debug on the previous part is advised
+
+        #the following function evalates the time that the embers  will need to burn the entire cell  they land into
+        transition_time_spot , ros_spot = self.p_time(self.dem[nr_spot, nc_spot], self.dem[nr_spot, nc_spot], #evaluation of the propagation time of the "spotted cells"
+                        self.veg[nr_spot, nc_spot], self.veg[nr_spot, nc_spot],   #dh=0 (no slope) and veg_from=veg_to to simplify the phenomenon
+                        np.zeros(nr_spot.shape), cellsize*np.ones(nr_spot.shape), #ember_angle, ember_distance, 
+                        moisture[nr_spot, nc_spot],
+                        w_dir, w_speed)
+        
+        return transition_time_spot, nr_spot, nc_spot, nt_spot
+
     def __compute_values(self):
         values = np.nanmean(self.f_global, 2)
         return values
@@ -317,9 +378,7 @@ class Propagator:
         return RoS_max
     
     def __compute_RoS_mean(self):
-        RoS_m = np.where(self.ros>0, self.ros, np.NaN)
-        RoS_mean = np.nanmean(RoS_m, 2)
-        RoS_mean = np.where(RoS_mean > 0, RoS_mean, 0)
+        RoS_mean = np.nanmean(self.ros, 2)
         return RoS_mean
     
     def __compute_fireline_int_max(self):
@@ -327,10 +386,12 @@ class Propagator:
         return fl_I_max
     
     def __compute_fireline_int_mean(self):
-        fl_I_m = np.where(self.fireline_int>0, self.fireline_int, np.NaN)
-        fl_I_mean = np.nanmean(fl_I_m, 2)
-        fl_I_mean = np.where(fl_I_mean > 0, fl_I_mean, 0)
+        fl_I_mean = np.nanmean(self.fireline_int, 2)
         return fl_I_mean
+
+    def __compute_dir_prop_mean(self):
+        dir_p_mean = np.arctan2(np.nanmean(self.dir_prop_x * self.ros, 2), np.nanmean(self.dir_prop_y * self.ros, 2))
+        return dir_p_mean
 
     def __compute_stats(self, values):
         n_active = len(self.ps.active().tolist())
@@ -380,7 +441,8 @@ class Propagator:
             json.dump(meta, fp)
 
             write_geotiff(tiff_file, values * 60 , dst_trans, self.dst_crs, values.dtype) #now it returns the RoS in m/h
-   
+
+
     def __write_output_RoS_mean(self, values, dst_trans, **kwargs):
         filename = os.path.join(self.settings.output_folder, 'RoS_mean_' + str(self.c_time))
         tiff_file = filename + '.tiff'
@@ -393,6 +455,7 @@ class Propagator:
             json.dump(meta, fp)
 
             write_geotiff(tiff_file, values * 60 , dst_trans, self.dst_crs, values.dtype) #now it returns the RoS in m/h
+
 
     def __write_output_I_max(self, values, dst_trans, **kwargs):
         filename = os.path.join(self.settings.output_folder, 'fireline_intensity_max_' + str(self.c_time))
@@ -407,6 +470,7 @@ class Propagator:
 
             write_geotiff(tiff_file, values , dst_trans, self.dst_crs, values.dtype)
 
+
     def __write_output_I_mean(self, values, dst_trans, **kwargs):
         filename = os.path.join(self.settings.output_folder, 'fireline_intensity_mean_' + str(self.c_time))
         tiff_file = filename + '.tiff'
@@ -419,7 +483,21 @@ class Propagator:
             json.dump(meta, fp)
 
             write_geotiff(tiff_file, values , dst_trans, self.dst_crs, values.dtype)
-    
+
+
+    def __write_output_d_p_mean(self, values, dst_trans, **kwargs):
+        filename = os.path.join(self.settings.output_folder, 'direction_propagation_mean_' + str(self.c_time))
+        tiff_file = filename + '.tiff'
+        json_file = filename + '.json'
+
+        ref_date = str(self.settings.init_date + timedelta(minutes=self.c_time))
+        with open(json_file, 'w') as fp:
+            meta = dict(time=self.c_time, timeref=ref_date)
+            meta.update(kwargs)
+            json.dump(meta, fp)
+
+            write_geotiff(tiff_file, values , dst_trans, self.dst_crs, values.dtype)
+
 
     def __check_input_files_consistency(self, dem_file, veg_file):
         if dem_file.crs != veg_file.crs:
@@ -494,8 +572,10 @@ class Propagator:
 
     def __init_simulation(self, n_threads, initial_ignitions, active_ignitions):
         self.f_global = np.zeros(self.__shape + (n_threads,))
-        self.ros = np.zeros(self.__shape + (n_threads,))
-        self.fireline_int = np.zeros(self.__shape + (n_threads,))
+        self.ros = np.ones(self.__shape + (n_threads,)) * np.NaN
+        self.fireline_int = np.ones(self.__shape + (n_threads,)) * np.NaN
+        self.dir_prop_x = np.ones(self.__shape + (n_threads,)) * np.NaN
+        self.dir_prop_y = np.ones(self.__shape + (n_threads,)) * np.NaN
         for t in range(n_threads):
             self.f_global[:, :, t] = initial_ignitions.copy()
             for p in active_ignitions:
@@ -542,7 +622,7 @@ class Propagator:
         heavy_acts = bc.get(HEAVY_ACTION_RASTER_TAG , None)
         if heavy_acts:
             for heavyy in heavy_acts:
-                self.veg[ heavyy[0] , heavyy[1] ] = 0 #da scegliere se mettere a 0 (impossibile che propaghi) 3 (non veg, quindi prova a propagare ma non riesce) o 7(faggete, quindi propaga con bassissima probabilità)
+                self.veg[ heavyy[0] , heavyy[1] ] = 0 #it can be set at 0 (can't propagate), 3 (bare soil), or 7(non fire-prone areas)
         
         nb_num = n_arr.shape[0]
         from_num = r.shape[0]
@@ -564,6 +644,8 @@ class Propagator:
         dem_to = self.dem[nr, nc]
         moisture_r = moisture[nr, nc]
         angle_to = angle[nb_arr_r+1, nb_arr_c+1]
+        angle_to_x = angle_x[nb_arr_r+1, nb_arr_c+1]
+        angle_to_y = angle_y[nb_arr_r+1, nb_arr_c+1]
         dist_to = dist[nb_arr_r+1, nb_arr_c+1]
 
         # exclude all ignited and not valid pixels
@@ -573,6 +655,8 @@ class Propagator:
         dem_to = dem_to[n_mask]
         veg_to = veg_to[n_mask]
         angle_to = angle_to[n_mask]
+        angle_to_x = angle_to_x[n_mask]
+        angle_to_y = angle_to_y[n_mask]
         dist_to = dist_to[n_mask]
         w_speed_r = w_speed_r[n_mask]
         w_dir_r = w_dir_r[n_mask]
@@ -616,87 +700,16 @@ class Propagator:
 
         self.ros[ p_nr , p_nc , p_nt ] = ros
 
-        ###### fire spotting    ----> FROM HERE
-        ##################################################
-        if self.settings.do_spotting == True:
-            #print("I will do spotting!")
-            conifer_mask = (veg_type == 5)      #only cells that have veg = fire-prone conifers are selected
-            conifer_r , conifer_c , conifer_t = u[conifer_mask, 0], u[conifer_mask, 1], u[conifer_mask, 2] 
-            
-            #N_spotters = conifer_r.shape[0]    #number of  fire-prone conifers cells that are  burning
-            
-            #calculate number of embers per emitter
-            N_embers = np.random.poisson( lambda_spotting , size=conifer_r.shape )
-
-            # create list of source points for each ember
-            conifer_arr_r = conifer_r.repeat(repeats=N_embers)
-            conifer_arr_c = conifer_c.repeat(repeats=N_embers)
-            conifer_arr_t = conifer_t.repeat(repeats=N_embers)
-            # calculate angle and distance
-            ember_angle = np.random.uniform(0 , 2.0*np.pi, size=conifer_arr_r.shape)
-            ember_distance  = fire_spotting(ember_angle,  w_dir, w_speed)  
-
-            # filter out short embers
-            idx_long_embers = ember_distance > 2*cellsize
-            conifer_arr_r = conifer_arr_r[idx_long_embers]
-            conifer_arr_c = conifer_arr_c[idx_long_embers]
-            conifer_arr_t = conifer_arr_t[idx_long_embers]
-            ember_angle = ember_angle[idx_long_embers]
-            ember_distance = ember_distance[idx_long_embers]
+        self.dir_prop_x[ p_nr , p_nc , p_nt ] = angle_to_x[p]
+        self.dir_prop_y[ p_nr , p_nc , p_nt ] = angle_to_y[p]
 
 
-            # calculate landing locations
-            delta_r = ember_distance * np.cos(ember_angle)  #vertical delta [meters]
-            delta_c = ember_distance * np.sin(ember_angle)  #horizontal delta [meters]
-            nb_spot_r = delta_r / cellsize     #number of vertical cells
-            nb_spot_r = nb_spot_r.astype(int)
-            nb_spot_c = delta_c / cellsize     #number of horizontal cells
-            nb_spot_c = nb_spot_c.astype(int) 
-
-            nr_spot = conifer_arr_r + nb_spot_r         #vertical location of the cell to be ignited by the ember
-            nc_spot = conifer_arr_c + nb_spot_c         #horizontal location of the cell to be ignited by the ember
-            nt_spot = conifer_arr_t
-
-            #if I surpass the bounds, I stick to them. This way I don't have to reshape anything.
-            nr_spot[nr_spot > self.__shape[0] -1 ] = self.__shape[0] -1 
-            nc_spot[nc_spot > self.__shape[1] -1 ] = self.__shape[1] -1 
-            nr_spot[nr_spot < 0 ] = 0
-            nc_spot[nc_spot < 0 ] = 0           
-
-
-
-            # we want to put another probabilistic filter in order to assess the success of ember ignition. 
-            # 
-            #Formula (10) of Alexandridis et al IJWLF 2011
-            # P_c = P_c0 (1 + P_cd), where P_c0 constant probability of ignition by spotting and P_cd is a correction factor that 
-            #depends on vegetation type and density...
-            # In this case, we put P_cd = 0.3 for conifers and 0 for the rest. but it can be generalized..
-
-            P_c = P_c0 * (1+ P_cd_conifer*(self.veg[nr_spot,nc_spot] == 5)) # + 0.4 * bushes_mask.... etc etc 
-
-            success_spot_mask = np.random.uniform(  size=P_c.shape ) <  P_c 
-            nr_spot = nr_spot[success_spot_mask]
-            nc_spot = nc_spot[success_spot_mask]
-            nt_spot = nt_spot[success_spot_mask]        
-            # A little more debug on the previous part is advised
-
-            #the following function evalates the time that the embers  will need to burn the entire cell  they land into
-            #transition_time_spot = self.p_time(self.dem[nr_spot, nc_spot], self.dem[nr_spot, nc_spot], #evaluation of the propagation time of the "spotted cells"
-            transition_time_spot , ros_spot = self.p_time(self.dem[nr_spot, nc_spot], self.dem[nr_spot, nc_spot], #evaluation of the propagation time of the "spotted cells"
-                            self.veg[nr_spot, nc_spot], self.veg[nr_spot, nc_spot],   #dh=0 (no slope) and veg_from=veg_to to simplify the phenomenon
-                            np.zeros(nr_spot.shape), cellsize*np.ones(nr_spot.shape), #ember_angle, ember_distance, 
-                            moisture[nr_spot, nc_spot],
-                            w_dir, w_speed)
-            
+        if self.settings.do_spotting == True:   #fire spotting modellization
+            transition_time_spot, nr_spot, nc_spot, nt_spot = self.spotting(veg_type, u, w_dir, w_speed, moisture, p_nr, p_nc, p_nt, transition_time)
             p_nr = np.append( p_nr , nr_spot)               #row-coordinates of the "spotted cells" added to the other ones
             p_nc = np.append( p_nc , nc_spot)               #column-coordinates of the "spotted cells" added to the other ones
             p_nt = np.append( p_nt , nt_spot)               #time propagation of "spotted cells" added to the other ones 
             transition_time = np.append( transition_time , np.around( transition_time_spot ) )
-        #else:
-        #    print("I am not going to spot...")
-
-        ######################################
-        ##################### UP TO HERE  <------
 
         prop_time = np.around(self.c_time + transition_time, decimals=1)
 
@@ -852,6 +865,7 @@ class Propagator:
                 RoS_mean = self.__compute_RoS_mean()
                 fl_I_max = self.__compute_fireline_int_max()
                 fl_I_mean = self.__compute_fireline_int_mean()
+                dir_prop_mean = self.__compute_dir_prop_mean()
                 stats = self.__compute_stats(values)
                 n_active, area_mean, area_50, area_75, area_90 = stats
                 self.log(n_active, area_mean)
@@ -879,7 +893,8 @@ class Propagator:
                     self.__trans,
                     self.__prj.srs,  #self.__prj,  crs.srs #changed due to updates in Pyproj and-or Rasterio...
                     self.dst_crs,
-                    trim = True #trim is used to auto-clip the tif where there are null value
+                    trim = True, #trim is used to auto-clip the tif where there are null value
+                    trim_value = np.NaN
                 )
 
                 self.__write_output_RoS_max(
@@ -897,7 +912,8 @@ class Propagator:
                     self.__trans,
                     self.__prj.srs,  #self.__prj,  crs.srs #changed due to updates in Pyproj and-or Rasterio...
                     self.dst_crs,
-                    trim = True #trim is used to auto-clip the tif where there are null value
+                    trim = True, #trim is used to auto-clip the tif where there are null value
+                    trim_value = np.NaN
                 )
 
                 self.__write_output_RoS_mean(
@@ -915,7 +931,8 @@ class Propagator:
                     self.__trans,
                     self.__prj.srs,  #self.__prj,  crs.srs #changed due to updates in Pyproj and-or Rasterio...
                     self.dst_crs,
-                    trim = True #trim is used to auto-clip the tif where there are null value
+                    trim = True, #trim is used to auto-clip the tif where there are null value
+                    trim_value = np.NaN
                 )
 
                 self.__write_output_I_max(
@@ -933,12 +950,32 @@ class Propagator:
                     self.__trans,
                     self.__prj.srs,  #self.__prj,  crs.srs #changed due to updates in Pyproj and-or Rasterio...
                     self.dst_crs,
-                    trim = True #trim is used to auto-clip the tif where there are null value
+                    trim = True, #trim is used to auto-clip the tif where there are null value
+                    trim_value = np.NaN
                 )
 
                 self.__write_output_I_mean(
                     reprj_values_I_mean,
                     dst_trans_I_mean,
+                    active=n_active,
+                    area_mean=area_mean,
+                    area_50=area_50,
+                    area_75=area_75,
+                    area_90=area_90
+                )
+
+                reprj_values_d_p_mean, dst_trans_d_p_mean = reproject(
+                    dir_prop_mean,
+                    self.__trans,
+                    self.__prj.srs,  #self.__prj,  crs.srs #changed due to updates in Pyproj and-or Rasterio...
+                    self.dst_crs,
+                    trim = True, #trim is used to auto-clip the tif where there are null value
+                    trim_value = np.NaN
+                )
+
+                self.__write_output_d_p_mean(
+                    reprj_values_d_p_mean,
+                    dst_trans_d_p_mean,
                     active=n_active,
                     area_mean=area_mean,
                     area_50=area_50,

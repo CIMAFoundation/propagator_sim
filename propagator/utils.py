@@ -7,7 +7,7 @@ import numpy as np
 import rasterio as rio
 import scipy.io
 import utm
-from numpy import pi
+from numpy import pi, tri
 from pyproj import Proj
 from rasterio import band, crs, transform, warp, enums
 from rasterio.features import shapes
@@ -327,16 +327,23 @@ def rasterize_actions(dim, points, lines, polys, lonmin, latmax, stepx, stepy, z
     return img, active_points
 
 
-def trim_values(values, src_trans):
+def trim_values(values, src_trans, trim_value):
     rows, cols = values.shape
     min_row, max_row = int(rows / 2 - 1), int(rows / 2 + 1)
     min_col, max_col = int(cols / 2 - 1), int(cols / 2 + 1)
 
-    v_rows = np.where(values.sum(axis=1) > 0)[0]
+    if np.isnan(trim_value):    #possibility of having trim different than 0
+        v_rows = np.where(~np.isnan(values).all(axis=1))[0]
+    else:
+        v_rows = np.where(values.sum(axis=1) > trim_value)[0] 
     if len(v_rows) > 0:
         min_row, max_row = v_rows[0] - 1, v_rows[-1] + 2
 
-    v_cols = np.where(values.sum(axis=0) > 0)[0]
+    if np.isnan(trim_value):    #possibility of having trim different than 0
+        v_cols = np.where(~np.isnan(values).all(axis=0))[0]
+    else:
+        v_cols = np.where(values.sum(axis=0) > trim_value)[0]
+
     if len(v_cols) > 0:
         min_col, max_col = v_cols[0] - 1, v_cols[-1] + 2
 
@@ -351,9 +358,9 @@ def trim_values(values, src_trans):
     return trim_values, trim_trans
 
 
-def reproject(values, src_trans, src_crs, dst_crs, trim=True):
+def reproject(values, src_trans, src_crs, dst_crs, trim=True,  trim_value=0):
     if trim:
-        values, src_trans = trim_values(values, src_trans)
+        values, src_trans = trim_values(values, src_trans, trim_value)
 
     rows, cols = values.shape
     (west, east), (north, south) = rio.transform.xy(

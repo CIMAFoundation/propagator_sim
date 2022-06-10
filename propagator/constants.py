@@ -23,38 +23,40 @@ n_arr = array([(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1,
 
 dist = array([[1.414, 1, 1.414], [1, 0, 1], [1.414, 1, 1.414]])
 angle = array([[pi*3/4, pi/2, pi/4], [pi, np.nan, 0], [-pi*3/4, -pi/2, -pi/4]])
+angle_x = array([[-np.sqrt(2)/2, 0, np.sqrt(2)/2], [-1, np.nan, 1], [-np.sqrt(2)/2, 0, np.sqrt(2)/2]])
+angle_y = array([[np.sqrt(2)/2, 1, np.sqrt(2)/2], [0, np.nan, 0], [-np.sqrt(2)/2, -1, -np.sqrt(2)/2]])
 cellsize = 20
 
-#aggiunte per spotting
-#insieme punti lontani 2 celle
+#added for spotting modelization
+#set of the 2-cells far away points
 neighbours2 = [(-2, -2), (-2, -1), (-2, 0), (-2, 1), (-2, 2), (-1, -2), (-1, 2), (0, -2), (0, 2), (1, -2), (1, 2), (2, -2), (2, -1), (2, 0), (2, 1), (2, 2)]
 n2_arr = array([(-2, -2), (-2, -1), (-2, 0), (-2, 1), (-2, 2), (-1, -2), (-1, 2), (0, -2), (0, 2), (1, -2), (1, 2), (2, -2), (2, -1), (2, 0), (2, 1), (2, 2)])
 dist2 = array([[2.828, 2.236, 2, 2.236, 2.828], [2.236, 1.414, 1, 1.414, 2.236], [2, 1, 0, 1, 2], [2.236, 1.414, 1, 1.414, 2.236], [2.828, 2.236, 2, 2.236, 2.828]])
 angle2 = array([[pi*3/4, pi*13/20, pi/2, pi*7/20, pi/4], [pi*17/20, pi*3/4, pi/2, pi/4, pi*3/20], [pi, pi, np.nan, 0, 0], [pi*17/20, pi*3/4, pi/2, pi/4, pi*3/20], [-pi*3/4, -pi*13/20, -pi/2, -pi*7/20, -pi/4]])
-#insieme punti lontani 3 celle
+#set of the 3-cells far away points
 neighbours3 = [(-3, -3), (-3, -2), (-3, -1), (-3, 0), (-3, 1), (-3, 2), (-3, 3), (-2, -3), (-2, 3), (-1, -3), (-1, 3), (0, -3), (0, 3), (1, -3), (1, 3), (2, -3), (2, 3), (3, -3), (3, -2), (3, -1), (3, 0), (3, 1), (3, 2), (3, 3)]
 n3_arr = array([(-3, -3), (-3, -2), (-3, -1), (-3, 0), (-3, 1), (-3, 2), (-3, 3), (-2, -3), (-2, 3), (-1, -3), (-1, 3), (0, -3), (0, 3), (1, -3), (1, 3), (2, -3), (2, 3), (3, -3), (3, -2), (3, -1), (3, 0), (3, 1), (3, 2), (3, 3)])
 dist3 = array([[4.243, 3.606, 3.162, 3, 3.162, 3.606, 4.243], [3.606, 2.828, 2.236, 2, 2.236, 2.828, 3.606], [3.162, 2.236, 1.414, 1, 1.414, 2.236, 3.162], [3, 2, 1, 0, 1, 2, 3], [3.162, 2.236, 1.414, 1, 1.414, 2.236, 3.162], [3.606, 2.828, 2.236, 2, 2.236, 2.828, 3.606], [4.243, 3.606, 3.162, 3, 3.162, 3.606, 4.243]])
 angle3 = array([[pi*3/4, pi*7/10, pi*3/5, pi/2, pi*2/5, pi*3/10, pi/4], [pi*4/5, pi*3/4, pi*13/20, pi/2, pi*7/20, pi/4, pi/5], [pi*9/10, pi*17/20, pi*3/4, pi/2, pi/4, pi*3/20, pi/10], [pi, pi, pi, np.nan, 0, 0, 0], [-pi*9/10, -pi*17/20, -pi*3/4, -pi/2, -pi/4, -pi*3/20, -pi/10], [-pi*4/5, -pi*3/4, -pi*13/20, -pi/2, -pi*7/20, -pi/4, -pi/5], [-pi*3/4, -pi*7/10, -pi*3/5, -pi/2, -pi*2/5, -pi*3/10, -pi/4]])
-#costante per calcolare distanza in fire-spotting
+#constant for fire-spotting distance evaluation
 c_2 = 0.191
 
-#parametri Rothermel
+#Rothermel's parameters
 alpha1 = 0.0693
 alpha2 = 0.0576
-#parametri Wang
+#Wang's parameters
 beta1 = 0.1783
 beta2 = 3.533
 beta3 = 1.2
 
-####costanti per moisture
-# probabilità
+####constants for FFMC effect
+# probability
 M1 = -3.5995
 M2 = 5.2389
 M3 = -2.6355
 M4 = 1.019
 # RoS
-c_moist = -0.014
+c_moist = -0.014 #to be set at -1.4 to have FFMC from 0 to 100 instead of from 0 to 1
 
 # The following constants are used in the Fire-Spotting model. Alexandridis et al. (2009,2011)
 
