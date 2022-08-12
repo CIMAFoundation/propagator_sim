@@ -1,0 +1,1 @@
+docker run -it -v `pwd`:/app --entrypoint /bin/bash propagatorbuild
