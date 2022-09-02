@@ -15,15 +15,15 @@ from scipy import ndimage
 from .constants import *
 from .utils import *
 
+from . import PROPAGATOR_PATH
 
 # [latifoglie cespugli aree_nude erba conifere coltivi faggete]
-try:
-    propagator_path = os.environ.get('PROPAGATOR_PATH', './')
-    v0 = np.loadtxt(os.path.join(propagator_path, 'v0_table.txt'))
-    prob_table = np.loadtxt(os.path.join(propagator_path, 'prob_table.txt'))
-    p_veg = np.loadtxt(os.path.join(propagator_path, 'p_vegetation.txt'))
+try:   
+    v0 = np.loadtxt(os.path.join(PROPAGATOR_PATH, 'v0_table.txt'))
+    prob_table = np.loadtxt(os.path.join(PROPAGATOR_PATH, 'prob_table.txt'))
+    p_veg = np.loadtxt(os.path.join(PROPAGATOR_PATH, 'p_vegetation.txt'))
 except Exception:
-    v0, prob_table, p_veg = None, None, None
+    raise Exception('Could not load the vegetation speed and probabilities tables')
 
 
 def load_parameters(probability_file=None, v0_file=None, p_vegetation=None):

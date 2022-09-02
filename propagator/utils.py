@@ -19,9 +19,9 @@ from shapely.geometry import shape, MultiLineString, LineString
 from sortedcontainers import SortedDict
 
 from .constants import *
+from . import PROPAGATOR_PATH
 
-DATA_DIR = 'data'
-
+DATA_DIR = PROPAGATOR_PATH + '/data'
 
 def normalize(angle_to_norm):
     return (angle_to_norm + pi) % (2 * pi) - pi
