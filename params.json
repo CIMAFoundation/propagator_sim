@@ -1,41 +1,18 @@
 {
-  "time_limit": 720,
-  "tileset": "default",
-  "name": "test",
+  "time_limit": 240,
+  "do_spotting": false,
   "boundary_conditions": [
     {
-      "w_dir": 180,
-      "w_speed": "60",
-      "moisture": 5,
-      "tooltip_timer": {},
-      "tooltip": false,
-      "time": 0
-    },
-    {
-      "w_dir": 180,
-      "w_speed": "60",
-      "moisture": 70,
-      "tooltip_timer": {},
-      "tooltip": false,
-      "time": 180
+      "time": 0,
+      "w_dir": 10,
+      "w_speed": 30,
+      "moisture": 0
     }
   ],
+  "title": "Hi Marko #2!",
+  "datatype_id": "35006",
+  "init_date": "202209011500",
   "ignitions": [
-    "POINT:40.43248942171313;8.771506459283538"
-  ],
-  "isochrone_thresholds": [
-    0.01,
-    0.5,
-    0.75,
-    0.9
-  ],
-  "w_dir": 0,
-  "time_resolution": 60,
-  "time_res": 60,
-  "grid_dim_km": 20,
-  "init_date": "202001300000",
-  "w_speed": 0,
-  "n_threads": 100,
-  "moisture": 0,
-  "ros_model": "wang"
+    "POLYGON: [43.933936 43.941849 43.989994 43.933936];[12.250883 12.26273 12.294955 12.250883]"
+  ]
 }
