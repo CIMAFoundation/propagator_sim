@@ -1,7 +1,10 @@
+from ast import Call
+from dataclasses import Field, field
 import json
 import logging
 import os
 from datetime import timedelta
+from typing import Callable
 
 # import utm
 from numpy import array, pi, sign, tanh, tile
@@ -266,21 +269,37 @@ class PropagatorSettings:
         #self.save_realizations = settings_dict['save_realizations']
 
 
+@dataclass
 class Propagator:
-    def __init__(self, settings: PropagatorSettings):
-        self.settings = settings
+    settings: PropagatorSettings = field(init=True)
+
+    f_global: np.ndarray = field(init=False)
+    veg: np.ndarray = field(init=False)
+    dem: np.ndarray = field(init=False)
+    boundary_conditions = field(init=False)
+    p_time: Callable = field(init=False)
+    p_moist: Callable = field(init=False)
+    ros: np.ndarray = field(init=False)
+    fireline_int: np.ndarray = field(init=False)
+    dst_crs:crs.CRS = field(default=crs.CRS({'init': 'EPSG:4326', 'no_defs': True}), init=False)
+
+    ps: Scheduler = field(init=False)
+
+    def __post_init__(self):
         self.ps = Scheduler()
         self.c_time = 0,
+
+        self.boundary_conditions = self.settings.boundary_conditions        
         self.f_global = None
         self.veg = None
         self.dem = None
         self.boundary_conditions = self.settings.boundary_conditions        
-        self.p_time = settings.p_time_fn
-        self.p_moist = settings.p_moist_fn #print("p_moist is ...", self.p_moist)
+        self.p_time = self.settings.p_time_fn
+        self.p_moist = self.settings.p_moist_fn
         self.ros = None
         self.fireline_int = None
         # make it configurable
-        self.dst_crs = crs.CRS({'init': 'EPSG:4326', 'no_defs': True})
+
 
     def __preprocess_bc(self, boundary_conditions):
         for bc in boundary_conditions:

@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from sched import scheduler
+
 from typing import List, Tuple, Type
 
 import numpy as np
 import rasterio as rio
 from rasterio import windows
-from propagator.propagator import fireline_intensity
 
-from propagator.utils import Scheduler
+
+
 
 @dataclass(frozen=True)
 class PropagatorState():
@@ -19,7 +19,7 @@ class PropagatorState():
     f_global: np.ndarray = field(repr=False, compare=False, hash=False, default=None, init=True)
     ros: np.ndarray = field(repr=False, compare=False, hash=False, default=None, init=True)
     fireline_intensity: np.ndarray = field(repr=False, compare=False, hash=False, default=None, init=True)
-    scheduler: Scheduler = field(repr=False, compare=False, hash=False, default=None, init=True)
+#    scheduler: Scheduler = field(repr=False, compare=False, hash=False, default=None, init=True)
 
 @dataclass(frozen=True)
 class PropagatorStateManager():
@@ -29,7 +29,7 @@ class PropagatorStateManager():
     f_global: VirtualRaster = field(repr=False, compare=False, hash=False, init=True)
     ros: VirtualRaster = field(repr=False, compare=False, hash=False, init=True)
     fireline_int: VirtualRaster = field(repr=False, compare=False, hash=False, init=True)
-    scheduler: Scheduler = field(repr=False, compare=False, hash=False, init=False)
+#    scheduler: Scheduler = field(repr=False, compare=False, hash=False, init=False)
 
     @staticmethod
     def from_geotiffs(
@@ -84,7 +84,7 @@ class PropagatorStateManager():
         """
         #extend scheduler indexes
         f_global = self.f_global.extend(left=left, down=down, up=up, right=right)
-        self.scheduler.list = f_global.transform_indexes(self.f_global, self.scheduler.list)
+ #       self.scheduler.list = f_global.transform_indexes(self.f_global, self.scheduler.list)
 
         return PropagatorStateManager(
             dem=self.dem.extend(left=left, down=down, up=up, right=right),
@@ -105,10 +105,10 @@ class PropagatorStateManager():
             f_global=self.f_global.data,
             ros=self.ros.data,
             fireline_intensity=self.fireline_int.data,
-            scheduler=self.scheduler
+            #scheduler=self.scheduler
         )
     
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_value, traceback):
         """Exit the context manager.
         """
         pass
@@ -255,32 +255,17 @@ class VirtualRaster(object):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-    dem_source = '/Users/mirko/Downloads/ireland_dem_veg/dem_utm29.tif'
-    veg_source = '/Users/mirko/Downloads/ireland_dem_veg/veg_utm29.tif'
+    dem_source = '/Users/mirko/Downloads/ireland_dem_veg/dem_utm29_cog.tif'
+    veg_source = 'https://propagator-cog-test.s3.eu-west-1.amazonaws.com/veg_utm29_cog2.tif' #'/Users/mirko/Downloads/ireland_dem_veg/veg_utm29.tif'
     west, south, east, north =  411596.1422,5988532.8732,453919.5216,6020290.1967
-    PropagatorStateManager.from_geotiffs(
+    state_manager = PropagatorStateManager.from_geotiffs(
         dem_path=dem_source, 
         veg_path=veg_source, 
         n_threads=10, 
         bounding_box=[west, south, east, north])
 
-    r = RIOVirtualRasterSource('/Users/mirko/Downloads/ireland_dem_veg/dem_utm29.tif')
-    n = NPVirtualRasterSource(max_shape=(5000, 5000), z_shape=10, fill=0)
+    with state_manager as state:
+        #print(state.dem)
+        plt.imshow(state.veg)
+        plt.show()
 
-    
-    dtm_raster = r.load(west=west, north=north, east=east, south=south)
-    status_raster = n.new(dtm_raster.offsets, dtm_raster.data.shape,)
-    print(dtm_raster.offsets, dtm_raster.data.shape)
-
-
-    indexes = np.array([1232]), np.array([390])
-    dtm_raster.data[indexes] = 2000
-
-    plt.figure();plt.imshow(dtm_raster.data);plt.title(dtm_raster.offsets);plt.scatter(indexes[1], indexes[0], c='r', s=100)
-    dtm_raster, old = dtm_raster.extend(left=500, up=500, right=500, down=500), dtm_raster
-    indexes = dtm_raster.transform_indexes(old, indexes)
-
-    
-    print(dtm_raster.offsets, dtm_raster.data.shape)
-    plt.figure();plt.imshow(dtm_raster.data);plt.title(dtm_raster.offsets);plt.scatter(indexes[1], indexes[0], c='r', s=100)
-    plt.show()
