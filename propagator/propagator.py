@@ -15,6 +15,8 @@ from rasterio import crs, enums, transform, warp
 
 from scipy import ndimage
 
+from propagator.state_manager import PropagatorStateManager
+
 from .constants import *
 from .utils import *
 
@@ -512,9 +514,9 @@ class Propagator:
         return last_bc #, n_bc
 
     def __init_simulation(self, n_threads, initial_ignitions, active_ignitions):
-        self.f_global = np.zeros(self.__shape + (n_threads,))
-        self.ros = np.zeros(self.__shape + (n_threads,))
-        self.fireline_int = np.zeros(self.__shape + (n_threads,))
+        self.state_manager = PropagatorStateManager.from_geotiffs()
+
+        
         for t in range(n_threads):
             self.f_global[:, :, t] = initial_ignitions.copy()
             for p in active_ignitions:
