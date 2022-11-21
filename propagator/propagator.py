@@ -15,28 +15,31 @@ from scipy import ndimage
 from .constants import *
 from .utils import *
 
+from . import PROPAGATOR_PATH
 
 # [latifoglie cespugli aree_nude erba conifere coltivi faggete]
-try:
-    propagator_path = os.environ.get('PROPAGATOR_PATH', './')
-    v0 = np.loadtxt(os.path.join(propagator_path, 'v0_table.txt'))
-    prob_table = np.loadtxt(os.path.join(propagator_path, 'prob_table.txt'))
+try:   
+    v0 = np.loadtxt(os.path.join(PROPAGATOR_PATH, 'v0_table.txt'))
+    prob_table = np.loadtxt(os.path.join(PROPAGATOR_PATH, 'prob_table.txt'))
+    p_veg = np.loadtxt(os.path.join(PROPAGATOR_PATH, 'p_vegetation.txt'))
 except Exception:
-    v0, prob_table = None, None
+    raise Exception('Could not load the vegetation speed and probabilities tables')
 
 
-def load_parameters(probability_file=None, v0_file=None):
+def load_parameters(probability_file=None, v0_file=None, p_vegetation=None):
     """
     Override the default values for vegetation speed and probabilities by loading them from file
     :param probability_file:
     :param time_file:
     :return:
     """
-    global v0, prob_table
+    global v0, prob_table, p_veg
     if v0_file:
         v0 = np.loadtxt(v0_file)
     if probability_file:
         prob_table = np.loadtxt(probability_file)
+    if p_vegetation:
+        p_veg = np.loadtxt(p_vegetation)
 
 def get_p_time_fn(ros_model_code):
     ros_models = {
@@ -83,12 +86,13 @@ def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, 
     moist_eff = np.exp(c_moist * moist) #moisture effect
 
     #v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
-    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS
+    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS [m/min]
 
     t = real_dist / v_wh
     t[t>=1] = np.around(t[t>=1])
     t = np.clip(t, 0.1, np.inf)
-    return t
+    return t , v_wh
+    #return t
 
 def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
   # velocità di base modulata con la densità(tempo di attraversamento)
@@ -114,13 +118,13 @@ def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir
     moist_eff = np.exp(c_moist * moist) #moisture effect
      
     #v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
-    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS
+    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS [m/min]
     
     t = real_dist / v_wh
 
     t[t>=1] = np.around(t[t>=1])
     t = np.clip(t, 0.1, np.inf)
-    return t
+    return t , v_wh
 
 def p_time_standard(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
     dh = (dem_to - dem_from)
@@ -134,7 +138,7 @@ def p_time_standard(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w
     t = real_dist / v_wh
     t[t>=1] = np.around(t[t>=1])
     t = np.clip(t, 0.1, np.inf)
-    return t
+    return t , v_wh
 
 def w_h_effect(angle_to, w_speed, w_dir, dh, dist):
     w_effect_module = (A + (D1 * (D2 * np.tanh((w_speed / D3) - D4))) + (w_speed / D5))
@@ -204,6 +208,32 @@ def fire_spotting(angle_to, w_dir, w_speed): #this function evaluates the distan
     d_p = r_n * np.exp( w_speed_ms * c_2 *( np.cos( w_dir - angle_to ) - 1 ) )  #Alexandridis' formulation for spotting distance
     return d_p
 
+# functions useful for evaluating the fire line intensity
+def lhv_dead_fuel(hhv, dffm):
+    lhv = hhv * (1.0 - (dffm / 100.0)) - Q * (dffm / 100.0)
+    return lhv
+
+
+def lhv_canopy(hhv, hum):
+    lhv = hhv * (1.0 - (hum / 100.0)) - Q * (hum / 100.0)
+    lhv[np.isnan(lhv)] = 0
+    return lhv
+
+  
+def fireline_intensity(d0, d1, ros, lhv_dead_fuel, lhv_canopy, rg=None):
+    intensity = np.full(ros.shape[0], np.nan, dtype='float32')
+    if rg is not None:
+        rg_idx = ~np.isnan(rg)
+        d1_idx = (d1 != 0.0) & rg_idx
+        d0_idx = (d1 == 0.0) & rg_idx
+        intensity[d0_idx] = ros[d0_idx] * (( lhv_dead_fuel[d0_idx] * d0[d0_idx] * (1.0 - rg[d0_idx])) / 2 ) / 60.0
+        intensity[d1_idx] = ros[d1_idx] * (( lhv_dead_fuel[d1_idx] * d0[d1_idx] + lhv_canopy[d1_idx] * (d1[d1_idx] * (1 - rg[d1_idx]))) / 2 ) / 60.0
+        intensity[~rg_idx] = ros[~rg_idx] * (( lhv_dead_fuel[~rg_idx] * d0[~rg_idx] + lhv_canopy[~rg_idx] * d1[~rg_idx]) / 2 ) / 60.0
+    else:
+        intensity = ros * (( lhv_dead_fuel * d0 + lhv_canopy * d1 ) ) / 60.0 #divided by 60 instead of 3600 because RoS is required in m/s and it is given in m/min (so it has to be divided by 60)
+    return intensity
+
+
 class PropagatorError(Exception):
     pass
 
@@ -247,6 +277,8 @@ class Propagator:
         self.boundary_conditions = self.settings.boundary_conditions        
         self.p_time = settings.p_time_fn
         self.p_moist = settings.p_moist_fn #print("p_moist is ...", self.p_moist)
+        self.ros = None
+        self.fireline_int = None
         # make it configurable
         self.dst_crs = crs.CRS({'init': 'EPSG:4326', 'no_defs': True})
 
@@ -279,6 +311,26 @@ class Propagator:
     def __compute_values(self):
         values = np.nanmean(self.f_global, 2)
         return values
+    
+    def __compute_RoS_max(self):
+        RoS_max = np.nanmax(self.ros, 2)
+        return RoS_max
+    
+    def __compute_RoS_mean(self):
+        RoS_m = np.where(self.ros>0, self.ros, np.NaN)
+        RoS_mean = np.nanmean(RoS_m, 2)
+        RoS_mean = np.where(RoS_mean > 0, RoS_mean, 0)
+        return RoS_mean
+    
+    def __compute_fireline_int_max(self):
+        fl_I_max = np.nanmax(self.fireline_int, 2)
+        return fl_I_max
+    
+    def __compute_fireline_int_mean(self):
+        fl_I_m = np.where(self.fireline_int>0, self.fireline_int, np.NaN)
+        fl_I_mean = np.nanmean(fl_I_m, 2)
+        fl_I_mean = np.where(fl_I_mean > 0, fl_I_mean, 0)
+        return fl_I_mean
 
     def __compute_stats(self, values):
         n_active = len(self.ps.active().tolist())
@@ -314,6 +366,60 @@ class Propagator:
             json.dump(meta, fp)
 
             write_geotiff(tiff_file, values*255, dst_trans, self.dst_crs)
+    
+    
+    def __write_output_RoS_max(self, values, dst_trans, **kwargs):
+        filename = os.path.join(self.settings.output_folder, 'RoS_max_' + str(self.c_time))
+        tiff_file = filename + '.tiff'
+        json_file = filename + '.json'
+
+        ref_date = str(self.settings.init_date + timedelta(minutes=self.c_time))
+        with open(json_file, 'w') as fp:
+            meta = dict(time=self.c_time, timeref=ref_date)
+            meta.update(kwargs)
+            json.dump(meta, fp)
+
+            write_geotiff(tiff_file, values * 60 , dst_trans, self.dst_crs, values.dtype) #now it returns the RoS in m/h
+   
+    def __write_output_RoS_mean(self, values, dst_trans, **kwargs):
+        filename = os.path.join(self.settings.output_folder, 'RoS_mean_' + str(self.c_time))
+        tiff_file = filename + '.tiff'
+        json_file = filename + '.json'
+
+        ref_date = str(self.settings.init_date + timedelta(minutes=self.c_time))
+        with open(json_file, 'w') as fp:
+            meta = dict(time=self.c_time, timeref=ref_date)
+            meta.update(kwargs)
+            json.dump(meta, fp)
+
+            write_geotiff(tiff_file, values * 60 , dst_trans, self.dst_crs, values.dtype) #now it returns the RoS in m/h
+
+    def __write_output_I_max(self, values, dst_trans, **kwargs):
+        filename = os.path.join(self.settings.output_folder, 'fireline_intensity_max_' + str(self.c_time))
+        tiff_file = filename + '.tiff'
+        json_file = filename + '.json'
+
+        ref_date = str(self.settings.init_date + timedelta(minutes=self.c_time))
+        with open(json_file, 'w') as fp:
+            meta = dict(time=self.c_time, timeref=ref_date)
+            meta.update(kwargs)
+            json.dump(meta, fp)
+
+            write_geotiff(tiff_file, values , dst_trans, self.dst_crs, values.dtype)
+
+    def __write_output_I_mean(self, values, dst_trans, **kwargs):
+        filename = os.path.join(self.settings.output_folder, 'fireline_intensity_mean_' + str(self.c_time))
+        tiff_file = filename + '.tiff'
+        json_file = filename + '.json'
+
+        ref_date = str(self.settings.init_date + timedelta(minutes=self.c_time))
+        with open(json_file, 'w') as fp:
+            meta = dict(time=self.c_time, timeref=ref_date)
+            meta.update(kwargs)
+            json.dump(meta, fp)
+
+            write_geotiff(tiff_file, values , dst_trans, self.dst_crs, values.dtype)
+    
 
     def __check_input_files_consistency(self, dem_file, veg_file):
         if dem_file.crs != veg_file.crs:
@@ -388,6 +494,8 @@ class Propagator:
 
     def __init_simulation(self, n_threads, initial_ignitions, active_ignitions):
         self.f_global = np.zeros(self.__shape + (n_threads,))
+        self.ros = np.zeros(self.__shape + (n_threads,))
+        self.fireline_int = np.zeros(self.__shape + (n_threads,))
         for t in range(n_threads):
             self.f_global[:, :, t] = initial_ignitions.copy()
             for p in active_ignitions:
@@ -485,11 +593,28 @@ class Propagator:
         p_nt = nt[p]
 
         # get the propagation time for the propagating pixels
-        transition_time = self.p_time(dem_from[p], dem_to[p],
+        #transition_time = self.p_time(dem_from[p], dem_to[p],
+        transition_time , ros = self.p_time(dem_from[p], dem_to[p],
                                     veg_from[p], veg_to[p],
                                     angle_to[p], dist_to[p],
                                     moisture_r[p],
                                     w_dir_r[p], w_speed_r[p])
+
+        d0 = p_veg[veg_to[p]-1,0]
+        d1 = p_veg[veg_to[p]-1,1]
+        hhv = p_veg[veg_to[p]-1,2]
+        humidity = p_veg[veg_to[p]-1,3]
+
+        # evaluate LHV of dead fuel
+        lhv_dead_fuel_value = lhv_dead_fuel(hhv, moisture_r[p])
+        # evaluate LHV of the canopy
+        lhv_canopy_value = lhv_canopy(hhv, humidity)
+        # evaluate fireline intensity
+        fireline_intensity_value = fireline_intensity(d0, d1, ros, lhv_dead_fuel_value, lhv_canopy_value)
+
+        self.fireline_int[ p_nr , p_nc , p_nt ] = fireline_intensity_value
+
+        self.ros[ p_nr , p_nc , p_nt ] = ros
 
         ###### fire spotting    ----> FROM HERE
         ##################################################
@@ -556,7 +681,8 @@ class Propagator:
             # A little more debug on the previous part is advised
 
             #the following function evalates the time that the embers  will need to burn the entire cell  they land into
-            transition_time_spot = self.p_time(self.dem[nr_spot, nc_spot], self.dem[nr_spot, nc_spot], #evaluation of the propagation time of the "spotted cells"
+            #transition_time_spot = self.p_time(self.dem[nr_spot, nc_spot], self.dem[nr_spot, nc_spot], #evaluation of the propagation time of the "spotted cells"
+            transition_time_spot , ros_spot = self.p_time(self.dem[nr_spot, nc_spot], self.dem[nr_spot, nc_spot], #evaluation of the propagation time of the "spotted cells"
                             self.veg[nr_spot, nc_spot], self.veg[nr_spot, nc_spot],   #dh=0 (no slope) and veg_from=veg_to to simplify the phenomenon
                             np.zeros(nr_spot.shape), cellsize*np.ones(nr_spot.shape), #ember_angle, ember_distance, 
                             moisture[nr_spot, nc_spot],
@@ -598,8 +724,8 @@ class Propagator:
         waterline_actionss = bc.get(WATERLINE_ACTION_TAG, None)
         moisture_value = bc.get(MOISTURE_TAG, 0)/100
         heavy_actionss = bc.get(HEAVY_ACTION_TAG, None)
-        canadairs = bc.get(CANADAIR_TAG, None)          #select canadair actions from boundary conditions
-        helicopters = bc.get(HELICOPTER_TAG, None)      #select helicopter actions from boundary conditions
+        canadairs = bc.get(CANADAIR_TAG, None)          # select canadair actions from boundary conditions
+        helicopters = bc.get(HELICOPTER_TAG, None)      # select helicopter actions from boundary conditions
 
         if waterline_actionss:
             waterline_action_string = '\n'.join(waterline_actionss)
@@ -722,6 +848,10 @@ class Propagator:
 
             if self.c_time % self.settings.time_resolution == 0:
                 values = self.__compute_values()
+                RoS_max = self.__compute_RoS_max()
+                RoS_mean = self.__compute_RoS_mean()
+                fl_I_max = self.__compute_fireline_int_max()
+                fl_I_mean = self.__compute_fireline_int_mean()
                 stats = self.__compute_stats(values)
                 n_active, area_mean, area_50, area_75, area_90 = stats
                 self.log(n_active, area_mean)
@@ -730,7 +860,8 @@ class Propagator:
                     values,
                     self.__trans,
                     self.__prj.srs,  #self.__prj,  crs.srs #changed due to updates in Pyproj and-or Rasterio...
-                    self.dst_crs
+                    self.dst_crs,
+                    trim = True #trim is used to auto-clip the tif where there are null value
                 )
 
                 self.__write_output(
@@ -742,6 +873,78 @@ class Propagator:
                     area_75=area_75,
                     area_90=area_90
                 )
+
+                reprj_values_ros_max, dst_trans_ros_max = reproject(
+                    RoS_max,
+                    self.__trans,
+                    self.__prj.srs,  #self.__prj,  crs.srs #changed due to updates in Pyproj and-or Rasterio...
+                    self.dst_crs,
+                    trim = True #trim is used to auto-clip the tif where there are null value
+                )
+
+                self.__write_output_RoS_max(
+                    reprj_values_ros_max,
+                    dst_trans_ros_max,
+                    active=n_active,
+                    area_mean=area_mean,
+                    area_50=area_50,
+                    area_75=area_75,
+                    area_90=area_90
+                )
+
+                reprj_values_ros_mean, dst_trans_ros_mean = reproject(
+                    RoS_mean,
+                    self.__trans,
+                    self.__prj.srs,  #self.__prj,  crs.srs #changed due to updates in Pyproj and-or Rasterio...
+                    self.dst_crs,
+                    trim = True #trim is used to auto-clip the tif where there are null value
+                )
+
+                self.__write_output_RoS_mean(
+                    reprj_values_ros_mean,
+                    dst_trans_ros_mean,
+                    active=n_active,
+                    area_mean=area_mean,
+                    area_50=area_50,
+                    area_75=area_75,
+                    area_90=area_90
+                )
+
+                reprj_values_I_max, dst_trans_I_max = reproject(
+                    fl_I_max,
+                    self.__trans,
+                    self.__prj.srs,  #self.__prj,  crs.srs #changed due to updates in Pyproj and-or Rasterio...
+                    self.dst_crs,
+                    trim = True #trim is used to auto-clip the tif where there are null value
+                )
+
+                self.__write_output_I_max(
+                    reprj_values_I_max,
+                    dst_trans_I_max,
+                    active=n_active,
+                    area_mean=area_mean,
+                    area_50=area_50,
+                    area_75=area_75,
+                    area_90=area_90
+                )
                 
+                reprj_values_I_mean, dst_trans_I_mean = reproject(
+                    fl_I_mean,
+                    self.__trans,
+                    self.__prj.srs,  #self.__prj,  crs.srs #changed due to updates in Pyproj and-or Rasterio...
+                    self.dst_crs,
+                    trim = True #trim is used to auto-clip the tif where there are null value
+                )
+
+                self.__write_output_I_mean(
+                    reprj_values_I_mean,
+                    dst_trans_I_mean,
+                    active=n_active,
+                    area_mean=area_mean,
+                    area_50=area_50,
+                    area_75=area_75,
+                    area_90=area_90
+                )
+
                 self.__update_isochrones(isochrones, reprj_values, dst_trans)
                 self.__write_isochrones(isochrones)

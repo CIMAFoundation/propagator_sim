@@ -132,3 +132,11 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+tmp/
+data/
+v0_table.txt
+work/
+.vscode/launch.json
+
+.vscode/settings.json
+.DS_Store

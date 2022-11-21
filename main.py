@@ -168,10 +168,11 @@ def main():
     if time_limit_min is None and args.time_limit:
         time_limit_min = args.time_limit*60
 
-    if PROB_FILE_TAG in d or V0_TABLE_TAG in d:
+    if PROB_FILE_TAG in d or V0_TABLE_TAG in d or P_VEGETATION_TAG in d:
         prob_file = d.get(PROB_FILE_TAG, None)
         v0_file = d.get(V0_TABLE_TAG, None)
-        propagator.load_parameters(prob_file, v0_file)
+        p_veg = d.get(P_VEGETATION_TAG, None)
+        propagator.load_parameters(prob_file, v0_file, p_veg)
 
 
 # we pass the flag for the spotting model. the value from input line (args)

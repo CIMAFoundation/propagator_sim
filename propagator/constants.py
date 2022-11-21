@@ -66,6 +66,9 @@ spotting_rn_std   = 25
 P_cd_conifer = 0.4
 P_c0 = 0.6
 
+# variable for fireline intensity
+Q = 2442.0
+
 
 #####   TAG   ####
 WATERLINE_ACTION_TAG = 'waterline_action'
@@ -90,6 +93,7 @@ W_SPEED_TAG = 'w_speed'
 
 PROB_FILE_TAG = 'prob_file'
 V0_TABLE_TAG = 'v0_file'
+P_VEGETATION_TAG = 'p_vegetation'
 IGNITIONS_TAG = 'ignitions'
 GRID_DIM_KM_TAG = 'grid_dim_km'
 IGNITIONS_RASTER_TAG = 'ignitions_raster'

@@ -1,3 +1,4 @@
+from itertools import count
 import logging
 from os.path import join
 
@@ -8,7 +9,7 @@ import scipy.io
 import utm
 from numpy import pi
 from pyproj import Proj
-from rasterio import crs, transform, warp, enums
+from rasterio import band, crs, transform, warp, enums
 from rasterio.features import shapes
 from scipy.ndimage import filters
 from scipy.ndimage.morphology import binary_erosion, binary_dilation
@@ -18,9 +19,9 @@ from shapely.geometry import shape, MultiLineString, LineString
 from sortedcontainers import SortedDict
 
 from .constants import *
+from . import PROPAGATOR_PATH
 
-DATA_DIR = 'data'
-
+DATA_DIR = PROPAGATOR_PATH + '/data'
 
 def normalize(angle_to_norm):
     return (angle_to_norm + pi) % (2 * pi) - pi
@@ -79,14 +80,22 @@ class Scheduler:
 
 def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset=DEFAULT_TAG):
     filename = var + '_' + str(tile_j) + '_' + str(tile_i) + '.mat'
+    filename_tif = var + '_' + str(tile_j) + '_' + str(tile_i) + '.tif'
 
     filepath = join(DATA_DIR, tileset, str(zone_number), filename)
     logging.debug(filepath)
     try:
        mat_file = scipy.io.loadmat(filepath)
        m = mat_file['M']
-    except:
-       m = np.nan * np.ones((dim, dim))
+    except FileNotFoundError:
+        try:
+            filepath = join(DATA_DIR, tileset, str(zone_number), filename_tif)
+            logging.debug(filepath)
+            with rio.open(filepath) as src:
+                m = src.read(1)
+        except FileNotFoundError:
+            m = np.nan * np.ones((dim, dim))
+            
     return np.ascontiguousarray(m)
 
 
