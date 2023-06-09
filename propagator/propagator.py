@@ -464,17 +464,30 @@ class Propagator:
 
     def load_data_from_tiles(self, easting, northing, zone_number):
         try:
-            logging.info('Loading VEGETATION from "' + self.settings.tileset + '" tileset')
-            veg, west, north, step_x, step_y = \
-                load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'prop', self.settings.tileset)
+            tileset = self.settings.tileset
+            try: 
+                logging.info('Loading VEGETATION from "' + tileset + '" tileset')
+                veg, west, north, step_x, step_y = \
+                    load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'prop', tileset)
+            except:
+                logging.info('Loading VEGETATION from "' + DEFAULT_TAG + '" tileset')
+                veg, west, north, step_x, step_y = \
+                    load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'prop', self.settings.tileset)
+                
             veg[:, (0, 1, 2, -3, -2, -1)] = 0
             veg[(0, 1, 2, -3, -2, -1), :] = 0
             self.veg = veg.astype('int8')
             
-            logging.info('Loading DEM "default" tileset')
-            dem, west, north, step_x, step_y = \
-                load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'quo', DEFAULT_TAG)
-            self.dem = dem.astype('float')
+            try: 
+                logging.info('Loading DEM from "' + tileset + '" tileset')
+                dem, west, north, step_x, step_y = \
+                    load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'quo', tileset)
+                self.dem = dem.astype('float')
+            except:
+                logging.info('Loading DEM from "' + DEFAULT_TAG + '" tileset')
+                dem, west, north, step_x, step_y = \
+                    load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'quo', DEFAULT_TAG)
+                self.dem = dem.astype('float')
 
             rows, cols = veg.shape
             south = north - (rows * step_y)
