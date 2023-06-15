@@ -187,9 +187,10 @@ def moist_proba_correction_1(moist):
     e_m is the moinsture correction to the transition probability p_{i,j}.  e_m = f(m), with m the Fine Fuel Moisture Content
     e_m = -11,507x5 + 22,963x4 - 17,331x3 + 6,598x2 - 1,7211x + 1,0003, where x is moisture / moisture of extintion (Mx).  Mx = 0.3 (Trucchia et al, Fire 2020 )
     """
-    #polynomial fit coefficient vector
-    M = [1.0003,  -1.7211, 6.598 , -17.331,  22.963,   -11.507 ]
-    p_moist = M[0]+  moist*M[1] + (moist**2)*M[2] + (moist**3)*M[3] + (moist**4)*M[4] + (moist**5)*M[5]
+    MX = 1.0
+    x = moist / MX
+    p_moist = (-11.507  * x**5) + (22.963 * x**4) + (-17.331 * x**3) + (6.598 * x**2) + (-1.7211 * x) + 1.0003
+    p_moist = np.clip(p_moist, 0.0, 1.0)
     return p_moist
     
 def moist_proba_correction_2(moist):
@@ -202,7 +203,8 @@ def moist_proba_correction_2(moist):
     return p_moist
 
 
-def fire_spotting(angle_to, w_dir, w_speed): #this function evaluates the distance that an ember can reach, by the use of the Alexandridis' formulation
+def fire_spotting(angle_to, w_dir, w_speed): 
+    """this function evaluates the distance that an ember can reach, by the use of the Alexandridis' formulation"""
     r_n = np.random.normal( spotting_rn_mean , spotting_rn_std , size=angle_to.shape ) # main thrust of the ember: sampled from a Gaussian Distribution (Alexandridis et al, 2008 and 2011)
     w_speed_ms = w_speed / 3.6                  #wind speed [m/s]
     d_p = r_n * np.exp( w_speed_ms * c_2 *( np.cos( w_dir - angle_to ) - 1 ) )  #Alexandridis' formulation for spotting distance
