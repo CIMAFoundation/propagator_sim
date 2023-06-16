@@ -447,7 +447,7 @@ class Propagator:
                     
                     self.veg[:, (0, 1, 2, -3, -2, -1)] = 0
                     self.veg[(0, 1, 2, -3, -2, -1), :] = 0
-                    self.veg[(self.veg<0)|(self.veg>6)] = 0                    
+                    self.veg[(self.veg<0)|(self.veg>fuel_max)] = 0     ##### MODIFIED         
                     
                     transform, crs, bounds, res = veg_file.transform, veg_file.crs, veg_file.bounds, veg_file.res
                     #self.__prj = Proj(crs.to_wkt()) this was not working anymore
@@ -620,7 +620,8 @@ class Propagator:
         ##################################################
         if self.settings.do_spotting == True:
             #print("I will do spotting!")
-            conifer_mask = (veg_type == 5)      #only cells that have veg = fire-prone conifers are selected
+            #conifer_mask = (veg_type == 5)      #only cells that have veg = fire-prone conifers are selected
+            conifer_mask = (veg_type == fuel_spotting)      #only cells that have veg = fire-prone conifers are selected      #### MODIFIED 
             conifer_r , conifer_c , conifer_t = u[conifer_mask, 0], u[conifer_mask, 1], u[conifer_mask, 2] 
             
             #N_spotters = conifer_r.shape[0]    #number of  fire-prone conifers cells that are  burning
@@ -672,7 +673,7 @@ class Propagator:
             #depends on vegetation type and density...
             # In this case, we put P_cd = 0.3 for conifers and 0 for the rest. but it can be generalized..
 
-            P_c = P_c0 * (1+ P_cd_conifer*(self.veg[nr_spot,nc_spot] == 5)) # + 0.4 * bushes_mask.... etc etc 
+            P_c = P_c0 * (1+ P_cd_conifer*(self.veg[nr_spot,nc_spot] == fuel_spotting)) # + 0.4 * bushes_mask.... etc etc    #### MODIFIED 
 
             success_spot_mask = np.random.uniform(  size=P_c.shape ) <  P_c 
             nr_spot = nr_spot[success_spot_mask]
