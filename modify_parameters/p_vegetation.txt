@@ -1,0 +1,14 @@
+#d0	d1	hhv     umid
+0.1	0	100	-9999   # 0 : bare soil
+0.5	0	17000	-9999   # 1 : grassland
+0.5	0	17000	-9999   # 2 : grassland
+0.5	0	17000	-9999   # 3 : grassland
+1.5	3	20000	60      # 4 : fire-prone broadleaves
+1.5	3	20000	60      # 5 : fire-prone broadleaves
+1.5	3	20000	60      # 6 : fire-prone broadleaves
+1	3	21000	45      # 7 : shrubs
+1	3	21000	45      # 8 : shrubs
+1	3	21000	45      # 9 : shrubs
+1	4	21000	55      # 10: fire-prone conifers
+1	4	21000	55      # 11:fire-prone conifers
+1	4	21000	55      # 12: fire-prone conifers
