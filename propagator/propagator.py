@@ -15,7 +15,8 @@ from scipy import ndimage
 from .constants import *
 from .utils import *
 
-from . import PROPAGATOR_PATH
+#from . import PROPAGATOR_PATH
+PROPAGATOR_PATH = os.getcwd()
 
 # [latifoglie cespugli aree_nude erba conifere coltivi faggete]
 try:   
