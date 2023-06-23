@@ -184,11 +184,14 @@ def p_probability(self, dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, m
 
 def moist_proba_correction_1(moist):
     """ 
-    e_m is the moinsture correction to the transition probability p_{i,j}.  e_m = f(m), with m the Fine Fuel Moisture Content
-    e_m = -11,507x5 + 22,963x4 - 17,331x3 + 6,598x2 - 1,7211x + 1,0003, where x is moisture / moisture of extintion (Mx).  Mx = 0.3 (Trucchia et al, Fire 2020 )
+    e_m is the moinsture correction to the transition probability p_{i,j}.  
+    e_m = f(m), with m the Fine Fuel Moisture Content
+    e_m = -11,507x5 + 22,963x4 - 17,331x3 + 6,598x2 - 1,7211x + 1,0003, where x is moisture / moisture of extintion (Mx).  
+    Mx = 0.3 
+    (reference: Trucchia et al, Fire 2020 )
     """
-    MX = 1.0
-    x = moist / MX
+    Mx = 0.3
+    x = np.clip(moist, 0.0, 1.0) / Mx
     p_moist = (-11.507  * x**5) + (22.963 * x**4) + (-17.331 * x**3) + (6.598 * x**2) + (-1.7211 * x) + 1.0003
     p_moist = np.clip(p_moist, 0.0, 1.0)
     return p_moist
@@ -753,7 +756,7 @@ class Propagator:
             
             mask = (img==1)
             img_mask = ndimage.binary_dilation(mask)
-            img[img_mask] = 0.8
+            img[img_mask] = WATERLINE_ACTION_VALUE
         else:
             img = np.ones((self.__shape[0], self.__shape[1])) * moisture_value
         
@@ -772,8 +775,8 @@ class Propagator:
             
             mask_can = (img_can==1)                                 #select points that are directly interested by canadair actions
             img_can_mask = ndimage.binary_dilation(mask_can)        #create a 1 pixel buffer around the selected points
-            img[img_can_mask] = 0.4                 #moisture value of the points of the buffer
-            img[mask_can] = 0.9                     #moisture value of the points directly interested by the canadair actions
+            img[img_can_mask] = CANADAIR_BUFFER_VALUE               #moisture value of the points of the buffer
+            img[mask_can] = CANADAIR_VALUE                    #moisture value of the points directly interested by the canadair actions
         
         ####helicopter actions
         if helicopters:
@@ -797,8 +800,8 @@ class Propagator:
 
             mask_newheli = (img_heli==0.6)                                  #select points that are directly interested by helicopter actions
             img_new_heli_mask = ndimage.binary_dilation(mask_newheli)       #create a 1 pixel buffer around the selected points
-            img[img_new_heli_mask] = 0.3                #moisture value of the points of the buffer
-            img[mask_newheli] = 0.6                     #moisture value of the points directly interested by the helicopter actions
+            img[img_new_heli_mask] = HELICOPTER_BUFFER_VALUE # moisture value of the points of the buffer
+            img[mask_newheli] = HELICOPTER_VALUE        #moisture value of the points directly interested by the helicopter actions
         
         bc[MOIST_RASTER_TAG] = img 
 
