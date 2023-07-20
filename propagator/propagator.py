@@ -20,9 +20,9 @@ PROPAGATOR_PATH = os.getcwd()
 
 # [latifoglie cespugli aree_nude erba conifere coltivi faggete]
 try:   
-    v0 = np.loadtxt(os.path.join(PROPAGATOR_PATH, 'v0_table.txt'))
-    prob_table = np.loadtxt(os.path.join(PROPAGATOR_PATH, 'prob_table.txt'))
-    p_veg = np.loadtxt(os.path.join(PROPAGATOR_PATH, 'p_vegetation.txt'))
+    v0 = np.loadtxt(os.path.join(PROPAGATOR_PATH, 'v0_table_ORIGINAL.txt'))
+    prob_table = np.loadtxt(os.path.join(PROPAGATOR_PATH, 'prob_table_ORIGINAL.txt'))
+    p_veg = np.loadtxt(os.path.join(PROPAGATOR_PATH, 'p_vegetation_ORIGINAL.txt'))
 except Exception:
     raise Exception('Could not load the vegetation speed and probabilities tables')
 
