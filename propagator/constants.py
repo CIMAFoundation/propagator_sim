@@ -2,8 +2,8 @@ import numpy as np
 from numpy import pi, array
 
 ### DEFINITION of FUEL
-fuel_max = 13
-fuel_spotting = 12
+fuel_max = 7
+fuel_spotting = 5
 
 
 '''
