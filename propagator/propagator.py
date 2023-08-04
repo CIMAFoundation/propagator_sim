@@ -184,12 +184,16 @@ def p_probability(self, dem_from, dem_to, veg_from, veg_to, angle_to, dist_to, m
 
 def moist_proba_correction_1(moist):
     """ 
-    e_m is the moinsture correction to the transition probability p_{i,j}.  e_m = f(m), with m the Fine Fuel Moisture Content
-    e_m = -11,507x5 + 22,963x4 - 17,331x3 + 6,598x2 - 1,7211x + 1,0003, where x is moisture / moisture of extintion (Mx).  Mx = 0.3 (Trucchia et al, Fire 2020 )
+    e_m is the moinsture correction to the transition probability p_{i,j}.  
+    e_m = f(m), with m the Fine Fuel Moisture Content
+    e_m = -11,507x5 + 22,963x4 - 17,331x3 + 6,598x2 - 1,7211x + 1,0003, where x is moisture / moisture of extintion (Mx).  
+    Mx = 0.3 
+    (reference: Trucchia et al, Fire 2020 )
     """
-    #polynomial fit coefficient vector
-    M = [1.0003,  -1.7211, 6.598 , -17.331,  22.963,   -11.507 ]
-    p_moist = M[0]+  moist*M[1] + (moist**2)*M[2] + (moist**3)*M[3] + (moist**4)*M[4] + (moist**5)*M[5]
+    Mx = 0.3
+    x = np.clip(moist, 0.0, 1.0) / Mx
+    p_moist = (-11.507  * x**5) + (22.963 * x**4) + (-17.331 * x**3) + (6.598 * x**2) + (-1.7211 * x) + 1.0003
+    p_moist = np.clip(p_moist, 0.0, 1.0)
     return p_moist
     
 def moist_proba_correction_2(moist):
@@ -202,7 +206,8 @@ def moist_proba_correction_2(moist):
     return p_moist
 
 
-def fire_spotting(angle_to, w_dir, w_speed): #this function evaluates the distance that an ember can reach, by the use of the Alexandridis' formulation
+def fire_spotting(angle_to, w_dir, w_speed): 
+    """this function evaluates the distance that an ember can reach, by the use of the Alexandridis' formulation"""
     r_n = np.random.normal( spotting_rn_mean , spotting_rn_std , size=angle_to.shape ) # main thrust of the ember: sampled from a Gaussian Distribution (Alexandridis et al, 2008 and 2011)
     w_speed_ms = w_speed / 3.6                  #wind speed [m/s]
     d_p = r_n * np.exp( w_speed_ms * c_2 *( np.cos( w_dir - angle_to ) - 1 ) )  #Alexandridis' formulation for spotting distance
@@ -464,17 +469,30 @@ class Propagator:
 
     def load_data_from_tiles(self, easting, northing, zone_number):
         try:
-            logging.info('Loading VEGETATION from "' + self.settings.tileset + '" tileset')
-            veg, west, north, step_x, step_y = \
-                load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'prop', self.settings.tileset)
+            tileset = self.settings.tileset
+            try: 
+                logging.info('Loading VEGETATION from "' + tileset + '" tileset')
+                veg, west, north, step_x, step_y = \
+                    load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'prop', tileset)
+            except:
+                logging.info('Loading VEGETATION from "' + DEFAULT_TAG + '" tileset')
+                veg, west, north, step_x, step_y = \
+                    load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'prop', self.settings.tileset)
+                
             veg[:, (0, 1, 2, -3, -2, -1)] = 0
             veg[(0, 1, 2, -3, -2, -1), :] = 0
             self.veg = veg.astype('int8')
             
-            logging.info('Loading DEM "default" tileset')
-            dem, west, north, step_x, step_y = \
-                load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'quo', DEFAULT_TAG)
-            self.dem = dem.astype('float')
+            try: 
+                logging.info('Loading DEM from "' + tileset + '" tileset')
+                dem, west, north, step_x, step_y = \
+                    load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'quo', tileset)
+                self.dem = dem.astype('float')
+            except:
+                logging.info('Loading DEM from "' + DEFAULT_TAG + '" tileset')
+                dem, west, north, step_x, step_y = \
+                    load_tiles(zone_number, easting, northing, self.settings.grid_dim, 'quo', DEFAULT_TAG)
+                self.dem = dem.astype('float')
 
             rows, cols = veg.shape
             south = north - (rows * step_y)
@@ -738,7 +756,7 @@ class Propagator:
             
             mask = (img==1)
             img_mask = ndimage.binary_dilation(mask)
-            img[img_mask] = 0.8
+            img[img_mask] = WATERLINE_ACTION_VALUE
         else:
             img = np.ones((self.__shape[0], self.__shape[1])) * moisture_value
         
@@ -757,8 +775,8 @@ class Propagator:
             
             mask_can = (img_can==1)                                 #select points that are directly interested by canadair actions
             img_can_mask = ndimage.binary_dilation(mask_can)        #create a 1 pixel buffer around the selected points
-            img[img_can_mask] = 0.4                 #moisture value of the points of the buffer
-            img[mask_can] = 0.9                     #moisture value of the points directly interested by the canadair actions
+            img[img_can_mask] = CANADAIR_BUFFER_VALUE               #moisture value of the points of the buffer
+            img[mask_can] = CANADAIR_VALUE                    #moisture value of the points directly interested by the canadair actions
         
         ####helicopter actions
         if helicopters:
@@ -782,8 +800,8 @@ class Propagator:
 
             mask_newheli = (img_heli==0.6)                                  #select points that are directly interested by helicopter actions
             img_new_heli_mask = ndimage.binary_dilation(mask_newheli)       #create a 1 pixel buffer around the selected points
-            img[img_new_heli_mask] = 0.3                #moisture value of the points of the buffer
-            img[mask_newheli] = 0.6                     #moisture value of the points directly interested by the helicopter actions
+            img[img_new_heli_mask] = HELICOPTER_BUFFER_VALUE # moisture value of the points of the buffer
+            img[mask_newheli] = HELICOPTER_VALUE        #moisture value of the points directly interested by the helicopter actions
         
         bc[MOIST_RASTER_TAG] = img 
 
