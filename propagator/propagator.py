@@ -2,45 +2,49 @@ import json
 import logging
 import os
 from datetime import timedelta
-
-# import utm
 from numpy import array, pi, sign, tanh, tile
+import numpy as np
 from numpy.random import rand
-
 from pyproj import Proj
-from rasterio import crs, enums, transform, warp
-
+from rasterio import crs, transform
 from scipy import ndimage
-
 from .constants import *
 from .utils import *
 
-#from . import PROPAGATOR_PATH
-PROPAGATOR_PATH = os.getcwd()
 
-# [latifoglie cespugli aree_nude erba conifere coltivi faggete]
-try:   
-    v0 = np.loadtxt(os.path.join(PROPAGATOR_PATH, 'v0_table_ORIGINAL.txt'))
-    prob_table = np.loadtxt(os.path.join(PROPAGATOR_PATH, 'prob_table_ORIGINAL.txt'))
-    p_veg = np.loadtxt(os.path.join(PROPAGATOR_PATH, 'p_vegetation_ORIGINAL.txt'))
+# path of propagator folder
+PROPAGATOR_PATH = os.path.normpath(os.path.join(os.path.realpath(__file__),
+                                                os.pardir))
+print(PROPAGATOR_PATH)
+
+# load vegetation parameters DEFAULT
+try:
+    prob_table = np.loadtxt(os.path.join(PROPAGATOR_PATH,
+                                         'prob_table.txt'))
+    v0 = np.loadtxt(os.path.join(PROPAGATOR_PATH,
+                                 'v0_table.txt'))
+    p_veg = np.loadtxt(os.path.join(PROPAGATOR_PATH,
+                                    'p_vegetation.txt'))
 except Exception:
-    raise Exception('Could not load the vegetation speed and probabilities tables')
+    raise Exception('Could not load vegetation parameters')
 
 
 def load_parameters(probability_file=None, v0_file=None, p_vegetation=None):
     """
-    Override the default values for vegetation speed and probabilities by loading them from file
-    :param probability_file:
-    :param time_file:
+    Overwrite vegetation paameters by loading them from file
+    :param probability_file: file for transition probabilities matrix
+    :param v0_file: file for nominal rate of spread
+    :param p_vegetation: file for vegetation type
     :return:
     """
     global v0, prob_table, p_veg
-    if v0_file:
-        v0 = np.loadtxt(v0_file)
     if probability_file:
         prob_table = np.loadtxt(probability_file)
+    if v0_file:
+        v0 = np.loadtxt(v0_file)
     if p_vegetation:
         p_veg = np.loadtxt(p_vegetation)
+
 
 def get_p_time_fn(ros_model_code):
     ros_models = {
@@ -190,7 +194,8 @@ def moist_proba_correction_1(moist):
     """
     x = moist / MX
     p_moist = (-11.507  * x**5) + (22.963 * x**4) + (-17.331 * x**3) + (6.598 * x**2) + (-1.7211 * x) + 1.0003
-    p_moist = np.clip(p_moist, 0.0, 1.0)
+    p_moist = np.clip(p_moist, 0.0, 1.0)# PROPAGATOR_PATH = os.getcwd()
+
     return p_moist
     
 def moist_proba_correction_2(moist):
