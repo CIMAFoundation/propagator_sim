@@ -31,8 +31,7 @@ class ErrorCodes(enum.Enum):
     BC_ERROR = 4
 
 
-def main():  
-    args = parse_params()
+def main(args):  
 
     if args.param_file is None:
         raise Exception('Error. Missing parameter file')
@@ -95,7 +94,7 @@ def main():
         "ignitions": ignitions,
         "time": 0
     }])
-  
+
     for bc in boundary_conditions:
         if  waterline_actions_fixed is not None:
             if WATERLINE_ACTION_TAG in bc:
@@ -208,7 +207,8 @@ def main():
     sim = Propagator(settings)
     easting, northing, zone_number, zone_letter, polys, lines, points = sim.load_ignitions_from_string(ignition_string)
     easting_ign, northing_ign, zone_number_ign, zone_letter_ign, polys_ign, lines_ign, points_ign = sim.load_ignitions_from_string(ignition_string_begin)
-    
+    print(ignition_string_begin)
+    print(polys_ign)
     if args.veg_file is None and args.dem_file is None:
         sim.load_data_from_tiles(easting, northing, zone_number)
     else:
@@ -218,14 +218,16 @@ def main():
         sim.load_data_from_files(args.veg_file, args.dem_file)
 
     sim.init_ignitions(polys_ign, lines_ign, points_ign, zone_number_ign)
+
     sim.run()
     logging.info('completed')
 
 
 if __name__ == '__main__':
+    args = parse_params()
     ERROR_CODE = ErrorCodes.OK
     try:        
-        main()
+        main(args)
     except NoTilesError as no_tiles:
         ERROR_CODE = ErrorCodes.DOMAIN_ERROR
     
