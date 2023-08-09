@@ -29,7 +29,9 @@ except Exception:
     raise Exception('Could not load vegetation parameters')
 
 
-def load_parameters(probability_file=None, v0_file=None, p_vegetation=None):
+def load_parameters(probability_file: str = None,
+                    v0_file: str = None,
+                    p_vegetation: str = None):
     """
     Overwrite vegetation paameters by loading them from file
     :param probability_file: file for transition probabilities matrix
@@ -46,118 +48,199 @@ def load_parameters(probability_file=None, v0_file=None, p_vegetation=None):
         p_veg = np.loadtxt(p_vegetation)
 
 
-def get_p_time_fn(ros_model_code):
+def get_p_time_fn(ros_model_code: str = None):
+    """Define ros function to compute burning time"""
     ros_models = {
         DEFAULT_TAG : p_time_standard,
         WANG_TAG : p_time_wang,
         ROTHERMEL_TAG : p_time_rothermel,
     }
-    p_time_function = ros_models.get(ros_model_code, p_time_wang)
+    # default ros: Wang model
+    p_time_function = ros_models.get(ros_model_code,
+                                     p_time_wang)
     return p_time_function
 
-def get_p_moist_fn(moist_model_code):
+
+def get_p_moist_fn(moist_model_code: str = None):
+    """Define moisture funciton to compute propagation probability"""
     moist_models = {
         DEFAULT_TAG : moist_proba_correction_1,
         NEW_FORMULATION_TAG : moist_proba_correction_1,
         ROTHERMEL_TAG : moist_proba_correction_2,
     }
-    p_moist_function = moist_models.get(moist_model_code, moist_proba_correction_1)
+    p_moist_function = moist_models.get(moist_model_code,
+                                        moist_proba_correction_1)
     return p_moist_function
 
-def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
-    # velocità di base modulata con la densità(tempo di attraversamento)
-    dh = (dem_to - dem_from)
-    
-    v = v0[veg_from-1] / 60 # tempo in minuti di attraversamento di una cella
-    
-    real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
-    
-    w_proj = np.cos(w_dir - angle_to) #wind component in propagation direction
-    w_spd = (w_speed * w_proj) / 3.6 #wind speed in the direction of propagation
 
-    teta_s_rad = np.arctan(dh / cellsize * dist) #slope angle [rad]
-    teta_s = np.degrees(teta_s_rad) #slope angle [°]
-
-    teta_f_rad = np.arctan(0.4226 * w_spd) #flame angle measured from the vertical in the direction of fire spread [rad]
-    teta_f = np.degrees(teta_f_rad) #flame angle [°]
-    
-    sf = np.exp(alpha1 * teta_s) #slope factor
-    sf_clip = np.clip(sf , 0.01 , 10) #slope factor clipped at 10
-    wf = np.exp(alpha2 * teta_f) #wind factor
-    wf_rescaled = wf / 13 #wind factor rescaled to have 10 as max value 
-    wf_clip = np.clip(wf_rescaled , 1 , 20) #max value is 20, min is 1
-
-    v_wh_pre = v * sf_clip * wf_clip #Rate of Spread evaluate with Rothermel's model
-    moist_eff = np.exp(c_moist * moist) #moisture effect
-
-    #v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
-    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS [m/min]
-
-    t = real_dist / v_wh
-    t[t>=1] = np.around(t[t>=1])
-    t = np.clip(t, 0.1, np.inf)
-    return t , v_wh
-    #return t
-
-def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
-  # velocità di base modulata con la densità(tempo di attraversamento)
-    dh = (dem_to - dem_from)
-
-    v = v0[veg_from-1] / 60 # tempo in minuti di attraversamento di una cella 
-    
-    real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
-    
-    w_proj = np.cos(w_dir - angle_to) #wind component in propagation direction
-    w_spd = (w_speed * w_proj)/3.6 #wind speed in the direction of propagation
-	
-    teta_s_rad = np.arctan(dh / cellsize * dist) #slope angle [rad]
-    teta_s_pos = np.absolute(teta_s_rad) #absolute values of slope angle
-    p_reverse = np.sign(dh) # +1 if fire spreads upslope, -1 if fire spreads downslope
-	
-    wf = np.exp(beta1 * w_spd) #wind factor
-    wf_clip = np.clip(wf , 0.01 , 10) #clipped at 10
-    sf = np.exp(p_reverse * beta2 * np.tan(teta_s_pos)**beta3) #slope factor
-    sf_clip = np.clip(sf , 0.01 , 10)
-
-    v_wh_pre = v * wf_clip * sf_clip #Rate of Spread evaluate with Wang Zhengfei's model
-    moist_eff = np.exp(c_moist * moist) #moisture effect
-     
-    #v_wh = np.clip(v_wh_pre, 0.01, 100) #adoptable RoS
-    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100) #adoptable RoS [m/min]
-    
-    t = real_dist / v_wh
-
-    t[t>=1] = np.around(t[t>=1])
-    t = np.clip(t, 0.1, np.inf)
-    return t , v_wh
-
-def p_time_standard(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
-    dh = (dem_to - dem_from)
+# ROS MODELS AND BURNING TIME #################################################
+def p_time_rothermel(dem_from: float, dem_to: float,
+                     veg_from: int, angle_to: float, dist: float,
+                     moist: float, w_dir: float, w_speed: float):
+    """
+    Burning time from ROS Rothermel model
+    :param dem_from: elevation of the cell from which the fire is propagating
+    :param dem_to: elevation of the cell to which the fire is propagating
+    :param veg_from: vegetation type of the cell from which the fire propagates
+    :param angle_to: angle of the cell to which the fire is propagating [rad]
+    :param dist: distance between the two cells
+    :param moist: moisture of the cell to which the fire is propagating
+    :param w_dir: wind direction [rad]
+    :param w_speed: wind speed [km/h]
+    """
+    # nominal rate of spread [m/min]
     v = v0[veg_from-1] / 60
+
+    dh = (dem_to - dem_from)
+    real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
+    # slope angle [rad]
+    teta_s_rad = np.arctan(dh / cellsize * dist)
+    # slope angle [°]
+    teta_s = np.degrees(teta_s_rad)
+
+    # wind component in propagation direction
+    w_proj = np.cos(w_dir - angle_to)
+    # wind speed in the direction of propagation [m/s]
+    w_spd = (w_speed * w_proj) / 3.6
+
+    # flame angle measured from vertical in fire spread direction [rad]
+    teta_f_rad = np.arctan(0.4226 * w_spd)
+    # flame angle [°]
+    teta_f = np.degrees(teta_f_rad)
+
+    # slope factor
+    sf = np.exp(alpha1 * teta_s)
+    # slope factor clipped at 10
+    sf_clip = np.clip(sf, 0.01, 10)
+    # wind factor
+    wf = np.exp(alpha2 * teta_f)
+    # wind factor rescaled to have 10 as max value
+    wf_rescaled = wf / 13.0 
+    # max value is 20, min is 1
+    wf_clip = np.clip(wf_rescaled, 1, 20)
+
+    # Rate of Spread evaluate with Rothermel's model
+    v_wh_pre = v * sf_clip * wf_clip
+    # moisture effect
+    moist_eff = np.exp(c_moist * moist)
+
+    # adoptable RoS [m/min]
+    # v_wh = np.clip(v_wh_pre, 0.01, 100)
+    # adoptable RoS [m/min] with moisture effect
+    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100)
+
+    # burning time [min]
+    t = real_dist / v_wh
+    t[t >= 1] = np.around(t[t >= 1])
+    t = np.clip(t, 0.1, np.inf)
+    return t, v_wh
+
+
+def p_time_wang(dem_from: float, dem_to: float,
+                veg_from: int, angle_to: float, dist: float,
+                moist: float, w_dir: float, w_speed: float):
+    """
+    Burning time from ROS Wang Zhengfei model
+    :param dem_from: elevation of the cell from which the fire is propagating
+    :param dem_to: elevation of the cell to which the fire is propagating
+    :param veg_from: vegetation type of the cell from which the fire propagates
+    :param angle_to: angle of the cell to which the fire is propagating [rad]
+    :param dist: distance between the two cells
+    :param moist: moisture of the cell to which the fire is propagating
+    :param w_dir: wind direction [rad]
+    :param w_speed: wind speed [km/h]
+    """
+    # nominal rate of spread [m/min]
+    v = v0[veg_from-1] / 60
+
+    dh = (dem_to - dem_from)
+    real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
+    # slope angle [rad]
+    teta_s_rad = np.arctan(dh / cellsize * dist)
+    # absolute values of slope angle
+    teta_s_pos = np.absolute(teta_s_rad)
+    # +1 if fire spreads upslope, -1 if fire spreads downslope
+    p_reverse = np.sign(dh)
+
+    # wind component in propagation direction
+    w_proj = np.cos(w_dir - angle_to)
+    # wind speed in the direction of propagation [m/s]
+    w_spd = (w_speed * w_proj) / 3.6
+
+    # wind factor
+    wf = np.exp(beta1 * w_spd)
+    # clipped at 10
+    wf_clip = np.clip(wf, 0.01, 10)
+    # slope factor
+    sf = np.exp(p_reverse * beta2 * np.tan(teta_s_pos)**beta3)
+    # clipped at 10
+    sf_clip = np.clip(sf, 0.01, 10)
+    # moisture effect
+    moist_eff = np.exp(c_moist * moist)
+
+    # Rate of Spread evaluate with Wang Zhengfei's model
+    v_wh_pre = v * wf_clip * sf_clip
+    # adoptable RoS [m/min]
+    v_wh = np.clip(v_wh_pre, 0.01, 100)
+    # adoptable RoS [m/min] with moisture effect
+    v_wh = np.clip(v_wh_pre * moist_eff, 0.01, 100)
+
+    # burning time [min]
+    t = real_dist / v_wh
+    t[t >= 1] = np.around(t[t >= 1])
+    t = np.clip(t, 0.1, np.inf)
+    return t, v_wh
+
+
+def p_time_standard(dem_from: float, dem_to: float,
+                    veg_from: int, angle_to: float, dist: float,
+                    moist: float, w_dir: float, w_speed: float):
+    """
+    Burning time from ROS (original model)
+    :param dem_from: elevation of the cell from which the fire is propagating
+    :param dem_to: elevation of the cell to which the fire is propagating
+    :param veg_from: vegetation type of the cell from which the fire propagates
+    :param angle_to: angle of the cell to which the fire is propagating [rad]
+    :param dist: distance between the two cells
+    :param moist: moisture of the cell to which the fire is propagating
+    :param w_dir: wind direction [rad]
+    :param w_speed: wind speed [km/h]
+    """
+    # nominal rate of spread [m/min]
+    v = v0[veg_from-1] / 60
+    dh = (dem_to - dem_from)
+    real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
+
     wh = w_h_effect(angle_to, w_speed, w_dir, dh, dist)
-    moist_eff = np.exp(c_moist * moist) #moisture effect
-    #v_wh = np.clip(v * wh, 0.01, 100)
+    # moisture effect
+    moist_eff = np.exp(c_moist * moist)
+    # adoptable RoS [m/min]
+    # v_wh = np.clip(v * wh, 0.01, 100)
+    # adoptable RoS [m/min] with moisture effect
     v_wh = np.clip(v * wh * moist_eff, 0.01, 100)
 
-    real_dist = np.sqrt((cellsize*dist)**2 + dh**2)
+    # burning time [min]
     t = real_dist / v_wh
-    t[t>=1] = np.around(t[t>=1])
+    t[t >= 1] = np.around(t[t >= 1])
     t = np.clip(t, 0.1, np.inf)
-    return t , v_wh
+    return t, v_wh
+
 
 def w_h_effect(angle_to, w_speed, w_dir, dh, dist):
-    w_effect_module = (A + (D1 * (D2 * np.tanh((w_speed / D3) - D4))) + (w_speed / D5))
+    w_effect_module = (A + (D1 * (D2 * np.tanh((w_speed / D3) - D4))) +
+                       (w_speed / D5))
     a = (w_effect_module - 1) / 4
-    w_effect_on_direction = (a + 1) * (1 - a ** 2) / (1 - a * np.cos(normalize(w_dir - angle_to)))
-    #h_effect = 1 + (tanh((dh / 7) ** 2. * sign(dh)))
-    slope = dh/(cellsize*dist)
+    w_effect_on_direction = (a + 1) * (1 - a ** 2) / (
+                            1 - a * np.cos(normalize(w_dir - angle_to)))
+    # h_effect = 1 + (tanh((dh / 7) ** 2. * sign(dh)))
+    slope = dh / (cellsize*dist)
     h_effect = 2**((tanh((slope * 3) ** 2. * sign(slope))))
-
     w_h = h_effect * w_effect_on_direction
-    #w_h = np.clip(w_h, 0.1, np.Inf)
+    # w_h = np.clip(w_h, 0.1, np.Inf)
     return w_h
 
 
+# PROBABILITY MODELS ##########################################################
 def w_h_effect_on_p(angle_to, w_speed, w_dir, dh, dist_to):
     """
     scales the wh factor for using it on the probability modulation
