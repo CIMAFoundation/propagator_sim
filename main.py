@@ -17,7 +17,10 @@ from scipy import ndimage
 
 import propagator.logging_config
 from propagator.args_parser import parse_params
-from propagator.propagator import NoTilesError, Propagator, PropagatorSettings
+from propagator.propagator import (
+    NoTilesError, Propagator, PropagatorSettings,
+    load_parameters
+)
 from propagator.utils import normalize
 
 from propagator.constants import *
@@ -167,11 +170,11 @@ def main(args):
     if time_limit_min is None and args.time_limit:
         time_limit_min = args.time_limit*60
 
-    if PROB_FILE_TAG in d or V0_TABLE_TAG in d or P_VEGETATION_TAG in d:
-        prob_file = d.get(PROB_FILE_TAG, None)
-        v0_file = d.get(V0_TABLE_TAG, None)
-        p_veg = d.get(P_VEGETATION_TAG, None)
-        propagator.load_parameters(prob_file, v0_file, p_veg)
+    # setting fuel
+    prob_file = d.get(PROB_FILE_TAG, None)
+    v0_file = d.get(V0_TABLE_TAG, None)
+    p_veg_file = d.get(P_VEGETATION_TAG, None)
+    load_parameters(prob_file, v0_file, p_veg_file)
 
 
 # we pass the flag for the spotting model. the value from input line (args)
@@ -207,8 +210,6 @@ def main(args):
     sim = Propagator(settings)
     easting, northing, zone_number, zone_letter, polys, lines, points = sim.load_ignitions_from_string(ignition_string)
     easting_ign, northing_ign, zone_number_ign, zone_letter_ign, polys_ign, lines_ign, points_ign = sim.load_ignitions_from_string(ignition_string_begin)
-    print(ignition_string_begin)
-    print(polys_ign)
     if args.veg_file is None and args.dem_file is None:
         sim.load_data_from_tiles(easting, northing, zone_number)
     else:

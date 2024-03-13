@@ -15,18 +15,19 @@ from .utils import *
 # path of propagator folder
 PROPAGATOR_PATH = os.path.normpath(os.path.join(os.path.realpath(__file__),
                                                 os.pardir))
-print(PROPAGATOR_PATH)
 
-# load vegetation parameters DEFAULT
-try:
-    prob_table = np.loadtxt(os.path.join(PROPAGATOR_PATH,
-                                         'prob_table.txt'))
-    v0 = np.loadtxt(os.path.join(PROPAGATOR_PATH,
-                                 'v0_table.txt'))
-    p_veg = np.loadtxt(os.path.join(PROPAGATOR_PATH,
-                                    'p_vegetation.txt'))
-except Exception:
-    raise Exception('Could not load vegetation parameters')
+
+# def set_fuel(fuel_max_val: int = None,
+#                 fuel_spotting_val: list[int] = None):
+#     global fuel_max, fuel_spotting
+#     if fuel_max_val:
+#         fuel_max = fuel_max_val
+#     else:
+#         fuel_max = 7
+#     if not (fuel_spotting_val is None):
+#         fuel_spotting = fuel_spotting_val
+#     else:
+#         fuel_spotting = [5]
 
 
 def load_parameters(probability_file: str = None,
@@ -42,10 +43,24 @@ def load_parameters(probability_file: str = None,
     global v0, prob_table, p_veg
     if probability_file:
         prob_table = np.loadtxt(probability_file)
+    else:
+        prob_table = np.loadtxt(os.path.join(PROPAGATOR_PATH,
+                                     'prob_table.txt'))
     if v0_file:
         v0 = np.loadtxt(v0_file)
+    else:
+        v0 = np.loadtxt(os.path.join(PROPAGATOR_PATH,
+                             'v0_table.txt'))
     if p_vegetation:
         p_veg = np.loadtxt(p_vegetation)
+    else:
+        p_veg = np.loadtxt(os.path.join(PROPAGATOR_PATH,
+                                        'p_vegetation.txt'))
+    # set fuel
+    global fuel_max, fuel_spotting
+    fuel_max = v0.shape[0]
+    fuel_spotting = [pp+1 for pp in np.argwhere(p_veg[:, 4] == 1)[:, 0]]
+    
 
 
 def get_p_time_fn(ros_model_code: str = None):
@@ -75,7 +90,8 @@ def get_p_moist_fn(moist_model_code: str = None):
 
 # ROS MODELS AND BURNING TIME #################################################
 def p_time_rothermel(dem_from: float, dem_to: float,
-                     veg_from: int, angle_to: float, dist: float,
+                     veg_from: int, veg_to: int,
+                     angle_to: float, dist: float,
                      moist: float, w_dir: float, w_speed: float):
     """
     Burning time from ROS Rothermel model
@@ -137,7 +153,8 @@ def p_time_rothermel(dem_from: float, dem_to: float,
 
 
 def p_time_wang(dem_from: float, dem_to: float,
-                veg_from: int, angle_to: float, dist: float,
+                veg_from: int, veg_to: int,
+                angle_to: float, dist: float,
                 moist: float, w_dir: float, w_speed: float):
     """
     Burning time from ROS Wang Zhengfei model
@@ -193,7 +210,8 @@ def p_time_wang(dem_from: float, dem_to: float,
 
 
 def p_time_standard(dem_from: float, dem_to: float,
-                    veg_from: int, angle_to: float, dist: float,
+                    veg_from: int, veg_to: int,
+                    angle_to: float, dist: float,
                     moist: float, w_dir: float, w_speed: float):
     """
     Burning time from ROS (original model)
@@ -710,7 +728,7 @@ class Propagator:
         if self.settings.do_spotting == True:
             #print("I will do spotting!")
             #conifer_mask = (veg_type == 5)      #only cells that have veg = fire-prone conifers are selected
-            conifer_mask = (veg_type == fuel_spotting)      #only cells that have veg = fire-prone conifers are selected      #### MODIFIED 
+            conifer_mask = np.isin(veg_type, fuel_spotting)     #only cells that have veg = fire-prone conifers are selected      #### MODIFIED 
             conifer_r , conifer_c , conifer_t = u[conifer_mask, 0], u[conifer_mask, 1], u[conifer_mask, 2] 
             
             #N_spotters = conifer_r.shape[0]    #number of  fire-prone conifers cells that are  burning
