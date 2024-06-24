@@ -520,7 +520,7 @@ def save_isochrones(results, filename, format='geojson'):
         geojson_obj = dict(type='FeatureCollection', features=features)
         for t in results:
             for p in results[t]:
-                if results[t][p].type == 'MultiLineString':
+                if results[t][p].geom_type == 'MultiLineString':
                     features.append({
                         'type': 'Feature',
                         'geometry': mapping(results[t][p]),
