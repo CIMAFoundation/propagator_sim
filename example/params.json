@@ -1,43 +1,20 @@
 {
-  "time_limit": 600,
-  "tileset": "default",
-  "name": "test",
-  "boundary_conditions": [
-    {
-      "w_dir": 116,
-      "w_speed": "43",
-      "moisture": 0,
-      "helicopter": [
-        "LINE:[42.69841 42.70345];[11.02154 11.02864]",
-        "LINE:[42.70345 42.69710];[11.02864 11.03851]",
-        "LINE:[42.69710 42.69084];[11.03851 11.02670]",
-        "LINE:[42.69084 42.69841];[11.02670 11.02154]"
-      ],
-      "time": 0
-    }
-  ],
-  "ignitions": [
-    "POINT:42.698584;11.02906"
-  ],
-  "isochrone_thresholds": [
-    0.01,
-    0.5,
-    0.75,
-    0.9
-  ],
-  "w_dir": 0,
-  "time_resolution": 60,
-  "time_res": 60,
-  "grid_dim_km": 20,
-  "init_date": "202001300000",
-  "w_speed": 0,
-  "n_threads": 100,
-  "heavy_action": 0,
-  "waterline_action": 0,
-  "canadair": 0,
-  "helicopter": 0,
-  "moisture": 0,
-  "ros_model": "wang",
-  "prob_moist_model": "new_formula",
-  "do_spotting": false
+    "time_limit": 2400,
+    "do_spotting": false,
+    "time_resolution": 10,
+    "boundary_conditions": [
+        {
+            "time": 0,
+            "w_dir": 10,
+            "w_speed": 30,
+            "moisture": 0
+        }
+    ],
+    "title": "",
+    "datatype_id": "35006",
+    "init_date": "202209011500",
+    "ignitions": [
+        "POINT: 52.47751;-6.82354"       
+        
+    ]
 }
