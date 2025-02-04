@@ -495,7 +495,7 @@ class Propagator:
 
                 self.veg[:, (0, 1, 2, -3, -2, -1)] = 0
                 self.veg[(0, 1, 2, -3, -2, -1), :] = 0
-                self.veg[(self.veg < 0) | (self.veg > 6)] = 0
+                self.veg[self.veg < 0] = 0
 
                 transform, crs, bounds, res = veg_file.transform, veg_file.crs, veg_file.bounds, veg_file.res
                 # self.__prj = Proj(crs.to_wkt()) this was not working anymore
