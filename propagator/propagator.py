@@ -690,7 +690,7 @@ class Propagator:
         if self.settings.do_spotting == True:
             # print("I will do spotting!")
             # only cells that have veg = fire-prone conifers are selected
-            conifer_mask = (veg_type == 5)
+            conifer_mask = np.isin(veg_type, FUEL_SPOTTING)
             conifer_r, conifer_c, conifer_t = u[conifer_mask,
                                                 0], u[conifer_mask, 1], u[conifer_mask, 2]
 
@@ -746,7 +746,7 @@ class Propagator:
             # In this case, we put P_cd = 0.3 for conifers and 0 for the rest. but it can be generalized..
 
             # + 0.4 * bushes_mask.... etc etc
-            P_c = P_c0 * (1 + P_cd_conifer*(self.veg[nr_spot, nc_spot] == 5))
+            P_c = P_c0 * (1 + P_cd_conifer*(np.isin(self.veg[nr_spot, nc_spot], FUEL_SPOTTING)))
 
             success_spot_mask = np.random.uniform(size=P_c.shape) < P_c
             nr_spot = nr_spot[success_spot_mask]

@@ -69,6 +69,7 @@ P_c0 = 0.6
 # variable for fireline intensity
 Q = 2442.0
 
+FUEL_SPOTTING = [5]
 
 #####   TAG   ####
 WATERLINE_ACTION_TAG = 'waterline_action'
