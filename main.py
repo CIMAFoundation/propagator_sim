@@ -17,7 +17,7 @@ from scipy import ndimage
 
 import propagator.logging_config
 from propagator.args_parser import parse_params
-from propagator.propagator import NoTilesError, Propagator, PropagatorSettings
+from propagator.propagator import NoTilesError, Propagator, PropagatorSettings, load_parameters
 from propagator.utils import normalize
 
 from propagator.constants import *
@@ -172,7 +172,7 @@ def main():
         prob_file = d.get(PROB_FILE_TAG, None)
         v0_file = d.get(V0_TABLE_TAG, None)
         p_veg = d.get(P_VEGETATION_TAG, None)
-        propagator.load_parameters(prob_file, v0_file, p_veg)
+        load_parameters(prob_file, v0_file, p_veg)
 
 
 # we pass the flag for the spotting model. the value from input line (args)
