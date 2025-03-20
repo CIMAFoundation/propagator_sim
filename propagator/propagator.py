@@ -6,16 +6,14 @@ from datetime import timedelta
 # import utm
 from numpy import array, pi, sign, tanh, tile
 from numpy.random import rand
-
 from pyproj import Proj
-from rasterio import crs, enums, transform, warp
-
+from rasterio import crs, transform
 from scipy import ndimage
 
 from .constants import *
+from .constants import PROPAGATOR_PATH
 from .utils import *
-
-from . import PROPAGATOR_PATH
+import time
 
 # [latifoglie cespugli aree_nude erba conifere coltivi faggete]
 try:
@@ -166,7 +164,7 @@ def w_h_effect(angle_to, w_speed, w_dir, dh, dist):
     h_effect = 2**((tanh((slope * 3) ** 2. * sign(slope))))
 
     w_h = h_effect * w_effect_on_direction
-    # w_h = np.clip(w_h, 0.1, np.Inf)
+    # w_h = np.clip(w_h, 0.1, np.inf)
     return w_h
 
 
@@ -370,7 +368,7 @@ class Propagator:
         return fl_I_mean
 
     def __compute_stats(self, values):
-        n_active = len(self.ps.active().tolist())
+        n_active = len(self.ps.active())
         cell_area = float(self.step_x) * float(self.step_y) / 10000.0
         area_mean = float(np.sum(values) * cell_area)
         area_50 = float(np.sum(values >= 0.5) * cell_area)
@@ -568,7 +566,7 @@ class Propagator:
         for t in range(n_threads):
             self.f_global[:, :, t] = initial_ignitions.copy()
             for p in active_ignitions:
-                self.ps.push(array([p[0], p[1], t]), 0)
+                self.ps.push([[p[0], p[1], t]], 0)
                 self.f_global[p[0], p[1], t] = 0
 
             # add ignitions in future boundary conditions
@@ -928,8 +926,9 @@ class Propagator:
     def run(self):
         isochrones = {}
         self.c_time = 0
-
-        while len(self.ps):
+        
+        start_time = time.time_ns()
+        while len(self.ps) > 0:
             if self.settings.time_limit and self.c_time > self.settings.time_limit:
                 break
 
@@ -946,6 +945,15 @@ class Propagator:
 
             new_updates = self.__apply_updates(updates, wspeed, wdir, moisture)
             self.ps.push_all(new_updates)
+            if self.c_time % 60 == 0:
+                elapsed_time = time.time_ns() - start_time
+
+                memory_usage = get_memory_usage()
+                logging.warning(f'{self.c_time}: Elapsed time: {elapsed_time/1e6} msecs Memory usage: {memory_usage} MB')
+                start_time = time.time_ns()
+            
+            if self.c_time == 0:
+                continue
 
             if self.c_time % self.settings.time_resolution == 0:
                 values = self.__compute_values()

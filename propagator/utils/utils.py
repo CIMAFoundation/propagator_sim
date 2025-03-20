@@ -1,4 +1,3 @@
-from itertools import count
 import logging
 from os.path import join
 
@@ -8,7 +7,6 @@ import rasterio as rio
 import scipy.io
 import utm
 from numpy import pi
-from pyproj import Proj
 from rasterio import band, crs, transform, warp, enums
 from rasterio.features import shapes
 from scipy.ndimage import filters
@@ -16,68 +14,14 @@ from scipy.ndimage.morphology import binary_erosion, binary_dilation
 from scipy.signal.signaltools import medfilt2d
 from shapely.geometry import mapping
 from shapely.geometry import shape, MultiLineString, LineString
-from sortedcontainers import SortedDict
 
-from .constants import *
-from . import PROPAGATOR_PATH
+from propagator.constants import DEFAULT_TAG, TIME_TAG, PROPAGATOR_PATH
 
 DATA_DIR = PROPAGATOR_PATH + '/data'
-
 
 def normalize(angle_to_norm):
     return (angle_to_norm + pi) % (2 * pi) - pi
 
-
-class Scheduler:
-    """
-    handles the scheduling of the propagation procedure
-    """
-
-    def __init__(self):
-        self.list = SortedDict()
-
-        # fix the change in SortedDict api
-        self.list_kw = {'last': False}
-        try:
-            self.list.popitem(**self.list_kw)
-        except KeyError:
-            pass
-        except TypeError:
-            self.list_kw = {'index': 0}
-
-    def push(self, coords, time):
-        if time not in self.list:
-            self.list[time] = []
-        self.list[time].append(coords)
-
-    def push_all(self, updates):
-        for t, u in updates:
-            self.push(u, t)
-
-    def pop(self):
-
-        item = self.list.popitem(**self.list_kw)
-        return item
-
-    def active(self):
-        """
-        get all the threads that have a scheduled update
-        :return:
-        """
-        active_t = np.unique([e for k in self.list.keys()
-                             for c in self.list[k] for e in c[:, 2]])
-        return active_t
-
-    def __len__(self):
-        return len(self.list)
-
-    def __call__(self):
-        while len(self) > 0:
-            c_time, updates = self.pop()
-            print('u')
-            new_updates = yield c_time, updates
-            print('n')
-            self.push_all(new_updates)
 
 
 def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset=DEFAULT_TAG):
@@ -87,8 +31,8 @@ def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset=DEFAULT_TAG):
     filepath = join(DATA_DIR, tileset, str(zone_number), filename)
     logging.debug(filepath)
     try:
-        mat_file = scipy.io.loadmat(filepath)
-        m = mat_file['M']
+       mat_file = scipy.io.loadmat(filepath)
+       m = mat_file['M']
     except FileNotFoundError:
         try:
             filepath = join(DATA_DIR, tileset, str(zone_number), filename_tif)
@@ -97,7 +41,7 @@ def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset=DEFAULT_TAG):
                 m = src.read(1)
         except FileNotFoundError:
             m = np.nan * np.ones((dim, dim))
-
+            
     return np.ascontiguousarray(m)
 
 
@@ -108,16 +52,11 @@ def load_tile_ref(zone_number, var, tileset=DEFAULT_TAG):
     step_x, step_y, max_y, min_x, tile_dim = \
         mat_file['stepx'][0][0], mat_file['stepy'][0][0], \
         mat_file['maxy'][0][0], mat_file['minx'][0][0], mat_file['tileDim'][0][0]
-
-    step_x = int(step_x)
-    step_y = int(step_y)
-
     return step_x, step_y, max_y, min_x, tile_dim
 
 
 def load_tiles(zone_number, x, y, dim, var, tileset=DEFAULT_TAG):
-    step_x, step_y, max_y, min_x, tile_dim = load_tile_ref(
-        zone_number, var, tileset)
+    step_x, step_y, max_y, min_x, tile_dim = load_tile_ref(zone_number, var, tileset)
     i = 1 + np.floor((max_y - y) / step_y)
     j = 1 + np.floor((x - min_x) / step_x)
 
@@ -169,8 +108,7 @@ def load_tiles(zone_number, x, y, dim, var, tileset=DEFAULT_TAG):
             np.concatenate([m1, m2], axis=1),
             np.concatenate([m3, m4], axis=1)
         ], axis=0)
-        mat = m[idx_i_min:(tile_dim + idx_i_max),
-                idx_j_min: (tile_dim + idx_j_max)]
+        mat = m[idx_i_min:(tile_dim + idx_i_max), idx_j_min: (tile_dim + idx_j_max)]
 
     return mat, min_easting, max_northing, step_x, step_y
 
@@ -221,8 +159,7 @@ def add_line(img, cs, rs, val):
     img_temp = np.zeros(img.shape)
 
     for idx in range(len(cs) - 1):
-        points = add_segment(
-            img_temp, cs[idx], rs[idx], cs[idx + 1], rs[idx + 1], 1)
+        points = add_segment(img_temp, cs[idx], rs[idx], cs[idx + 1], rs[idx + 1], 1)
         if idx > 0:
             contour.extend(points[1:])
         else:
@@ -238,8 +175,7 @@ def add_poly(img, cs, rs, val):
     contour = []
 
     for idx in range(len(cs) - 1):
-        points = add_segment(
-            img_temp, cs[idx], rs[idx], cs[idx + 1], rs[idx + 1], 2)
+        points = add_segment(img_temp, cs[idx], rs[idx], cs[idx + 1], rs[idx + 1], 2)
         if idx > 0:
             contour.extend(points[1:])
         else:
@@ -274,7 +210,6 @@ def add_poly(img, cs, rs, val):
 
     img[img_temp > 0] = val
     return contour
-
 
 def read_actions(imp_points_string):
     strings = imp_points_string.split('\n')
@@ -312,7 +247,7 @@ def read_actions(imp_points_string):
     mid_lat = (max_lat + min_lat) / 2
     mid_lon = (max_lon + min_lon) / 2
 
-    return mid_lat, mid_lon, polys, lines, points
+    return mid_lat, mid_lon, polys, lines, points 
 
 
 def rasterize_actions(dim, points, lines, polys, lonmin, latmax, stepx, stepy, zone_number, base_value=0, value=1):
@@ -328,8 +263,7 @@ def rasterize_actions(dim, points, lines, polys, lonmin, latmax, stepx, stepy, z
         active = add_line(img, x, y, 1)
         active_points.extend(active)
     for point in points:
-        xs, ys, _, _ = utm.from_latlon(
-            point[0], point[1], force_zone_number=zone_number)
+        xs, ys, _, _ = utm.from_latlon(point[0], point[1], force_zone_number=zone_number)
         x = int(np.floor((xs - lonmin) / stepx))
         y = int(np.floor((latmax - ys) / stepy))
         active = add_point(img, x, y, 1)
@@ -360,7 +294,7 @@ def trim_values(values, src_trans):
     if len(v_cols) > 0:
         min_col, max_col = v_cols[0] - 1, v_cols[-1] + 2
 
-    trim_values = values[min_row:max_row, min_col:max_col]
+    trim_values = values[min_row:max_row, min_col:max_col]    
     rows, cols = trim_values.shape
 
     (west, east), (north, south) = rio.transform.xy(
@@ -396,18 +330,17 @@ def reproject(values, src_trans, src_crs, dst_crs, trim=True):
         dst = np.empty((dh, dw))
 
         warp.reproject(
-            source=np.ascontiguousarray(values),
+            source=np.ascontiguousarray(values), 
             destination=dst,
-            src_crs=src_crs,
+            src_crs=src_crs, 
             dst_crs=dst_crs,
-            dst_transform=dst_trans,
+            dst_transform=dst_trans, 
             src_transform=src_trans,
             resampling=enums.Resampling.nearest,
             num_threads=1
         )
-
+    
     return dst, dst_trans
-
 
 def write_geotiff(filename, values, dst_trans, dst_crs, dtype=np.uint8):
     with rio.Env():
@@ -478,14 +411,13 @@ def extract_isochrone(values, transf,
 
     for t in thresholds:
         over_t_ = (filt_values >= t).astype('uint8')
-        over_t = binary_dilation(binary_erosion(
-            over_t_).astype('uint8')).astype('uint8')
+        over_t = binary_dilation(binary_erosion(over_t_).astype('uint8')).astype('uint8')
         if np.any(over_t):
             for s, v in shapes(over_t, transform=transf):
                 sh = shape(s)
 
                 ml = [
-                    smooth_linestring(l, smooth_sigma)  # .simplify(simp_fact)
+                    smooth_linestring(l, smooth_sigma) # .simplify(simp_fact)
                     for l in sh.interiors
                     if l.length > min_length
                 ]
@@ -505,7 +437,7 @@ def save_isochrones(results, filename, format='geojson'):
         with fiona.open(filename, 'w', 'ESRI Shapefile', schema) as c:
             for t in results:
                 for p in results[t]:
-                    if results[t][p].type == 'MultiLineString':
+                    if results[t][p].geom_type == 'MultiLineString':
                         c.write({
                             'geometry': mapping(results[t][p]),
                             'properties': {
@@ -542,11 +474,8 @@ if __name__ == '__main__':
         "POINT:44.32372526549074;8.45040310174227"]
     ignition_string = '\n'.join(s1)
     mid_lat, mid_lon, polys, lines, points = read_actions(ignition_string)
-    easting, northing, zone_number, zone_letter = utm.from_latlon(
-        mid_lat, mid_lon)
-    src, west, north, step_x, step_y = load_tiles(
-        zone_number, easting, northing, grid_dim, 'prop', tileset)
+    easting, northing, zone_number, zone_letter = utm.from_latlon(mid_lat, mid_lon)
+    src, west, north, step_x, step_y = load_tiles(zone_number, easting, northing, grid_dim, 'prop', tileset)
 
-    dst, dst_trans, dst_crs = reproject(
-        src, (west, north, step_x, step_y), zone_number, zone_letter)
+    dst, dst_trans, dst_crs = reproject(src, (west, north, step_x, step_y), zone_number, zone_letter)
     write_geotiff('test_latolng.tiff', dst, dst_trans, dst_crs)
