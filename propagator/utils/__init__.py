@@ -1,6 +1,6 @@
 from .utils import *
-#from .scheduler import Scheduler
-from propagator_scheduler_rs import Scheduler
+from .scheduler import Scheduler
+#from propagator_scheduler_rs import Scheduler
 
 
 import psutil
