@@ -1,11 +1,4 @@
-test/
-tmp/
-data/
-work/
-.vscode/launch.json
-.vscode/settings.json
 .DS_Store
-
 .ipynb_checkpoints/
 
 # Byte-compiled / optimized / DLL files
