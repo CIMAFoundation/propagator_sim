@@ -1,0 +1,18 @@
+[project]
+name = "propagator-sim"
+version = "0.1.0"
+description = "PROPAGATOR: An Operational Cellular-Automata Based Wildfire Simulator"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "affine>=2.4.0",
+    "angles>=2.0",
+    "fiona>=1.10.1",
+    "numpy>=2.2.4",
+    "pyproj>=3.7.1",
+    "rasterio>=1.4.3",
+    "scipy>=1.15.2",
+    "shapely>=2.0.7",
+    "sortedcontainers>=2.4.0",
+    "utm>=0.8.1",
+]

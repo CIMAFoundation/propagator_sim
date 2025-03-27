@@ -14,7 +14,7 @@ pip install -r requirements.txt
 
 ## Launch a simulation
 ```bash
-python main.py -f ./example/params.json -of ./example/output -tl 24 -dem ./sample/dem.tif -veg ./sample/veg.tif
+python main.py -f ./example/params.json -of ./example/output -tl 24 -dem ./example/dem.tif -veg ./example/veg.tif
 ```
 
 See `python main.py --help` for command line args.
