@@ -16,3 +16,8 @@ dependencies = [
     "sortedcontainers>=2.4.0",
     "utm>=0.8.1",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.2",
+]
