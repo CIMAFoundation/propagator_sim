@@ -64,7 +64,7 @@ def get_p_moist_fn(moist_model_code):
     return p_moist_function
 
 
-def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
+def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed, cellsize=cellsize_default):
     # velocità di base modulata con la densità(tempo di attraversamento)
     dh = (dem_to - dem_from)
 
@@ -103,7 +103,7 @@ def p_time_rothermel(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, 
     # return t
 
 
-def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
+def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed, cellsize=cellsize_default):
   # velocità di base modulata con la densità(tempo di attraversamento)
     dh = (dem_to - dem_from)
 
@@ -140,7 +140,7 @@ def p_time_wang(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir
     return t, v_wh
 
 
-def p_time_standard(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed):
+def p_time_standard(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w_dir, w_speed, cellsize=cellsize_default):
     dh = (dem_to - dem_from)
     v = v0[veg_from-1] / 60
     wh = w_h_effect(angle_to, w_speed, w_dir, dh, dist)
@@ -155,7 +155,7 @@ def p_time_standard(dem_from, dem_to, veg_from, veg_to, angle_to, dist, moist, w
     return t, v_wh
 
 
-def w_h_effect(angle_to, w_speed, w_dir, dh, dist):
+def w_h_effect(angle_to, w_speed, w_dir, dh, dist, cellsize=cellsize_default):
     w_effect_module = (
         A + (D1 * (D2 * np.tanh((w_speed / D3) - D4))) + (w_speed / D5))
     a = (w_effect_module - 1) / 4
@@ -295,6 +295,7 @@ class PropagatorSettings:
         self.p_time_fn = get_p_time_fn(settings_dict[ROS_MODEL_CODE_TAG])
         self.p_moist_fn = get_p_moist_fn(settings_dict[PROB_MOIST_CODE_TAG])
         self.do_spotting = settings_dict[SPOT_FLAG_TAG]
+        self.cellsize = settings_dict[CELLSIZE_TAG]
 
         # self.simp_fact = settings_dict['simp_fact']
         # self.debug_mode = settings_dict['debug_mode']
@@ -709,7 +710,7 @@ class Propagator:
             ember_distance = fire_spotting(ember_angle,  w_dir, w_speed)
 
             # filter out short embers
-            idx_long_embers = ember_distance > 2*cellsize
+            idx_long_embers = ember_distance > 2*self.settings.cellsize
             conifer_arr_r = conifer_arr_r[idx_long_embers]
             conifer_arr_c = conifer_arr_c[idx_long_embers]
             conifer_arr_t = conifer_arr_t[idx_long_embers]
@@ -721,9 +722,9 @@ class Propagator:
             delta_r = ember_distance * np.cos(ember_angle)
             # horizontal delta [meters]
             delta_c = ember_distance * np.sin(ember_angle)
-            nb_spot_r = delta_r / cellsize  # number of vertical cells
+            nb_spot_r = delta_r / self.settings.cellsize  # number of vertical cells
             nb_spot_r = nb_spot_r.astype(int)
-            nb_spot_c = delta_c / cellsize  # number of horizontal cells
+            nb_spot_c = delta_c / self.settings.cellsize  # number of horizontal cells
             nb_spot_c = nb_spot_c.astype(int)
 
             # vertical location of the cell to be ignited by the ember
@@ -762,7 +763,7 @@ class Propagator:
                                                                   nc_spot], self.veg[nr_spot, nc_spot],
                                                          # ember_angle, ember_distance,
                                                          np.zeros(
-                                                             nr_spot.shape), cellsize*np.ones(nr_spot.shape),
+                                                             nr_spot.shape), self.settings.cellsize*np.ones(nr_spot.shape),
                                                          moisture[nr_spot,
                                                                   nc_spot],
                                                          w_dir, w_speed)

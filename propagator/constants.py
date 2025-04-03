@@ -23,7 +23,7 @@ n_arr = array([(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1,
 
 dist = array([[1.414, 1, 1.414], [1, 0, 1], [1.414, 1, 1.414]])
 angle = array([[pi*3/4, pi/2, pi/4], [pi, np.nan, 0], [-pi*3/4, -pi/2, -pi/4]])
-cellsize = 20
+cellsize_default = 20
 
 #aggiunte per spotting
 #insieme punti lontani 2 celle
@@ -94,6 +94,8 @@ W_SPEED_TAG = 'w_speed'
 
 ZONE_NUMBER_TAG = 'zone_number'
 ZONE_LETTER_TAG = 'zone_letter'
+
+CELLSIZE_TAG = 'cellsize'
 
 PROB_FILE_TAG = 'prob_file'
 V0_TABLE_TAG = 'v0_file'

@@ -45,7 +45,8 @@ def main():
 
     n_threads = int(d.get(N_THREADS_TAG, 10))
     grid_dim_km = float(d.get(GRID_DIM_KM_TAG, 20))
-    grid_dim = np.floor(grid_dim_km / cellsize * 1000)
+    cellsize_m = float(d.get(CELLSIZE_TAG, cellsize_default)) #in m
+    grid_dim = np.floor(grid_dim_km / cellsize_m * 1000)
     grid_dim = int(np.clip(np.floor(grid_dim), 300, 1500))
     tile_set = d.get(TILESET_TAG, DEFAULT_TAG)
     ros_model_code = d.get(ROS_MODEL_TAG, WANG_TAG) #switch per scegliere se usare il modello di Rothermel (rothermel), Wang (wang) oppure il classico Propagator (default)
@@ -202,7 +203,8 @@ def main():
         save_realizations=args.save_realizations,
         ros_model_code=ros_model_code,
         prob_moist_model=prob_moist_model,
-        do_spotting = do_spotting
+        do_spotting = do_spotting,
+        cellsize=cellsize_m
     )
 
     sim = Propagator(settings)
