@@ -92,6 +92,9 @@ TIME_TAG = 'time'
 W_DIR_TAG = 'w_dir'
 W_SPEED_TAG = 'w_speed'
 
+ZONE_NUMBER_TAG = 'zone_number'
+ZONE_LETTER_TAG = 'zone_letter'
+
 PROB_FILE_TAG = 'prob_file'
 V0_TABLE_TAG = 'v0_file'
 P_VEGETATION_TAG = 'p_vegetation'

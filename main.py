@@ -206,9 +206,13 @@ def main():
     )
 
     sim = Propagator(settings)
-    easting, northing, zone_number, zone_letter, polys, lines, points = sim.load_ignitions_from_string(ignition_string)
-    easting_ign, northing_ign, zone_number_ign, zone_letter_ign, polys_ign, lines_ign, points_ign = sim.load_ignitions_from_string(ignition_string_begin)
     
+    zone_letter_force = d.get(ZONE_LETTER_TAG, None)
+    zone_number_force = d.get(ZONE_NUMBER_TAG, None)
+    
+    easting, northing, zone_number, zone_letter, polys, lines, points = sim.load_ignitions_from_string(ignition_string,  zone_number_force, zone_letter_force)
+    easting_ign, northing_ign, zone_number_ign, zone_letter_ign, polys_ign, lines_ign, points_ign = sim.load_ignitions_from_string(ignition_string_begin, zone_number_force, zone_letter_force)
+
     if args.veg_file is None and args.dem_file is None:
         sim.load_data_from_tiles(easting, northing, zone_number)
     else:

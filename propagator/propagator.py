@@ -796,10 +796,10 @@ class Propagator:
 
         return new_updates
 
-    def load_ignitions_from_string(self, ignition_string):
+    def load_ignitions_from_string(self, ignition_string, zone_number_force=None, zone_letter_force=None):
         mid_lat, mid_lon, polys, lines, points = read_actions(ignition_string)
         easting, northing, zone_number, zone_letter = utm.from_latlon(
-            mid_lat, mid_lon)
+            mid_lat, mid_lon, force_zone_number=zone_number_force, force_zone_letter=zone_letter_force)
         return easting, northing, zone_number, zone_letter, polys, lines, points
 
     def __rasterize_moisture_fighting_actions(self, bc):
