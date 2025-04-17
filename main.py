@@ -36,8 +36,8 @@ p_veg = np.loadtxt("p_vegetation.txt")
 #     loader = PropagatorDataFromGeotiffs(...)
 
 loader = PropagatorDataFromGeotiffs(
-    dem_file="example/dem.tif",
-    veg_file="example/veg.tif",
+    dem_file="example/dem_clip.tif",
+    veg_file="example/veg_clip.tif",
 )
 
 # Load the data
@@ -48,7 +48,7 @@ geo_info = loader.get_geo_info()
 simulator = Propagator(
     dem=dem,
     veg=veg,
-    realizations=10,
+    realizations=1,
     ros_0=v0,
     probability_table=prob_table,
     veg_parameters=p_veg,
@@ -58,7 +58,7 @@ simulator = Propagator(
 )
 
 ignition_array = np.zeros(dem.shape, dtype=np.uint8)
-ignition_array[2000:2100, 2000:2100] = 1
+ignition_array[100:101, 100:101] = 1
 
 boundary_conditions_list: list[PropagatorBoundaryConditions] = [
     PropagatorBoundaryConditions(
@@ -66,7 +66,7 @@ boundary_conditions_list: list[PropagatorBoundaryConditions] = [
         ignitions=ignition_array,
         wind_speed=np.ones(dem.shape) * 10,
         wind_dir=np.ones(dem.shape) * 180,
-        moisture=np.ones(dem.shape) * 5,
+        moisture=np.ones(dem.shape) * 0.05,
     ),
 ]
 actions_list: list[PropagatorActions] = []

@@ -142,7 +142,8 @@ class Propagator:
 
     def compute_stats(self, values) -> PropagatorStats:
         n_active = len(self.scheduler.active().tolist())
-        cell_area = float(self.step_x) * float(self.step_y) / 10000.0
+        # cell_area = float() * float(self.step_y) / 10000.0
+        cell_area = 1
         area_mean = float(np.sum(values) * cell_area)
         area_50 = float(np.sum(values >= 0.5) * cell_area)
         area_75 = float(np.sum(values >= 0.75) * cell_area)
@@ -527,5 +528,4 @@ class Propagator:
         if len(self.scheduler) == 0:
             return None
 
-        next_time, _ = self.scheduler.next_time()
-        return next_time
+        return self.scheduler.next_time()
