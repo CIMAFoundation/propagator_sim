@@ -36,8 +36,8 @@ p_veg = np.loadtxt("p_vegetation.txt")
 #     loader = PropagatorDataFromGeotiffs(...)
 
 loader = PropagatorDataFromGeotiffs(
-    dem_file="example/dem_clip.tif",
-    veg_file="example/veg_clip.tif",
+    dem_file="example/dem.tif",
+    veg_file="example/veg.tif",
 )
 
 # Load the data
