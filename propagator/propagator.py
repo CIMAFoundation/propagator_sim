@@ -67,7 +67,17 @@ class PropagatoOutput:
 
 @dataclass
 class Propagator:
-    # domain parameters for the simulation
+    """
+    Propagator class for simulating fire spread.
+    This class is responsible for managing the state of the simulation,
+    applying boundary conditions, and performing the fire spread calculations.
+    It uses a scheduler to manage the time steps and updates of the simulation.
+    Attributes:
+        veg (np.ndarray): Vegetation type array.
+        dem (np.ndarray): Digital elevation model array.
+        realizations (int): Number of realizations for the simulation.
+        
+    """
 
     # input
     veg: np.ndarray
