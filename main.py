@@ -7,8 +7,10 @@ from propagator.functions import moist_proba_correction_1, p_time_wang
 from propagator.loader.geotiff import PropagatorDataFromGeotiffs
 from propagator.propagator import (
     Propagator,
-    PropagatorActions,
-    PropagatorBoundaryConditions,
+    Actions,
+    Event,
+    Ignitions,
+    BoundaryConditions,
 )
 # from propagator.settings import PropagatorSettings
 
@@ -60,16 +62,26 @@ simulator = Propagator(
 ignition_array = np.zeros(dem.shape, dtype=np.uint8)
 ignition_array[100:101, 100:101] = 1
 
-boundary_conditions_list: list[PropagatorBoundaryConditions] = [
-    PropagatorBoundaryConditions(
+events: list[Event] = [
+    Event(
         time=0,
-        ignitions=ignition_array,
-        wind_speed=np.ones(dem.shape) * 10,
-        wind_dir=np.ones(dem.shape) * 180,
-        moisture=np.ones(dem.shape) * 0.05,
+        ignitions=Ignitions(ignitions=ignition_array),
+        boundary_conditions=BoundaryConditions(
+            wind_speed=np.ones(dem.shape) * 10,
+            wind_dir=np.ones(dem.shape) * 180,
+            moisture=np.ones(dem.shape) * 0.05,
+        )
     ),
+    Event(
+        time=180,
+        boundary_conditions=BoundaryConditions(
+            wind_speed=np.ones(dem.shape) * 10,
+            wind_dir=np.ones(dem.shape) * 0,
+            moisture=np.ones(dem.shape) * 0.05,
+        )
+
+    )
 ]
-actions_list: list[PropagatorActions] = []
 
 time_resolution = 60
 time_limit = 3600
@@ -81,17 +93,20 @@ while True:
 
     logging.info(f"Supposed Next time: {next_time}")
 
-    if len(boundary_conditions_list) > 0:
-        boundary_conditions = boundary_conditions_list[0]
-        if boundary_conditions.time <= next_time:
-            simulator.set_boundary_conditions(boundary_conditions)
-            boundary_conditions_list.pop(0)
+    if len(events) > 0:
+        event = events[0]
+        if event.time <= next_time:
+            if event.ignitions is not None:
+                simulator.set_ignitions(event.ignitions)
 
-    if len(actions_list) > 0:
-        actions = actions_list[0]
-        if actions.time <= next_time:
-            simulator.apply_actions(actions)
-            actions_list.pop(0)
+            if event.boundary_conditions is not None:
+                simulator.set_boundary_conditions(event.boundary_conditions)
+
+            if event.actions is not None:
+                simulator.apply_actions(event.actions)
+                
+            events.pop(0)
+
 
     logging.info(f"Current time: {simulator.time}")
     simulator.step()

@@ -1,49 +1,39 @@
+from dataclasses import dataclass, field
 from sortedcontainers import SortedDict
-import numpy as np
+from .events import EventData
 
 
+@dataclass(frozen=True)
 class Scheduler:
     """
     handles the scheduling of the propagation procedure
     """
+    events: SortedDict[int, list[EventData]] = field(default_factory=SortedDict)
 
-    def __init__(self):
-        self.list = SortedDict()
+    def add(self, event: EventData):
+        if event.time not in self.events:
+            events_at_time = []
+            self.events[event.time] = events_at_time
+        else:
+            events_at_time = self.events[event.time]
+        events_at_time.append(event)
 
-        # fix the change in SortedDict api
-        self.list_kw = {"last": False}
-        try:
-            self.list.popitem(**self.list_kw)
-        except KeyError:
-            pass
-        except TypeError:
-            self.list_kw = {"index": 0}
+    def pop(self) -> tuple[int, list[EventData]]:
+        time, events = self.events.popitem(index=0)
+        return time, events
 
-    def push(self, coords, time):
-        if time not in self.list:
-            self.list[time] = []
-        self.list[time].append(coords)
-
-    def push_all(self, updates):
-        for t, u in updates:
-            self.push(u, t)
-
-    def pop(self):
-        item = self.list.popitem(**self.list_kw)
-        return item
-
-    def active(self):
-        """
-        get all the threads that have a scheduled update
-        :return:
-        """
-        active_t = np.unique(
-            [e for k in self.list.keys() for c in self.list[k] for e in c[:, 2]]
-        )
-        return active_t
+    # def active(self):
+    #     """
+    #     get all the threads that have a scheduled update
+    #     :return:
+    #     """
+    #     active_t = np.unique(
+    #         [e for k in self.updates.keys() for c in self.updates[k] for e in c[:, 2]]
+    #     )
+    #     return active_t
 
     def __len__(self):
-        return len(self.list)
+        return len(self.updates)
 
     def next_time(self):
         """
@@ -53,13 +43,6 @@ class Scheduler:
         if len(self) == 0:
             return None
 
-        next_time, _next_updates = self.list.peekitem(index=0)
+        next_time, _next_events = self.events.peekitem(index=0)
         return next_time
 
-    def __call__(self):
-        while len(self) > 0:
-            c_time, updates = self.pop()
-            print("u")
-            new_updates = yield c_time, updates
-            print("n")
-            self.push_all(new_updates)

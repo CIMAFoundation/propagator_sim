@@ -3,7 +3,9 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy import tile
 
-from propagator.constants import (
+from .events import ( Ignitions, Actions, BoundaryConditions, Event)
+
+from .constants import (
     CELLSIZE,
     LAMBDA_SPOTTING,
     NEIGHBOURS_ANGLE,
@@ -28,21 +30,6 @@ RNG = np.random.default_rng(12345)
 class PropagatorError(Exception):
     pass
 
-
-@dataclass(frozen=True)
-class PropagatorBoundaryConditions:
-    time: int
-    ignitions: np.ndarray | None
-    moisture: np.ndarray | None
-    wind_dir: np.ndarray | None
-    wind_speed: np.ndarray | None
-
-
-@dataclass(frozen=True)
-class PropagatorActions:
-    time: int
-    additional_moisture: np.ndarray | None
-    vegetation_changes: np.ndarray | None
 
 
 @dataclass(frozen=True)
@@ -123,7 +110,7 @@ class Propagator:
         points = np.argwhere(ignitions)
         for t in range(self.realizations):
             for p in points:
-                self.scheduler.push(np.array([p[0], p[1], t]), time=time)
+                self.scheduler.add(np.array([p[0], p[1], t]), time=time)
                 self.fire[p[0], p[1], t] = 0
 
     def compute_fire_probability(self) -> np.ndarray:
@@ -191,13 +178,8 @@ class Propagator:
         return probability
 
     def set_boundary_conditions(
-        self, boundary_condition: PropagatorBoundaryConditions
+        self, boundary_condition: BoundaryConditions
     ) -> None:
-        if self.time > boundary_condition.time:
-            raise ValueError(
-                "Boundary conditions cannot be applied in the past. Please check the time of the boundary conditions."
-            )
-
         if boundary_condition.moisture is not None:
             self.moisture = boundary_condition.moisture
         if boundary_condition.wind_dir is not None:
@@ -205,18 +187,10 @@ class Propagator:
         if boundary_condition.wind_speed is not None:
             self.wind_speed = boundary_condition.wind_speed
 
-        if boundary_condition.ignitions is not None:
-            self.set_ignitions(boundary_condition.ignitions, boundary_condition.time)
-
-    def apply_actions(self, actions: PropagatorActions) -> None:
+    def apply_actions(self, actions: Actions) -> None:
         """
         Set the actions to be applied at the current time step.
         """
-        if self.time > actions.time:
-            raise ValueError(
-                "Actions cannot be applied in the past. Please check the time of the actions."
-            )
-
         if actions.additional_moisture is not None:
             self.actions_moisture += actions.additional_moisture
         if actions.vegetation_changes is not None:
