@@ -85,19 +85,19 @@ def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset=DEFAULT_TAG):
     filename_tif = var + '_' + str(tile_j) + '_' + str(tile_i) + '.tif'
 
     filepath = join(DATA_DIR, tileset, str(zone_number), filename)
-    logging.debug(filepath)
-    try:
+    filepath_tif = join(DATA_DIR, tileset, str(zone_number), filename_tif)
+    if exists(filepath):
+        logging.info('loading from mat', filepath)
         mat_file = scipy.io.loadmat(filepath)
         m = mat_file['M']
-    except FileNotFoundError:
-        try:
-            filepath = join(DATA_DIR, tileset, str(zone_number), filename_tif)
-            logging.debug(filepath)
-            with rio.open(filepath) as src:
-                m = src.read(1)
-        except FileNotFoundError:
-            m = np.nan * np.ones((dim, dim))
-
+    elif exists(filepath_tif):
+        logging.info('loading from tiff', filepath_tif)
+        with rio.open(filepath_tif) as src:
+            m = src.read(1)
+    else:
+        logging.info(f'returning an empty array for {var} {tile_i}, {tile_j}')
+        m = np.nan * np.ones((dim, dim))
+            
     return np.ascontiguousarray(m)
 
 
