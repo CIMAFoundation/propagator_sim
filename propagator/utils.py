@@ -1,6 +1,6 @@
 from itertools import count
 import logging
-from os.path import join
+from os.path import join, exists
 
 import fiona
 import numpy as np
