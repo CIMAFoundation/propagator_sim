@@ -87,15 +87,15 @@ def load_tile(zone_number, var, tile_i, tile_j, dim,  tileset=DEFAULT_TAG):
     filepath = join(DATA_DIR, tileset, str(zone_number), filename)
     filepath_tif = join(DATA_DIR, tileset, str(zone_number), filename_tif)
     if exists(filepath):
-        logging.info('loading from mat', filepath)
+        logging.debug('loading from mat', filepath)
         mat_file = scipy.io.loadmat(filepath)
         m = mat_file['M']
     elif exists(filepath_tif):
-        logging.info('loading from tiff', filepath_tif)
+        logging.debug('loading from tiff', filepath_tif)
         with rio.open(filepath_tif) as src:
             m = src.read(1)
     else:
-        logging.info(f'returning an empty array for {var} {tile_i}, {tile_j}')
+        logging.debug(f'returning an empty array for {var} {tile_i}, {tile_j}')
         m = np.nan * np.ones((dim, dim))
             
     return np.ascontiguousarray(m)
@@ -108,16 +108,12 @@ def load_tile_ref(zone_number, var, tileset=DEFAULT_TAG):
     step_x, step_y, max_y, min_x, tile_dim = \
         mat_file['stepx'][0][0], mat_file['stepy'][0][0], \
         mat_file['maxy'][0][0], mat_file['minx'][0][0], mat_file['tileDim'][0][0]
-
-    step_x = int(step_x)
-    step_y = int(step_y)
-
     return step_x, step_y, max_y, min_x, tile_dim
 
 
 def load_tiles(zone_number, x, y, dim, var, tileset=DEFAULT_TAG):
-    step_x, step_y, max_y, min_x, tile_dim = load_tile_ref(
-        zone_number, var, tileset)
+    dim = 2000 # <- HOTFIX dim is maybe passed as the wrong parameter here?
+    step_x, step_y, max_y, min_x, tile_dim = load_tile_ref(zone_number, var, tileset)
     i = 1 + np.floor((max_y - y) / step_y)
     j = 1 + np.floor((x - min_x) / step_x)
 
@@ -148,29 +144,38 @@ def load_tiles(zone_number, x, y, dim, var, tileset=DEFAULT_TAG):
     if tile_i_max == tile_i_min and tile_j_max == tile_j_min:
         m = load_tile(zone_number, var, tile_i_min, tile_j_min, dim, tileset)
         mat = m[idx_i_min:idx_i_max, idx_j_min: idx_j_max]
+    
     elif tile_i_min == tile_i_max:
         m1 = load_tile(zone_number, var, tile_i_min, tile_j_min, dim, tileset)
+        
         m2 = load_tile(zone_number, var, tile_i_min, tile_j_max, dim, tileset)
+        
         m = np.concatenate([m1, m2], axis=1)
         mat = m[idx_i_min:idx_i_max, idx_j_min: (tile_dim + idx_j_max)]
 
     elif tile_j_min == tile_j_max:
 
         m1 = load_tile(zone_number, var, tile_i_min, tile_j_min, dim, tileset)
+        
         m2 = load_tile(zone_number, var, tile_i_max, tile_j_min, dim, tileset)
+        
+
         m = np.concatenate([m1, m2], axis=0)
         mat = m[idx_i_min:(tile_dim + idx_i_max), idx_j_min: idx_j_max]
     else:
         m1 = load_tile(zone_number, var, tile_i_min, tile_j_min, dim, tileset)
+        
         m2 = load_tile(zone_number, var, tile_i_min, tile_j_max, dim, tileset)
+        
         m3 = load_tile(zone_number, var, tile_i_max, tile_j_min, dim, tileset)
+        
         m4 = load_tile(zone_number, var, tile_i_max, tile_j_max, dim, tileset)
+        
         m = np.concatenate([
             np.concatenate([m1, m2], axis=1),
             np.concatenate([m3, m4], axis=1)
         ], axis=0)
-        mat = m[idx_i_min:(tile_dim + idx_i_max),
-                idx_j_min: (tile_dim + idx_j_max)]
+        mat = m[idx_i_min:(tile_dim + idx_i_max), idx_j_min: (tile_dim + idx_j_max)]
 
     return mat, min_easting, max_northing, step_x, step_y
 
