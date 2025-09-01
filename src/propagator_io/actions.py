@@ -6,10 +6,11 @@ import numpy.typing as npt
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 from functools import lru_cache
+from pyparsing import abstractmethod
 from scipy import ndimage
 from collections import defaultdict
 
-from propagator_io.geometry import Geometry, GeometryParser
+from propagator_io.geometry import Geometry, parse_geometry_list, is_allowed
 from propagator_io.geo import GeographicInfo
 from propagator_io.geometry import GeometryKind, rasterize_geometries
 
@@ -35,18 +36,19 @@ class Action(BaseModel):
     geometries: List[Geometry] = Field(default_factory=list)
 
     @classmethod
+    @abstractmethod
     def allowed_kinds(cls) -> set[GeometryKind]:
-        return set()
+        ...
 
     @field_validator("geometries")
     @classmethod
     def _check_allowed(cls, geoms: List[Geometry]) -> List[Geometry]:
         allowed = cls.allowed_kinds()
         for g in geoms:
-            if g.kind not in allowed:
+            if not is_allowed(g, allowed):
                 raise ValueError(
                     f"{cls.__name__} supports {allowed},\
-                    got {g.kind}"
+                    got {g}"
                 )
         return geoms
 
@@ -224,8 +226,8 @@ def parse_actions(
         if cls is None:
             # unknown/unregistered action -> ignore
             continue
-        allowed = {k.value for k in cls.allowed_kinds()}
-        geoms = GeometryParser.parse_geometry_list(raw, allowed=allowed, epsg=epsg)
+
+        geoms = parse_geometry_list(raw, allowed=cls.allowed_kinds(), epsg=epsg)
         if geoms:
             acc[atype].extend(geoms)
             consumed.add(key)

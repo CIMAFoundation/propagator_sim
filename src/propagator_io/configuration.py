@@ -21,7 +21,9 @@ from propagator.models import Fuel, FuelSystem
 from propagator.constants import FUEL_SYSTEM_LEGACY
 from propagator_io.boundary_conditions import TimedInput
 from propagator_io.geo import GeographicInfo
-from propagator_io.geometry import DEFAULT_EPSG_GEOMETRY, Geometry, GeometryParser
+from propagator_io.geometry import DEFAULT_EPSG_GEOMETRY, GeometryKind
+from shapely import Geometry
+from propagator_io.geometry import parse_geometry_list
 
 
 # ---- configuration ----------------------------------------------------------
@@ -149,8 +151,8 @@ class PropagatorConfigurationLegacy(BaseModel):
 
         # 2) top-level ignitions (strings -> Geometry w/ epsg)
         if "ignitions" in data:
-            data["ignitions"] = GeometryParser.parse_geometry_list(
-                data["ignitions"], allowed={"point", "line", "polygon"}, epsg=epsg
+            data["ignitions"] = parse_geometry_list(
+                data["ignitions"], allowed={GeometryKind.POINT, GeometryKind.LINE, GeometryKind.POLYGON}, epsg=epsg
             )
 
         # 3) nested ignitions inside boundary_conditions[*]

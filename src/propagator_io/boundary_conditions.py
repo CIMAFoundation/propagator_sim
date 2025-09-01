@@ -15,8 +15,10 @@ from propagator_io.geo import GeographicInfo
 from propagator_io.geometry import (
     DEFAULT_EPSG_GEOMETRY,
     Geometry,
-    GeometryParser,
+    GeometryKind,
     rasterize_geometries,
+    parse_geometry_list,
+    get_middle_point,
 )
 
 
@@ -82,8 +84,8 @@ class TimedInput(BaseModel):
         if "ignitions" in data:
             v = data["ignitions"]
             if isinstance(v, list) and (not v or isinstance(v[0], str)):
-                data["ignitions"] = GeometryParser.parse_geometry_list(
-                    v, allowed={"point", "line", "polygon"}, epsg=epsg
+                data["ignitions"] = parse_geometry_list(
+                    v, allowed={GeometryKind.POINT, GeometryKind.LINE, GeometryKind.POLYGON}, epsg=epsg
                 )
         # let actions.py parse and normalize legacy fields
         new_actions, consumed = parse_actions(data, epsg=epsg)
@@ -166,7 +168,7 @@ class TimedInput(BaseModel):
         if self.ignitions is None or len(self.ignitions) == 0:
             return None
         ignitions_middle_points = [
-            ignition.get_middle_point() for ignition in self.ignitions
+            get_middle_point(ignition) for ignition in self.ignitions
         ]
         ignitions_middle_points = [
             mp for mp in ignitions_middle_points if mp is not None
