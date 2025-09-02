@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Iterable, Type, cast, List, Literal, Optional
 import numpy as np
 import numpy.typing as npt
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from enum import Enum
 from functools import lru_cache
 from pyparsing import abstractmethod
@@ -33,7 +33,10 @@ HELICOPTER_BUFFER_MOIST_VALUE = 0.2
 
 # ---------- Base class ----------
 class Action(BaseModel):
-    geometries: List[Geometry] = Field(default_factory=list)
+    geometries: List[Geometry] = Field(default_factory=list, exclude=True)
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True    # use shapely geometry for geometries
+    )
 
     @classmethod
     @abstractmethod

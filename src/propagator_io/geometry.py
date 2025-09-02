@@ -25,7 +25,27 @@ class GeometryKind(str, Enum):
     POLYGON = "polygon"
 
 
-def get_middle_point(ignition: Geometry) -> Optional[Tuple[float, float]]: ...
+def get_middle_point(ignition: Geometry) -> Optional[Tuple[float, float]]: 
+    """
+    Calculate the barycenter (average of coordinates) of a Shapely geometry.
+    Works for any geometry type. Returns None if geometry is None or empty.
+    """
+    if ignition is None:
+        return None
+    coords = list(ignition.coords) if hasattr(ignition, "coords") else []  # type: ignore
+
+    # recursively collect coords if geometry has parts
+    if not coords and hasattr(ignition, "geoms"):
+        for g in ignition.geoms:        # type: ignore
+            sub = get_middle_point(g)
+            if sub:
+                coords.append(sub)
+
+    if not coords:
+        return None
+
+    xs, ys = zip(*coords)
+    return (sum(xs) / len(xs), sum(ys) / len(ys))
 
 
 def reproject_geometry(geom: Geometry, crs_from: str, crs_to: str) -> Geometry:
