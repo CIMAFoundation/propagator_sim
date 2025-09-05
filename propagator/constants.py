@@ -1,13 +1,10 @@
+import os
+from os.path import join, realpath
 import numpy as np
-from numpy import pi, array
+from numpy import array, pi
 
-'''
-D1 = 0.5
-D2 = 2
-D3 = 10
-D4 = 2
-D5 = 50
-'''
+PROPAGATOR_PATH = realpath(__file__).replace('/propagator/constants.py', '')
+PROPAGATOR_PATH = os.environ.get('PROPAGATOR_PATH', PROPAGATOR_PATH)
 
 D1 = 0.5
 D2 = 1.4
