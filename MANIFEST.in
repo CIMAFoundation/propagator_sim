@@ -1,0 +1,11 @@
+# Keep the essentials explicitly (optional but nice)
+include README.md LICENSE.md pyproject.toml
+
+# Drop docs and examples from the source distribution
+prune docs
+prune example
+prune tests
+
+# Also skip mkdocs config and Quarto files in the sdist
+exclude mkdocs.yml
+global-exclude *.qmd

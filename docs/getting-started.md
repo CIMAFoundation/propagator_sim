@@ -5,7 +5,7 @@
 Using uv (recommended):
 
 ```bash
-uv sync
+uv sync --all-extras
 ```
 
 Using pip:

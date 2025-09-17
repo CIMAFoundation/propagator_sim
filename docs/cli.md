@@ -20,4 +20,3 @@ uv run propagator \
 ```
 
 See `propagator_cli/args_parser.py` for all flags and their meanings.
-

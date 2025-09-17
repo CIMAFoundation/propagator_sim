@@ -1,4 +1,6 @@
+src/propagator/version.py
 example/output
+
 .DS_Store
 .ipynb_checkpoints/
 
@@ -130,9 +132,7 @@ dmypy.json
 tmp/
 data/
 work/
-.vscode/launch.json
 
-.vscode/settings.json
 .DS_Store
 
 output/

@@ -1,6 +1,5 @@
-::: propagator.propagator
-::: propagator.functions
-::: propagator.scheduler
-::: propagator.types
-::: propagator.utils
-::: propagator.constants
+# Propagator Module
+
+::: propagator.core
+
+::: propagator.core.scheduler

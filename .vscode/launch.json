@@ -8,11 +8,11 @@
             "name": "Python Debugger: run propagator_cli.cli",
             "type": "debugpy",
             "request": "launch",
-            "module": "propagator_cli.cli", 
+            "module": "propagator.cli.main",
             "console": "integratedTerminal",
             "args": [
                 "--config",
-                "./example/params.json",
+                "./example/params_ign_polygon.json",
                 "--mode", "geotiff",
                 "--output",
                 "./example/output",
@@ -31,7 +31,7 @@
             "name": "Python Debugger: run propagator_cli.cli tiles mode",
             "type": "debugpy",
             "request": "launch",
-            "module": "propagator_cli.cli", 
+            "module": "propagator.cli.main",
             "console": "integratedTerminal",
             "args": [
                 "--config",
@@ -44,6 +44,21 @@
                 "PYTHONPATH": "${workspaceFolder}",
                 "PROJ_LIB": ".venv/share/proj/"
             }
-        }
+        },
+
+        {
+            "name": "Python Debugger: run example",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "example/example.py",
+            "console": "integratedTerminal",
+            "args": [
+            ],
+            "env": {
+                "NUMBA_DISABLE_JIT": "1",
+                "PYTHONPATH": "${workspaceFolder}",
+                "PROJ_LIB": ".venv/share/proj/"
+            }
+        },
     ]
 }

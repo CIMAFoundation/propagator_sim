@@ -3,6 +3,7 @@
         "ms-python.vscode-pylance",
         "ms-python.debugpy",
         "djsaunders1997.uv-wingman",
-        "charliermarsh.ruff"
+        "charliermarsh.ruff",
+        "elagil.pre-commit-helper"
     ]
 }

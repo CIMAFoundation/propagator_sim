@@ -32,7 +32,17 @@ plugins:
           paths: ["src"]
           # Helpful defaults:
           options:
-            docstring_style: google
-            show_source: true
+            docstring_style: numpy
+            show_root_heading: true         # show module name as H1
+            show_root_toc_entry: false
+            show_source: false
+            members_order: source           # or "alphabetical"
+            group_by_category: true         # groups Classes / Functions / Variables
             inherited_members: true
-            merge_init_into_package: true
+            filters:
+              - "!^_"                       # hide private members
+              - "!^__"                      # hide dunders
+            heading_level: 2                # start sections at ## under your page H1
+            show_signature: true
+            merge_init_into_class: true
+            show_submodules: false          # keep pages focused unless you want them listed

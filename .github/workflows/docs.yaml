@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   docs:
     runs-on: ubuntu-latest
@@ -17,7 +21,7 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # we need tags and gh-pages
+          fetch-depth: 0   # need full history for tags and gh-pages
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -44,16 +48,14 @@ jobs:
             git fetch origin gh-pages:gh-pages
           fi
 
-      # --- Branch-based deployments (optional) ---
+      # --- Branch-based deployments ---
       - name: Publish dev branch as 'dev'
         if: github.ref_name == 'dev'
         run: mike deploy --push dev
 
-      - name: Publish main branch as 'latest' and set default
+      - name: Publish main branch build as 'main'
         if: github.ref_name == 'main'
-        run: |
-          mike deploy --push --update-aliases latest stable
-          mike set-default --push latest
+        run: mike deploy --push main
 
       # --- Tag-based versioning: v1.2.3 -> 1.2.3 ---
       - name: Publish tag as version
@@ -61,7 +63,7 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}   # e.g. v1.2.3
         run: |
-          VERSION="${TAG#v}"             # strip leading 'v'
+          VERSION="${TAG#v}"
           echo "Deploying version ${VERSION}"
           mike deploy --push "${VERSION}"
 
@@ -70,6 +72,7 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: |
+          set -euo pipefail
           VERSION="${TAG#v}"
 
           # Ignore pre-releases (contains a dash, e.g., 1.2.3-rc1)
@@ -79,19 +82,21 @@ jobs:
           fi
 
           # Determine newest semver tag in repo (ignores pre-releases)
-          LATEST_TAG="$(git tag -l 'v[0-9]*' | grep -v '-' | sort -V | tail -n1)"
+          LATEST_TAG="$(git tag -l 'v[0-9]*' | grep -v '-' | sort -V | tail -n1 || true)"
           LATEST_VERSION="${LATEST_TAG#v}"
-          echo "Latest tag in repo: $LATEST_VERSION"
+          echo "Latest tag in repo: ${LATEST_VERSION:-<none>}"
 
           if [ "$LATEST_VERSION" = "$VERSION" ]; then
-            echo "This is the newest release; updating aliases."
+            echo "This is the newest release; updating aliases and default."
             mike deploy --push --update-aliases "$VERSION" latest stable
             mike set-default --push "$VERSION"
           else
             echo "Not the newest release; leaving aliases as-is."
           fi
 
+      # Optional: keep the built 'site' dir as a CI artifact (debugging)
       - name: Upload built site as artifact (optional)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: site-${{ github.ref_name }}
