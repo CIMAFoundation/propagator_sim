@@ -176,6 +176,8 @@ class Scheduler:
 
     def active(self) -> npt.NDArray[np.integer]:
         arrays = [event.updates.realizations for event in self._queue.values()]
+        if len(arrays) == 0:
+            return np.array([], dtype=np.int32)
         stacked = np.concatenate(arrays)
         return np.unique(stacked)
 

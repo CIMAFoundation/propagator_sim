@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from enum import Enum
-from functools import lru_cache
-from typing import Any, Iterable, List, Literal, Optional, Type, cast
+from typing import Any, List, Literal, Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -177,84 +175,64 @@ class HeavyAction(Action):
         return fuel_action
 
 
-# ---------- parsing for boundary conditions definition ----------
-
-
-def _iter_subclasses(cls: Type[Action]) -> Iterable[Type[Action]]:
-    for sub in cls.__subclasses__():
-        yield sub
-        yield from _iter_subclasses(sub)
-
-
-@lru_cache(maxsize=1)
-def get_action_registry() -> dict[ActionType, Type[Action]]:
-    """
-    Build once by introspecting subclasses (no manual lists).
-    Pydantic v2 stores field metadata on `model_fields`.
-    """
-    reg: dict[ActionType, Type[Action]] = {}
-    for sub in _iter_subclasses(Action):
-        # Be defensive: model_fields may not exist on unrelated classes
-        fields: dict[str, Any] = cast(
-            dict[str, Any], getattr(sub, "model_fields", {})
-        )
-        info = fields.get("action_type")
-        default = getattr(info, "default", None)
-        if isinstance(default, ActionType):
-            reg[default] = sub
-    return reg
-
-
-@lru_cache(maxsize=1)
-def _action_name_set() -> frozenset[str]:
-    return frozenset(a.value for a in ActionType)
-
-
-def load_action(obj: dict[str, Any]) -> Action:
-    """
-    Instantiate the right Action subclass from a dict containing 'action_type'.
-    Accepts str or ActionType.
-    """
-    atype_raw = obj.get("action_type")
-    atype = (
-        ActionType(atype_raw)
-        if isinstance(atype_raw, str)
-        else cast(ActionType, atype_raw)
-    )
-    cls = get_action_registry().get(atype)
-    if cls is None:
-        raise ValueError(f"Unknown action_type: {atype_raw!r}")
-    return cls.model_validate(obj)
-
-
 def parse_actions(
     data: dict[str, Any],
     epsg: int,
-) -> tuple[list[Action], set[str]]:
-    reg = get_action_registry()
-    valid_names = _action_name_set()
-    # 1) gather geometries per action type
-    acc: dict[ActionType, list[Geometry]] = defaultdict(list)
-    consumed: set[str] = set()
-    for key, raw in list(data.items()):
-        # skip non-actions or empty payloads
-        if key not in valid_names or not raw:
-            continue
-        atype = ActionType(key)
-        cls = reg.get(atype)
-        if cls is None:
-            # unknown/unregistered action -> ignore
-            continue
+) -> list[Action]:
+    """
+    Parse legacy action fields from a dictionary and convert them to Action objects.
+    Consumes legacy fields from the input dictionary.
 
-        geoms = parse_geometry_list(
-            raw, allowed=cls.allowed_kinds(), epsg=epsg
-        )
-        if geoms:
-            acc[atype].extend(geoms)
-            consumed.add(key)
-    # build a single Action per type with merged geometries
+    Parameters
+    ----------
+    data : dict[str, Any]
+        Input dictionary potentially containing legacy action fields.
+    epsg : int
+        EPSG code for geometry parsing.
+    Returns
+    -------
+    list[Action]
+        List of parsed Action objects.
+    """
     actions: list[Action] = []
-    for atype, geoms in acc.items():
-        cls = reg[atype]
-        actions.append(cls(geometries=geoms))
-    return actions, consumed
+    if ActionType.WATERLINE_ACTION in data:
+        raw = data.pop(ActionType.WATERLINE_ACTION)
+        geometries = parse_geometry_list(
+            raw,
+            allowed=WaterlineAction.allowed_kinds(),
+            epsg=epsg,
+        )
+        if geometries:
+            actions.append(WaterlineAction(geometries=geometries))
+
+    if ActionType.CANADAIR in data:
+        raw = data.pop(ActionType.CANADAIR)
+        geometries = parse_geometry_list(
+            raw,
+            allowed=CanadairAction.allowed_kinds(),
+            epsg=epsg,
+        )
+        if geometries:
+            actions.append(CanadairAction(geometries=geometries))
+
+    if ActionType.HELICOPTER in data:
+        raw = data.pop(ActionType.HELICOPTER)
+        geometries = parse_geometry_list(
+            raw,
+            allowed=HelicopterAction.allowed_kinds(),
+            epsg=epsg,
+        )
+        if geometries:
+            actions.append(HelicopterAction(geometries=geometries))
+
+    if ActionType.HEAVY_ACTION in data:
+        raw = data.pop(ActionType.HEAVY_ACTION)
+        geometries = parse_geometry_list(
+            raw,
+            allowed=HeavyAction.allowed_kinds(),
+            epsg=epsg,
+        )
+        if geometries:
+            actions.append(HeavyAction(geometries=geometries))
+
+    return actions

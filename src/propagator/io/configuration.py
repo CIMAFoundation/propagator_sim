@@ -31,9 +31,10 @@ from propagator.core.numba import (
 )
 from propagator.core.numba.models import FuelSystem
 from propagator.io.boundary_conditions import TimedInput
-from propagator.io.geo import GeographicInfo, GeometryKind
+from propagator.io.geo import GeographicInfo
 from propagator.io.geometry import (
     DEFAULT_EPSG_GEOMETRY,
+    GeometryKind,
     parse_geometry_list,
 )
 
@@ -276,8 +277,8 @@ class PropagatorConfigurationLegacy(BaseModel):
         if not middle_points:
             return None
         # Return the average of the middle points
-        avg_x = float(np.mean([pt[0] for pt in middle_points]))
-        avg_y = float(np.mean([pt[1] for pt in middle_points]))
+        avg_x = float(np.mean([pt[0] for pt in middle_points]))  # type: ignore
+        avg_y = float(np.mean([pt[1] for pt in middle_points]))  # type: ignore
         return avg_x, avg_y
 
 

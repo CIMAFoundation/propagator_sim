@@ -8,7 +8,7 @@ from typing import List, Optional, Sequence, Tuple, Union
 import numpy as np
 import rasterio.enums as rio_enums
 import shapely
-from pyproj import Transformer
+from pyproj import CRS, Transformer
 from rasterio.features import rasterize
 from shapely import Geometry, LineString, Point, Polygon
 from shapely.ops import transform
@@ -48,7 +48,9 @@ def get_middle_point(ignition: Geometry) -> Optional[Tuple[float, float]]:
     return (sum(xs) / len(xs), sum(ys) / len(ys))
 
 
-def reproject_geometry(geom: Geometry, crs_from: str, crs_to: str) -> Geometry:
+def reproject_geometry(
+    geom: Geometry, crs_from: str | CRS, crs_to: str | CRS
+) -> Geometry:
     """Reproject a Shapely geometry from one CRS to another.
 
     Parameters
@@ -201,7 +203,7 @@ def rasterize_geometries(
     # Prepare shapes in destination CRS
     shapes: List[Tuple[dict, Union[int, float]]] = []
     for i, g in enumerate(geometries):
-        geom = reproject_geometry(g, "epsg:4326", f"epsg:{geo_info.crs}")
+        geom = reproject_geometry(g, "epsg:4326", str(geo_info.crs))
         gj = json.loads(shapely.to_geojson(geom))
         val = values[i] if values is not None else default_value
         shapes.append((gj, val))

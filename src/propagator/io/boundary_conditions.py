@@ -32,7 +32,7 @@ from propagator.io.geometry import (
 class TimedInput(BaseModel):
     """Single time-step boundary conditions."""
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     time: int = Field(0, description="minutes from simulation start")
 
@@ -98,13 +98,9 @@ class TimedInput(BaseModel):
                     epsg=epsg,
                 )
         # let actions.py parse and normalize legacy fields
-        new_actions, consumed = parse_actions(data, epsg=epsg)
-        if len(new_actions) != 0:
-            # append to any already-provided "actions"
-            data["actions"] = list(data.get("actions", [])) + new_actions
-            # remove consumed legacy keys so they don't error as "extra"
-            for k in consumed:
-                data.pop(k, None)
+        actions = parse_actions(data, epsg=epsg)
+        # append to any already-provided "actions"
+        data["actions"] = actions
         return data
 
     def get_boundary_conditions(
@@ -158,7 +154,8 @@ class TimedInput(BaseModel):
                         vegetation_changes = np.zeros(
                             geo_info.shape, dtype=int
                         )
-                    vegetation_changes = np.where(
+
+                    vegetation_changes = np.where(  # type: ignore
                         np.isnan(fuel_action),
                         vegetation_changes,
                         fuel_action,
@@ -192,6 +189,6 @@ class TimedInput(BaseModel):
             return None
 
         # Return the average of the middle points
-        avg_x = float(np.mean([pt[0] for pt in ignitions_middle_points]))
-        avg_y = float(np.mean([pt[1] for pt in ignitions_middle_points]))
+        avg_x = float(np.mean([pt[0] for pt in ignitions_middle_points]))  # type: ignore
+        avg_y = float(np.mean([pt[1] for pt in ignitions_middle_points]))  # type: ignore
         return avg_x, avg_y
