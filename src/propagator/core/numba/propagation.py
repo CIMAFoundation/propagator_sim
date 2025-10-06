@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 import numpy.typing as npt
-from numba import jit
+from numba import jit  # type: ignore
 from numpy.random import normal, poisson, random, uniform
 
 from propagator.core.constants import NO_FUEL
@@ -138,7 +138,8 @@ def compute_spotting(
     """
 
     # calculate number of embers per emitter > Poisson distribution
-    spotting_updates = []
+    # let numba assign the type
+    spotting_updates = []  # type: ignore
 
     num_embers = poisson(LAMBDA_SPOTTING)
 
@@ -329,7 +330,9 @@ def single_cell_updates(
     list[tuple[int, int, int, float, float]]
         A list of fire spread updates (transition_times, rows, cols, rates_of_spread, fireline_intensities)
     """
-    fire_spread_updates = []
+
+    # let numba assign the type
+    fire_spread_updates = []  # type: ignore
 
     dem_from = dem[row, col]
     veg_from = veg[row, col]
@@ -347,6 +350,13 @@ def single_cell_updates(
     ):
         row_to = row + neighbour[0]
         col_to = col + neighbour[1]
+
+        # check if the neighbour is within the grid, otherwise discard
+        if row_to < 0 or row_to >= fire.shape[0]:
+            continue
+        if col_to < 0 or col_to >= fire.shape[1]:
+            continue
+
         veg_to = veg[row_to, col_to]
         dist_to = dist_to_lattice * cellsize
 

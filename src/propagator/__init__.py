@@ -2,6 +2,7 @@ from .core import (
     FUEL_SYSTEM_LEGACY,
     BoundaryConditions,
     Propagator,
+    PropagatorOutOfBoundsError,
     PropagatorStats,
     fuelsystem_from_dict,
     get_p_moisture_fn,
@@ -11,6 +12,7 @@ from .core import (
 __all__ = [
     "BoundaryConditions",
     "Propagator",
+    "PropagatorOutOfBoundsError",
     "PropagatorStats",
     "FUEL_SYSTEM_LEGACY",
     "fuelsystem_from_dict",

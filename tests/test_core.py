@@ -27,7 +27,7 @@ def test_get_moisture_no_actions():
     # Manually set moisture
     propagator.moisture = np.full((2, 2), 0.1)
     propagator.actions_moisture = None
-    result = propagator.get_moisture()
+    result = propagator._get_moisture()
     np.testing.assert_allclose(result, np.full((2, 2), 0.1))
 
 
@@ -39,5 +39,5 @@ def test_get_moisture_with_actions():
     )
     propagator.moisture = np.full((2, 2), 0.1)
     propagator.actions_moisture = np.full((2, 2), 0.05)
-    result = propagator.get_moisture()
+    result = propagator._get_moisture()
     np.testing.assert_allclose(result, np.full((2, 2), 0.15))

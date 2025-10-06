@@ -220,7 +220,7 @@ def test_decay_actions_moisture_exponential():
     propagator = make_propagator(realizations=1)
     propagator.actions_moisture = np.full((2, 2), 0.5, dtype=np.float32)
 
-    propagator.decay_actions_moisture(time_delta=5, decay_factor=0.1)
+    propagator._decay_actions_moisture(time_delta=5, decay_factor=0.1)
 
     expected_value = 0.5 * (1 - 0.1) ** 5
     np.testing.assert_allclose(
@@ -229,7 +229,7 @@ def test_decay_actions_moisture_exponential():
     )
 
     propagator.actions_moisture = None
-    propagator.decay_actions_moisture(time_delta=5, decay_factor=0.1)
+    propagator._decay_actions_moisture(time_delta=5, decay_factor=0.1)
     assert propagator.actions_moisture is None
 
 
@@ -257,7 +257,7 @@ def test_apply_updates_schedules_follow_up(monkeypatch):
         "propagator.core.propagator.next_updates_fn", lambda *_, **__: stub
     )
 
-    propagator.apply_updates(updates)
+    propagator._apply_updates(updates)
 
     assert propagator.fire[0, 1, 0] == 1
     assert propagator.ros[0, 1, 0] == pytest.approx(2.5)

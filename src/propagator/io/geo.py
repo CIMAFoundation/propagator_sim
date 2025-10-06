@@ -3,10 +3,12 @@ from typing import Tuple
 
 import numpy as np
 import numpy.typing as npt
-import rasterio as rio
+
+# ignore missing stubs
+import rasterio as rio  # type: ignore
 from pyproj import CRS, Proj
 from rasterio import enums, transform, warp
-from rasterio.transform import Affine
+from rasterio.transform import Affine  # type: ignore
 
 
 def reproject(

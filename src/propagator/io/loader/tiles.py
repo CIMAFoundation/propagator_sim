@@ -4,9 +4,9 @@ from os.path import join
 
 import numpy as np
 import numpy.typing as npt
-import rasterio as rio
+import rasterio as rio  # type: ignore[import]
 import scipy
-import utm
+import utm  # type: ignore[import]
 
 from propagator.core.models import PropagatorError
 from propagator.io.geo import GeographicInfo

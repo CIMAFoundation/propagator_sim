@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pyproj import CRS
 
 from propagator.cli.console import info_msg, ok_msg, setup_console
-from propagator.core import Propagator
+from propagator.core import Propagator, PropagatorOutOfBoundsError
 from propagator.io.configuration import PropagatorConfigurationLegacy
 from propagator.io.loader.geotiff import PropagatorDataFromGeotiffs
 from propagator.io.loader.protocol import PropagatorInputDataProtocol
@@ -222,6 +222,7 @@ def main():
         realizations=cfg.realizations,
         fuels=cfg.fuel_system,
         do_spotting=cfg.do_spotting,
+        out_of_bounds_mode="raise",
         **args,
     )
 
@@ -237,14 +238,20 @@ def main():
         if next_time is None:
             break
 
-        simulator.step()
-
-        if simulator.time % cfg.time_resolution == 0:
-            ref_date = cfg.init_date + timedelta(minutes=int(simulator.time))
-            info_msg(f"Time: {simulator.time} -> {ref_date}")
-            output = simulator.get_output()
-            # Save the output to the specified folder
-            writer.write_output(output)
+        try:
+            simulator.step()
+        except PropagatorOutOfBoundsError as e:
+            warn(f"Simulation stopped due to PropagatorOutOfBoundsError: {e}")
+            break
+        finally:
+            if simulator.time % cfg.time_resolution == 0:
+                ref_date = cfg.init_date + timedelta(
+                    minutes=int(simulator.time)
+                )
+                info_msg(f"Time: {simulator.time} -> {ref_date}")
+                output = simulator.get_output()
+                # Save the output to the specified folder
+                writer.write_output(output)
 
         if simulator.time > cfg.time_limit:
             break

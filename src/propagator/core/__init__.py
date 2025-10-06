@@ -12,6 +12,7 @@ from .numba import (
 )
 from .propagator import (
     Propagator,
+    PropagatorOutOfBoundsError,
 )
 
 try:
@@ -22,6 +23,7 @@ except Exception:
 __all__ = [
     "BoundaryConditions",
     "Propagator",
+    "PropagatorOutOfBoundsError",
     "PropagatorStats",
     "FUEL_SYSTEM_LEGACY",
     "fuelsystem_from_dict",
