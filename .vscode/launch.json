@@ -13,7 +13,8 @@
             "args": [
                 "--config",
                 "./example/params_ign_polygon.json",
-                "--mode", "geotiff",
+                "--mode",
+                "geotiff",
                 "--output",
                 "./example/output",
                 "--dem",
@@ -26,7 +27,29 @@
                 "PROJ_LIB": ".venv/share/proj/"
             }
         },
-
+        {
+            "name": "Python Debugger: run propagator_cli.cli with actions",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "propagator.cli.main",
+            "console": "integratedTerminal",
+            "args": [
+                "--config",
+                "./example/params_actions.json",
+                "--mode",
+                "geotiff",
+                "--output",
+                "./example/output",
+                "--dem",
+                "./example/dem.tif",
+                "--fuel",
+                "./example/fuel.tif"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PROJ_LIB": ".venv/share/proj/"
+            }
+        },
         {
             "name": "Python Debugger: run propagator_cli.cli tiles mode",
             "type": "debugpy",
@@ -36,24 +59,25 @@
             "args": [
                 "--config",
                 "./example/params_tiles.json",
-                "--mode", "tiles",
-                "--tilespath", "/share/propagator/data",
-                "--output", "./example/output",
+                "--mode",
+                "tiles",
+                "--tilespath",
+                "/share/propagator/data",
+                "--output",
+                "./example/output",
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}",
                 "PROJ_LIB": ".venv/share/proj/"
             }
         },
-
         {
             "name": "Python Debugger: run example",
             "type": "debugpy",
             "request": "launch",
             "program": "example/example.py",
             "console": "integratedTerminal",
-            "args": [
-            ],
+            "args": [],
             "env": {
                 "NUMBA_DISABLE_JIT": "1",
                 "PYTHONPATH": "${workspaceFolder}",
