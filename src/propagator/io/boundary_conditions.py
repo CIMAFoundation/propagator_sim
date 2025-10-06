@@ -37,13 +37,16 @@ class TimedInput(BaseModel):
     time: int = Field(0, description="minutes from simulation start")
 
     # Weather conditions
-    w_dir: float = Field(
-        default=0,
+    w_dir: Optional[float] = Field(
+        None,
         description="wind direction clockwise in degrees from north (north=0)",
     )
-    w_speed: float = Field(0.0, description="wind speed in km/h")
-    moisture: float = Field(
-        0.0,
+    w_speed: Optional[float] = Field(
+        None,
+        description="wind speed in km/h"
+    )
+    moisture: Optional[float] = Field(
+        None,
         ge=0.0,
         le=100.0,
         description="fuel moisture in percentage (0-100)",
@@ -58,12 +61,14 @@ class TimedInput(BaseModel):
     @classmethod
     def _coerce_speed(cls, v):
         if v is None:
-            return 0.0
+            return v
         return float(v)
 
     @field_validator("w_dir", mode="before")
     @classmethod
     def _coerce_wdir(cls, v):
+        if v is None:
+            return v
         x = float(v)
         if x < 0:
             x = 360 + (x % 360)
@@ -109,12 +114,19 @@ class TimedInput(BaseModel):
         non_vegetated: int,
     ) -> BoundaryConditions:
         # rasterize weather conditions > so far given as scalars
-        w_speed_arr = np.ones(geo_info.shape) * self.w_speed
-        w_dir_arr = np.ones(geo_info.shape) * self.w_dir
-        moisture_arr = np.ones(geo_info.shape) * self.moisture
+        w_speed_arr = None
+        w_dir_arr = None
+        moisture_arr = None
         ignition_mask = None
         additional_moisture = None
         vegetation_changes = None
+
+        if self.w_speed is not None:
+            w_speed_arr = np.ones(geo_info.shape) * self.w_speed
+        if self.w_dir is not None:
+            w_dir_arr = np.ones(geo_info.shape) * self.w_dir      
+        if self.moisture is not None:
+            moisture_arr = np.ones(geo_info.shape) * self.moisture
 
         if self.ignitions is not None:
             ignition_mask = rasterize_geometries(
@@ -132,6 +144,8 @@ class TimedInput(BaseModel):
                 if moist_action is not None:
                     if additional_moisture is None:
                         additional_moisture = np.zeros(geo_info.shape)
+                    if moisture_arr is None:
+                        moisture_arr = np.zeros(geo_info.shape)
                     # in case of multiple actions, take the one
                     # that have maximum effect e.g. max moisture
                     moisture_arr_tmp = moisture_arr + additional_moisture

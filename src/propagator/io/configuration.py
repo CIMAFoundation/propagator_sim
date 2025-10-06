@@ -45,6 +45,10 @@ class PropagatorConfigurationLegacy(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    name: Optional[str] = Field(
+        None, description="Name of the simulation (optional)"
+    )
+
     fuel_config: Optional[Path] = Field(
         None, description="Path to fuel configuration file (YAML)"
     )
