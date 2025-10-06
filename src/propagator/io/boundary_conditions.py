@@ -151,9 +151,7 @@ class TimedInput(BaseModel):
                 )
                 if fuel_action is not None:
                     if vegetation_changes is None:
-                        vegetation_changes = np.zeros(
-                            geo_info.shape, dtype=int
-                        )
+                        vegetation_changes = np.full(geo_info.shape, np.nan)
 
                     vegetation_changes = np.where(  # type: ignore
                         np.isnan(fuel_action),

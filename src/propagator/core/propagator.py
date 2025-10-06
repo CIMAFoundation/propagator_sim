@@ -6,6 +6,7 @@ moisture inputs. Public dataclasses capture boundary conditions, actions,
 summary statistics, and output snapshots suitable for CLI and IO layers.
 """
 
+import warnings
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -132,7 +133,7 @@ class Propagator:
         numpy.ndarray
             2D array with max RoS per cell.
         """
-        RoS_max = np.nanmax(self.ros, axis=2).astype(np.float32)
+        RoS_max = self._compute_variable_max(self.ros).astype(np.float32)
         return RoS_max
 
     def compute_ros_mean(self) -> npt.NDArray[np.floating]:
@@ -153,7 +154,9 @@ class Propagator:
         numpy.ndarray
             2D array of max intensity values.
         """
-        fl_I_max = np.nanmax(self.fireline_int, axis=2).astype(np.float32)
+        fl_I_max = self._compute_variable_max(self.fireline_int).astype(
+            np.float32
+        )
         return fl_I_max
 
     def compute_fireline_int_mean(self) -> npt.NDArray[np.floating]:
@@ -195,6 +198,14 @@ class Propagator:
         out = np.full(self.veg.shape, np.nan, dtype=np.float32)
         np.divide(s, c, out=out, where=c > 0)
         return out
+
+    def _compute_variable_max(
+        self, the_var: npt.NDArray[np.floating]
+    ) -> npt.NDArray[np.floating]:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            max_values = np.nanmax(the_var, axis=2).astype(np.float32)
+        return max_values
 
     def compute_stats(
         self, values: npt.NDArray[np.floating]

@@ -19,6 +19,21 @@ from propagator.io.geometry import (
 )
 
 
+def build_mask(
+    geometries: List[Geometry], geo_info: GeographicInfo
+) -> np.ndarray:
+    """Boolean mask of the action geometries."""
+    m = rasterize_geometries(
+        geometries=geometries,
+        geo_info=geo_info,
+        fill=0,
+        default_value=1,
+        all_touched=True,
+        dtype="uint8",
+    )
+    return m.astype(bool)
+
+
 class ActionType(str, Enum):
     WATERLINE_ACTION = "waterline_action"
     CANADAIR = "canadair"
@@ -57,18 +72,6 @@ class Action(BaseModel):
                 )
         return geoms
 
-    def _mask(self, geo_info: GeographicInfo) -> np.ndarray:
-        """Boolean mask of the action geometries."""
-        m = rasterize_geometries(
-            geometries=self.geometries,
-            geo_info=geo_info,
-            fill=0,
-            default_value=1,
-            all_touched=True,
-            dtype="uint8",
-        )
-        return m.astype(bool)
-
     def rasterize_action_moisture(
         self, geo_info: GeographicInfo
     ) -> Optional[npt.NDArray[np.floating]]:
@@ -95,7 +98,7 @@ class WaterlineAction(Action):
     def rasterize_action_moisture(
         self, geo_info: GeographicInfo
     ) -> Optional[npt.NDArray[np.floating]]:
-        mask_action = self._mask(geo_info)
+        mask_action = build_mask(self.geometries, geo_info)
         mask_buffer = ndimage.binary_dilation(mask_action)
         moisture_action = np.where(
             mask_buffer, WATERLINE_ACTION_MOIST_VALUE, np.nan
@@ -115,7 +118,7 @@ class CanadairAction(Action):
     def rasterize_action_moisture(
         self, geo_info: GeographicInfo
     ) -> npt.NDArray[np.floating]:
-        mask_action = self._mask(geo_info)
+        mask_action = build_mask(self.geometries, geo_info)
         mask_buffer = ndimage.binary_dilation(mask_action)
         moisture_action = np.where(
             mask_buffer, CANADAIR_BUFFER_MOIST_VALUE, np.nan
@@ -138,7 +141,7 @@ class HelicopterAction(Action):
     def rasterize_action(
         self, geo_info: GeographicInfo
     ) -> npt.NDArray[np.floating]:
-        mask_action = self._mask(geo_info)
+        mask_action = build_mask(self.geometries, geo_info)
         # create "jittered" seed points near the line pixels
         iy, ix = np.nonzero(mask_action)
         seed_mask = np.zeros(geo_info.shape, dtype=bool)
@@ -169,7 +172,7 @@ class HeavyAction(Action):
     def rasterize_action_fuel(
         self, geo_info: GeographicInfo, fuel: int
     ) -> npt.NDArray[np.floating]:
-        mask_action = self._mask(geo_info)
+        mask_action = build_mask(self.geometries, geo_info)
         mask_buffer = ndimage.binary_dilation(mask_action)
         fuel_action = np.where(mask_buffer, fuel, np.nan)
         return fuel_action
