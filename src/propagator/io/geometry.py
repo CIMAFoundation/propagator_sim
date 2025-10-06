@@ -75,10 +75,23 @@ def reproject_geometry(
 
 
 # ---- parsing ---------------------------------------------------------------
+# _POINT_RE = re.compile(
+#     r"""^POINT:\s*(?P<y>-?\d+(?:\.\d+)?)\s*;\s*(?P<x>-?\d+(?:\.\d+)?)\s*$""",
+#     re.IGNORECASE | re.VERBOSE,
+# )
+
 _POINT_RE = re.compile(
-    r"""^POINT:\s*(?P<y>-?\d+(?:\.\d+)?)\s*;\s*(?P<x>-?\d+(?:\.\d+)?)\s*$""",
+    r"""
+    ^POINT:\s*
+    (?:\[\s*)?                     # optional opening bracket
+    (?P<y>[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)   # y
+    \s*(?:[,;])\s*                 # separator: comma or semicolon
+    (?P<x>[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)   # x
+    \s*(?:\]\s*)?                  # optional closing bracket
+    $""",
     re.IGNORECASE | re.VERBOSE,
 )
+
 
 _SERIES_RE = re.compile(
     r"""^(?P<kind>LINE|POLYGON):\[\s*

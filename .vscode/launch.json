@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--config",
-                "./example/params_ign_polygon.json",
+                "./example/params.json",
                 "--mode",
                 "geotiff",
                 "--output",

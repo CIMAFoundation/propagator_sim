@@ -1,7 +1,7 @@
 {
     "init_date": "202209011500",
     "ignitions": [
-        "POINT: 52.51751;-6.82354"
+        "POINT: [52.51751;-6.82354]"
     ],
     "realizations": 100,
     "time_limit": 2400,
