@@ -67,6 +67,7 @@ dev = [
     "types-shapely>=2.1.0.20250917",
     "scipy-stubs[scipy]>=1.16.1.1",
     "types-pyyaml>=6.0.12.20250915",
+    "types-geopandas>=1.1.1.20250829",
 ]
 
 [build-system]

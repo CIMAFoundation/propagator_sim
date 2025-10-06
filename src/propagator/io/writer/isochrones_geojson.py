@@ -7,8 +7,8 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 from pyproj import CRS
-from rasterio.features import shapes
-from rasterio.transform import Affine
+from rasterio.features import shapes  # type: ignore
+from rasterio.transform import Affine  # type: ignore
 from scipy.ndimage.filters import gaussian_filter1d
 from scipy.ndimage.morphology import binary_dilation, binary_erosion
 from scipy.signal.signaltools import medfilt2d

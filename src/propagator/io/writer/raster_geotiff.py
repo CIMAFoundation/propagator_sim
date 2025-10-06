@@ -5,9 +5,9 @@ from typing import Callable
 
 import numpy as np
 import numpy.typing as npt
-import rasterio as rio
+import rasterio as rio  # type: ignore
 from pyproj import CRS
-from rasterio.transform import Affine
+from rasterio.transform import Affine  # type: ignore
 
 from propagator.core.models import PropagatorOutput
 from propagator.io.geo import GeographicInfo, reproject, trim_values

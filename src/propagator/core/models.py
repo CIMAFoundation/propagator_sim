@@ -49,7 +49,7 @@ class UpdateBatch:
         default_factory=lambda: np.empty((0,), dtype=np.float32)
     )
 
-    bbox: tuple[int, int, int, int] = field(init=False)
+    bbox: Optional[tuple[int, int, int, int]] = field(init=False, default=None)
 
     def __post_init__(self):
         n = len(self.rows)
@@ -62,7 +62,9 @@ class UpdateBatch:
             raise ValueError("All input arrays must have the same length")
 
         if n == 0:
+            self.bbox = None
             return
+
         r0 = int(np.min(self.rows))
         c0 = int(np.min(self.cols))
         r1 = int(np.max(self.rows))
@@ -81,6 +83,13 @@ class UpdateBatch:
         self.fireline_intensities = np.concatenate(
             [self.fireline_intensities, other.fireline_intensities]
         )
+
+        if self.bbox is None:
+            self.bbox = other.bbox
+            return
+
+        if other.bbox is None:
+            return
 
         r0, c0, r1, c1 = self.bbox
         or0, oc0, or1, oc1 = other.bbox

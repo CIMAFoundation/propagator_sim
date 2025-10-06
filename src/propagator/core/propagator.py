@@ -214,9 +214,12 @@ class Propagator:
     def _compute_variable_max(
         self, the_var: npt.NDArray[np.floating]
     ) -> npt.NDArray[np.floating]:
+        mask = np.sum(self.fire, axis=2) > 0
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
             max_values = np.nanmax(the_var, axis=2).astype(np.float32)
+
+        max_values[~mask] = np.nan
         return max_values
 
     def compute_stats(
@@ -416,6 +419,7 @@ class Propagator:
         bbox = updates.bbox
         if bbox is None:
             return
+
         update_r0, update_c0, update_r1, update_c1 = bbox
         sim_bbox = self._get_simulation_bbox()
         sim_r0, sim_c0, sim_r1, sim_c1 = sim_bbox

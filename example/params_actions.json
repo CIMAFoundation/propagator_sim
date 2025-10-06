@@ -5,7 +5,7 @@
     "realizations": 10,
     "time_limit": 2400,
     "do_spotting": true,
-    "time_resolution": 1,
+    "time_resolution": 30,
     "boundary_conditions": [
         {
             "time": 0,

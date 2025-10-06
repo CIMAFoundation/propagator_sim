@@ -22,10 +22,11 @@ def reproject(
 
     Returns `(dst, dst_trans)` with the new raster array and affine transform.
     """
+    trimmed_values = values
     if trim:
-        values, src_trans = trim_values(values, src_trans)
+        trimmed_values, src_trans = trim_values(values.copy(), src_trans)
 
-    rows, cols = values.shape
+    rows, cols = trimmed_values.shape
     (west, east), (north, south) = transform.xy(
         src_trans, [0, rows], [0, cols], offset="ul"
     )
@@ -45,7 +46,7 @@ def reproject(
         dst = np.empty(shape=(dh, dw))  # type: ignore # warp calculate_default_transform returns inconsistent types
 
         warp.reproject(
-            source=np.ascontiguousarray(values),
+            source=np.ascontiguousarray(trimmed_values),
             destination=dst,
             src_crs=src_crs,
             dst_crs=dst_crs,
@@ -70,11 +71,13 @@ def trim_values(
     mask = values > 0
     v_rows = np.where(mask.sum(axis=1) > 0)[0]
     if len(v_rows) > 0:
-        min_row, max_row = v_rows[0] - 1, v_rows[-1] + 2
+        min_row = max(v_rows[0] - 1, 0)
+        max_row = min(v_rows[-1] + 2, rows)
 
     v_cols = np.where(mask.sum(axis=0) > 0)[0]
     if len(v_cols) > 0:
-        min_col, max_col = v_cols[0] - 1, v_cols[-1] + 2
+        min_col = max(v_cols[0] - 1, 0)
+        max_col = min(v_cols[-1] + 2, cols)
 
     trim_values = values[min_row:max_row, min_col:max_col]
     rows, cols = trim_values.shape
