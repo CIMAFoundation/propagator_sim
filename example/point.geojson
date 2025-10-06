@@ -1,8 +1,25 @@
 {
-"type": "FeatureCollection",
-"name": "point",
-"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
-"features": [
-{ "type": "Feature", "properties": { "id": null }, "geometry": { "type": "Point", "coordinates": [ -6.88635904794041, 52.532480357156501 ] } }
-]
+    "type": "FeatureCollection",
+    "name": "point",
+    "crs": {
+        "type": "name",
+        "properties": {
+            "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+        }
+    },
+    "features": [
+        {
+            "type": "Feature",
+            "properties": {
+                "id": null
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    -6.82354,
+                    52.51751
+                ]
+            }
+        }
+    ]
 }
