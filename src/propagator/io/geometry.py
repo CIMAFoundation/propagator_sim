@@ -201,7 +201,7 @@ def rasterize_geometries(
     # Prepare shapes in destination CRS
     shapes: List[Tuple[dict, Union[int, float]]] = []
     for i, g in enumerate(geometries):
-        geom = reproject_geometry(g, "epsg:4326", f"epsg:{geo_info.prj.crs}")
+        geom = reproject_geometry(g, "epsg:4326", f"epsg:{geo_info.crs}")
         gj = json.loads(shapely.to_geojson(geom))
         val = values[i] if values is not None else default_value
         shapes.append((gj, val))

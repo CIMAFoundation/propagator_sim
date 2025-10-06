@@ -15,5 +15,5 @@ __all__ = [
     "MoistureModel",
     "RateOfSpreadModel",
     "next_updates_fn",
-    "FuelSystem"
+    "FuelSystem",
 ]

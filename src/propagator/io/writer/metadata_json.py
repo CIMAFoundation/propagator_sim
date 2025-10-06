@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from propagator.io.writer.protocol import MetadataWriterProtocol
 from propagator.core.models import PropagatorOutput
+from propagator.io.writer.protocol import MetadataWriterProtocol
 
 
 @dataclass

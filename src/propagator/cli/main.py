@@ -77,6 +77,14 @@ class PropagatorCLILegacy(BaseSettings):
 
     @model_validator(mode="after")
     def _check_mode_files(self):
+        # if you provide dem and fuel, then automatically set in geotiff mode
+        if self.dem is not None and self.fuel is not None:
+            if self.mode == "tiles":
+                warn(
+                    "DEM and FUEL files provided, switching to 'geotiff' mode"
+                )
+            self.mode = "geotiff"
+        # check required files based on mode
         if self.mode == "geotiff":
             if self.dem is None or self.fuel is None:
                 raise ValueError(

@@ -4,8 +4,8 @@ from typing import Optional, Protocol
 
 from pyproj import Proj
 
-from propagator.io.geo import GeographicInfo
 from propagator.core.models import PropagatorOutput
+from propagator.io.geo import GeographicInfo
 
 
 class BaseWriterProtocol(Protocol):

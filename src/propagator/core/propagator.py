@@ -212,7 +212,7 @@ class Propagator:
             Dataclass with counters and area summaries.
         """
         n_active = len(self.scheduler.active().tolist())
-        cell_area = (self.cellsize**2)  # m^2, squared cells
+        cell_area = self.cellsize**2  # m^2, squared cells
         area_mean = float(np.sum(values) * cell_area)
         area_50 = float(np.sum(values >= 0.5) * cell_area)
         area_75 = float(np.sum(values >= 0.75) * cell_area)
@@ -267,11 +267,14 @@ class Propagator:
         if boundary_condition.ignition_mask is not None:
             ign_arr = boundary_condition.ignition_mask
             points = np.argwhere(ign_arr > 0)
-            realizations = np.arange(self.realizations)
+
             points_repeated = np.repeat(points, self.realizations, axis=0)
+            realizations = np.tile(np.arange(self.realizations), len(points))
+
             fireline_intensity = np.zeros_like(
                 points_repeated[:, 0], dtype=np.float32
             )
+
             ros = np.zeros_like(points_repeated[:, 0], dtype=np.float32)
             event.updates = UpdateBatch(
                 rows=points_repeated[:, 0],
