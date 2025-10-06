@@ -47,10 +47,6 @@ def load_data_from_files(veg_filename, dem_filename):
             dem = dem_file.read(1).astype("int16")
             veg = veg_file.read(1).astype("int8")
 
-            veg[:, (0, 1, 2, -3, -2, -1)] = 0
-            veg[(0, 1, 2, -3, -2, -1), :] = 0
-            veg[(veg < 0) | (veg > 6)] = 0
-
             geo_info = GeographicInfo.from_file(dem_file)
         except IOError:
             logging.error("Error reading input files")

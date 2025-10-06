@@ -74,9 +74,9 @@ class PropagatorDataFromTiles(PropagatorInputDataProtocol):
             "prop",
             self.tileset,
         )
-        veg = veg.astype("int8")
+        veg = veg.astype(np.integer)
 
-        return veg
+        return veg  # type: ignore[return-value]
 
     def get_geo_info(self) -> GeographicInfo:
         rows = self.grid_dim
