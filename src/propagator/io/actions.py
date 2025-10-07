@@ -198,8 +198,8 @@ def parse_actions(
         List of parsed Action objects.
     """
     actions: list[Action] = []
-    if ActionType.WATERLINE_ACTION in data:
-        raw = data.pop(ActionType.WATERLINE_ACTION)
+    if ActionType.WATERLINE_ACTION.value in data:
+        raw = data.pop(ActionType.WATERLINE_ACTION.value)
         geometries = parse_geometry_list(
             raw,
             allowed=WaterlineAction.allowed_kinds(),
@@ -208,8 +208,8 @@ def parse_actions(
         if geometries:
             actions.append(WaterlineAction(geometries=geometries))
 
-    if ActionType.CANADAIR in data:
-        raw = data.pop(ActionType.CANADAIR)
+    if ActionType.CANADAIR.value in data:
+        raw = data.pop(ActionType.CANADAIR.value)
         geometries = parse_geometry_list(
             raw,
             allowed=CanadairAction.allowed_kinds(),
@@ -218,8 +218,8 @@ def parse_actions(
         if geometries:
             actions.append(CanadairAction(geometries=geometries))
 
-    if ActionType.HELICOPTER in data:
-        raw = data.pop(ActionType.HELICOPTER)
+    if ActionType.HELICOPTER.value in data:
+        raw = data.pop(ActionType.HELICOPTER.value)
         geometries = parse_geometry_list(
             raw,
             allowed=HelicopterAction.allowed_kinds(),
@@ -228,8 +228,8 @@ def parse_actions(
         if geometries:
             actions.append(HelicopterAction(geometries=geometries))
 
-    if ActionType.HEAVY_ACTION in data:
-        raw = data.pop(ActionType.HEAVY_ACTION)
+    if ActionType.HEAVY_ACTION.value in data:
+        raw = data.pop(ActionType.HEAVY_ACTION.value)
         geometries = parse_geometry_list(
             raw,
             allowed=HeavyAction.allowed_kinds(),

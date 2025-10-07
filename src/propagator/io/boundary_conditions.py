@@ -41,10 +41,7 @@ class TimedInput(BaseModel):
         None,
         description="wind direction clockwise in degrees from north (north=0)",
     )
-    w_speed: Optional[float] = Field(
-        None,
-        description="wind speed in km/h"
-    )
+    w_speed: Optional[float] = Field(None, description="wind speed in km/h")
     moisture: Optional[float] = Field(
         None,
         ge=0.0,
@@ -103,9 +100,15 @@ class TimedInput(BaseModel):
                     epsg=epsg,
                 )
         # let actions.py parse and normalize legacy fields
-        actions = parse_actions(data, epsg=epsg)
+        legacy_actions = parse_actions(data, epsg=epsg)
         # append to any already-provided "actions"
-        data["actions"] = actions
+        existing_actions = data.get("actions")
+        if existing_actions is None:
+            data["actions"] = legacy_actions
+        elif isinstance(existing_actions, list):
+            data["actions"] = [*existing_actions, *legacy_actions]
+        else:
+            raise ValueError("actions must be provided as a list")
         return data
 
     def get_boundary_conditions(
@@ -124,7 +127,7 @@ class TimedInput(BaseModel):
         if self.w_speed is not None:
             w_speed_arr = np.ones(geo_info.shape) * self.w_speed
         if self.w_dir is not None:
-            w_dir_arr = np.ones(geo_info.shape) * self.w_dir      
+            w_dir_arr = np.ones(geo_info.shape) * self.w_dir
         if self.moisture is not None:
             moisture_arr = np.ones(geo_info.shape) * self.moisture
 
