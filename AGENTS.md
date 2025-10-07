@@ -1,30 +1,32 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `propagator/`: Core fire spread logic including `propagator.py`, `scheduler.py`, and helper functions.
-- `propagator_io/`: Configuration models and IO utilities such as `configuration.py`, `input.py`, and `output.py`.
-- `propagator_cli/`: CLI entrypoints (`cli.py`, `args_parser.py`, `console.py`) and supporting console helpers.
-- `example/`: Lightweight DEM, vegetation, and parameter samples for smoke tests.
-- `tests/`: Pytest suite (e.g., `tests/test_propagator.py`) covering propagation rules and IO flows.
+- `src/propagator/core` implements the wildfire CA engine (grid updates, spread models); `src/propagator/io` manages raster/GeoPackage I/O; `src/propagator/cli` backs the `propagator` console entrypoint.
+- Keep shared helpers near their domain modules and expose new public APIs in `src/propagator/__init__.py` when relevant.
+- Authoritative docs live in `docs/` and build through MkDocs; runnable walk-throughs sit in `example/`. Simulation outputs created locally should stay under `results/` (git-ignored by default).
+- Tests mirror the package layout inside `tests/` (e.g., `tests/core` exercises `src/propagator/core`). Add new suites by replicating the source structure.
 
 ## Build, Test, and Development Commands
-- `python -m venv .venv && source .venv/bin/activate`: Create and activate a local virtual environment.
-- `pip install -e .[dev]` or `uv sync`: Install project and dev dependencies using pip or uv.
-- `python main.py --help`: Inspect CLI options; use sample params via `python main.py -f ./example/params.json -of ./example/output -tl 24`.
-- `pytest -q`: Run the full automated test suite.
-- `ruff check .` / `ruff format .`: Lint and format codebase; run lint before formatting when iterating.
+- `uv sync --dev --all-extras` creates the virtualenv with optional CLI/I/O extras and dev tooling.
+- `uv run propagator --help` lists runtime switches; use `uv run propagator <config>` to launch scenarios.
+- `uv run pytest -q` executes the unit tests; append `-k pattern` or `--maxfail=1` for targeted debugging.
+- `uv run ruff check src tests` enforces formatting and lint rules; add `--fix` only after reviewing diffs.
+- `uv run mkdocs serve` develops docs with live reload; `uv run mkdocs build` generates the static site.
 
 ## Coding Style & Naming Conventions
-- Target Python ≥ 3.13, 4-space indentation, explicit type hints for public APIs.
-- Modules use `snake_case.py`; classes `CamelCase`; functions and variables `snake_case`.
-- Organize imports per Ruff defaults; drop unused code. Keep dataclasses and Pydantic models documented with short docstrings.
+- Ruff enforces PEP 8–aligned style (79-char lines, E/F/W/Q/I rules with E203/E501 ignored). Run it before pushing.
+- Use `snake_case` for functions, variables, and modules; `PascalCase` for classes; `UPPER_CASE` for constants.
+- Favor explicit type hints on public interfaces and keep docstrings concise but informative.
+- Add brief inline comments only when an algorithm or model tweak is non-obvious.
 
 ## Testing Guidelines
-- Primary framework: Pytest with deterministic seeding when randomness is involved.
-- Place tests under `tests/` with filenames `test_*.py` and functions `test_*`.
-- Run `pytest -q` locally before submitting changes; add coverage for new logic and edge cases.
+- Pytest is configured via `pyproject.toml`; place shared fixtures in a module-level `conftest.py` when needed.
+- Name tests after the behavior under test (e.g., `test_scheduler_respects_firebreak`). Prefer parametrization for scenario coverage.
+- Seed randomness inside tests to keep runs reproducible, especially for stochastic spread models.
+- Update or add integration-style tests whenever core spread logic or I/O contracts change.
 
 ## Commit & Pull Request Guidelines
-- Follow Conventional Commits (`feat:`, `fix:`, `chore:`, etc.) as in existing history. Squash before merging when possible.
-- PRs should describe behavior changes, link tracked issues, and note any CLI flag updates.
-- Include relevant test output or CLI snippets when touching runtime behavior; update `example/` assets or docs if inputs change.
+- Follow the Conventional Commit style seen in history (`feat`, `fix`, `refactor`, `chore`, etc.) and keep scopes focused.
+- Reference tracking issues in commit bodies or PR descriptions when applicable.
+- PRs should explain behavior changes, list verification steps (`uv run pytest`, `uv run propagator` summaries), and attach artifacts/screens when useful.
+- Request review before merging; rerun lint and tests after addressing comments to keep CI green.
