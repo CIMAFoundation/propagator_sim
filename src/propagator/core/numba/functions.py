@@ -107,7 +107,7 @@ def get_p_time_fn(ros_model_code: RateOfSpreadModel) -> Any:
         `(v0, dem_from, dem_to, angle_to, dist, moist, w_dir, w_speed) -> (time, ros)`.
     """
     match ros_model_code:
-        case "default":
+        case "standard":
             return p_time_standard
         case "wang":
             return p_time_wang

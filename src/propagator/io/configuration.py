@@ -17,7 +17,12 @@ from pydantic import (
 )
 from shapely import Geometry
 
-from propagator.core.constants import CELLSIZE, REALIZATIONS
+from propagator.core.constants import (
+    CELLSIZE,
+    REALIZATIONS,
+    ROS_DEFAULT,
+    MOISTURE_MODEL_DEFAULT,
+)
 from propagator.core.models import BoundaryConditions
 
 # ---- project utils ----------------------------------------------------------
@@ -102,9 +107,10 @@ class PropagatorConfigurationLegacy(BaseModel):
         default_factory=list, description="List of boundary conditions"
     )
     do_spotting: bool = Field(False, description="Spotting option")
-    ros_model: RateOfSpreadModel = Field("wang", description="ROS model name")
+    ros_model: RateOfSpreadModel = Field(
+        ROS_DEFAULT, description="ROS model name")
     prob_moist_model: MoistureModel = Field(
-        "trucchia", description="Moisture model name"
+        MOISTURE_MODEL_DEFAULT, description="Moisture model name"
     )
     cellsize: float = Field(
         CELLSIZE, gt=0.0, description="Cell size in meters"

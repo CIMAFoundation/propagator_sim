@@ -13,7 +13,12 @@ from typing import Any, Literal
 import numpy as np
 import numpy.typing as npt
 
-from propagator.core.constants import CELLSIZE, REALIZATIONS
+from propagator.core.constants import (
+    CELLSIZE,
+    REALIZATIONS,
+    ROS_DEFAULT,
+    MOISTURE_MODEL_DEFAULT
+)
 from propagator.core.models import (
     BoundaryConditions,
     PropagatorOutput,
@@ -92,8 +97,8 @@ class Propagator:
     realizations: int = REALIZATIONS
 
     # selected simulation functions
-    p_time_fn: Any = field(default=get_p_time_fn("wang"))
-    p_moist_fn: Any = field(default=get_p_moisture_fn("trucchia"))
+    p_time_fn: Any = field(default=get_p_time_fn(ROS_DEFAULT))
+    p_moist_fn: Any = field(default=get_p_moisture_fn(MOISTURE_MODEL_DEFAULT))
 
     # scheduler object
     scheduler: Scheduler = field(init=False)
