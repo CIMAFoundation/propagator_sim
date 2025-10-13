@@ -11,7 +11,13 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pyproj import CRS
 
-from propagator.cli.console import info_msg, ok_msg, setup_console
+from propagator.cli.console import (
+    info_msg,
+    ok_msg,
+    setup_console,
+    print_model_table,
+    print_boundary_conditions_table
+)
 from propagator.core import Propagator, PropagatorOutOfBoundsError
 from propagator.core.numba import fuelsystem_from_dict, FUEL_SYSTEM_LEGACY
 from propagator.core.numba.models import FuelSystem
@@ -173,17 +179,19 @@ def main():
     ok_msg("CLI initialized")
 
     if cli.record:
-        basename = (
-            f"propagator_run_{simulation_time.strftime('%Y%m%d_%H%M%S')}"
-        )
-        setup_console(record_path=cli.output, basename=basename)
+        setup_console(record_path=cli.output, basename="run")
     else:
         setup_console()
     ok_msg("Console initialized")
+    info_msg(f"Run time: {simulation_time}")
+
+    print_model_table(cli, title="CLI Settings")
 
     info_msg("Loading configuration from JSON file...")
     cfg = cli.build_configuration()
     ok_msg("Configuration loaded")
+
+    print_model_table(cfg, title="Simulation Configuration")
 
     info_msg("Loading fuel system...")
     if cli.fuel_config is not None:
@@ -288,6 +296,8 @@ def main():
     for boundary_condition in boundary_conditions_list:
         simulator.set_boundary_conditions(boundary_condition)
     ok_msg("Boundary conditions set")
+
+    print_boundary_conditions_table(cfg.boundary_conditions)
 
     info_msg("Start simulation...")
     while True:
