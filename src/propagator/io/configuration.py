@@ -43,31 +43,31 @@ class PropagatorConfigurationLegacy(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    # --- basic info ---
     name: Optional[str] = Field(
         None, description="Name of the simulation (optional)"
-    )
-    realizations: int = Field(
-        REALIZATIONS, ge=1, description="Number of realizations"
     )
     init_date: datetime = Field(
         default_factory=datetime.now,
         description="Datetime of the simulated event",
     )
-    time_resolution: int = Field(
-        60, gt=0, description="Simulation resolution [minutes]"
-    )
     time_limit: int = Field(
         1440, gt=0, description="Simulation limit [minutes]"
+    )
+    ignitions: Optional[List[Geometry]] = Field(
+        None, description="List of ignitions at simulation start (time=0)."
     )
     epsg: int = Field(
         DEFAULT_EPSG_GEOMETRY,  # default to WGS84
         description="EPSG of geometries",
     )
-    ignitions: Optional[List[Geometry]] = Field(
-        None, description="List of ignitions at simulation start (time=0)."
+
+    # --- settings ---
+    time_resolution: int = Field(
+        60, gt=0, description="Simulation resolution [minutes]"
     )
-    boundary_conditions: List[TimedInput] = Field(
-        default_factory=list, description="List of boundary conditions"
+    cellsize: float = Field(
+        CELLSIZE, gt=0.0, description="Cell size in meters"
     )
     do_spotting: bool = Field(False, description="Spotting option")
     ros_model: RateOfSpreadModel = Field(
@@ -75,9 +75,16 @@ class PropagatorConfigurationLegacy(BaseModel):
     prob_moist_model: MoistureModel = Field(
         MOISTURE_MODEL_DEFAULT, description="Moisture model name"
     )
-    cellsize: float = Field(
-        CELLSIZE, gt=0.0, description="Cell size in meters"
+    realizations: int = Field(
+        REALIZATIONS, ge=1, description="Number of realizations"
     )
+
+    # --- boundary conditions ---
+    boundary_conditions: List[TimedInput] = Field(
+        default_factory=list, description="List of boundary conditions"
+    )
+
+    # --- models ---
     p_time_fn: Optional[object] = Field(default=None, exclude=True)
     p_moist_fn: Optional[object] = Field(default=None, exclude=True)
 
@@ -133,7 +140,6 @@ class PropagatorConfigurationLegacy(BaseModel):
             ]
         return data
 
-    # ---------- cross-field checks & friendly console messages ----------
     @model_validator(mode="after")
     def _post_setup(self):
         # set the functions
@@ -147,10 +153,10 @@ class PropagatorConfigurationLegacy(BaseModel):
                 {self.prob_moist_model}"
             )
 
+        # checks on boundary conditions
         # check if boundary condition is empty
         if len(self.boundary_conditions) == 0:
             raise ValueError("boundary_conditions must not be empty.")
-
         # check if time == 0 is present
         t0_bc = next(
             (bc for bc in self.boundary_conditions if bc.time == 0), None
@@ -159,22 +165,17 @@ class PropagatorConfigurationLegacy(BaseModel):
             raise ValueError(
                 "boundary_conditions must include an entry with time = 0."
             )
-
         # add initial ignitions (if present) to the firt boundary condition
         if self.ignitions:
             if t0_bc.ignitions is None:
                 t0_bc.ignitions = []
             t0_bc.ignitions.extend(self.ignitions)
-            # # single source of truth: clear at top-level
-            # self.ignitions = None
-
         # now, check if t0 has an ignition > must have, otherwise error
         if not t0_bc.ignitions or len(t0_bc.ignitions) == 0:
             raise ValueError(
                 "Initial ignitions must be provided either at top-level or in "
                 "the first boundary condition (time=0)."
             )
-
         # check if there are repetitions in boundary conditions
         times = [bc.time for bc in self.boundary_conditions]
         if len(times) != len(set(times)):
@@ -185,8 +186,6 @@ class PropagatorConfigurationLegacy(BaseModel):
     def get_boundary_conditions(
         self, geo_info: GeographicInfo, non_vegetated: int
     ) -> List[BoundaryConditions]:
-        # NOTE: boundary conditions should be sorted by time already
-
         return [
             bc.get_boundary_conditions(geo_info, non_vegetated)
             for bc in self.boundary_conditions
