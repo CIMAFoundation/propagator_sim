@@ -1,5 +1,3 @@
-
-
 {
     "init_date": "202209011500",
     "ignitions": [
@@ -12,7 +10,7 @@
     "boundary_conditions": [
         {
             "time": 0,
-            "w_dir": 10,
+            "w_dir": 0,
             "w_speed": 30,
             "moisture": 0
         }

@@ -136,3 +136,4 @@ work/
 .DS_Store
 
 output/
+example/*.xml

@@ -9,7 +9,7 @@
     "boundary_conditions": [
         {
             "time": 0,
-            "w_dir": 10,
+            "w_dir": 0,
             "w_speed": 30,
             "moisture": 0,
             "heavy_action": [
