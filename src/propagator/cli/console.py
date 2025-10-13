@@ -133,7 +133,7 @@ def _geom_to_custom_str(g) -> str:
         x, y = g.x, g.y
         y_s = f"{y:.15f}".rstrip("0").rstrip(".")
         x_s = f"{x:.15f}".rstrip("0").rstrip(".")
-        return f'POINT:[{y_s}];[{x_s}]'
+        return f'POINT:[{y_s};{x_s}]'
 
     # LineString
     if hasattr(g, "geom_type") and g.geom_type == "LineString":
