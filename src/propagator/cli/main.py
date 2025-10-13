@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal, Optional
 from warnings import warn
+import time
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -126,12 +127,12 @@ class PropagatorCLILegacy(BaseSettings):
 # --- main function -----------------------------------------------------------
 def main():
     simulation_time = datetime.now()
+    start = time.time()
 
     info_msg("Initializing CLI...")
     # pydantic-settings is taking care of it
     cli = PropagatorCLILegacy()  # type: ignore
     ok_msg("CLI initialized")
-    # print(cli.model_dump())
 
     if cli.record:
         basename = (
@@ -146,6 +147,7 @@ def main():
     cfg = cli.build_configuration()
     ok_msg("Configuration loaded")
 
+    info_msg("Setting up data loader...")
     loader: PropagatorInputDataProtocol
     if cli.mode == "tiles":
         # first extract middle point from configuration
@@ -161,7 +163,6 @@ def main():
             mid_lon=mid_lon,
             grid_dim=2000,
         )
-
     elif cli.mode == "geotiff":
         # loader geographic information
         loader = PropagatorDataFromGeotiffs(
@@ -170,13 +171,16 @@ def main():
         )
     else:
         raise ValueError(f"Unknown mode {cli.mode}")
+    ok_msg("Data loader ready")
 
     # Load the data
     dem = loader.get_dem()
     veg = loader.get_veg()
     geo_info = loader.get_geo_info()
     dst_crs = CRS.from_epsg(4326)
+    ok_msg("Static data loaded")
 
+    info_msg("Setting up output writer...")
     raster_writer = GeoTiffWriter(
         start_date=cfg.init_date,
         raster_variables_mapping={
@@ -209,7 +213,9 @@ def main():
         metadata_writer=metadata_writer,
         isochrones_writer=isochrones_writer,
     )
+    ok_msg("Output writer ready")
 
+    info_msg("Setting up simulator...")
     args = dict()
     if cfg.p_time_fn is not None:
         args.update(dict(p_time_fn=cfg.p_time_fn))
@@ -225,14 +231,18 @@ def main():
         out_of_bounds_mode="raise",
         **args,
     )
+    ok_msg("Simulator ready")
 
+    info_msg("Setting up boundary conditions...")
     non_vegetated = cfg.fuel_system.get_non_vegetated()
     boundary_conditions_list = cfg.get_boundary_conditions(
         geo_info, non_vegetated
     )
     for boundary_condition in boundary_conditions_list:
         simulator.set_boundary_conditions(boundary_condition)
+    ok_msg("Boundary conditions set")
 
+    info_msg("Start simulation...")
     while True:
         next_time = simulator.next_time()
         if next_time is None:
@@ -255,6 +265,10 @@ def main():
 
         if simulator.time > cfg.time_limit:
             break
+    ok_msg("Simulation completed")
+
+    end = time.time()
+    info_msg(f"Execution time: {end - start:.2f} seconds")
 
 
 # %%
