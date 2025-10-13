@@ -79,14 +79,14 @@ class PropagatorConfigurationLegacy(BaseModel):
         REALIZATIONS, ge=1, description="Number of realizations"
     )
 
+    # --- models ---
+    p_time_fn: Optional[object] = Field(default=None, exclude=True)
+    p_moist_fn: Optional[object] = Field(default=None, exclude=True)
+
     # --- boundary conditions ---
     boundary_conditions: List[TimedInput] = Field(
         default_factory=list, description="List of boundary conditions"
     )
-
-    # --- models ---
-    p_time_fn: Optional[object] = Field(default=None, exclude=True)
-    p_moist_fn: Optional[object] = Field(default=None, exclude=True)
 
     # ---------- checks ----------
     @field_validator("init_date", mode="before")
