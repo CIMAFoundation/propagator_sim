@@ -281,7 +281,8 @@ class Propagator:
         if boundary_condition.wind_dir is not None:
             # wind direction is given in degrees clockwise, north is 0
             # we need to transform it to radians, counter-clockwise east is 0
-            wind_dir_radians = np.radians(90 - boundary_condition.wind_dir)
+            wind_dir_radians = np.radians(270 - boundary_condition.wind_dir)
+            # then, we normalize to be in [-pi, pi]
             wind_dir_norm = (wind_dir_radians + np.pi) % (2 * np.pi) - np.pi
             event.wind_dir = wind_dir_norm
         if boundary_condition.wind_speed is not None:
