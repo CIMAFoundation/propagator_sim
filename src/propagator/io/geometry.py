@@ -75,10 +75,7 @@ def reproject_geometry(
 
 
 # ---- parsing ---------------------------------------------------------------
-# _POINT_RE = re.compile(
-#     r"""^POINT:\s*(?P<y>-?\d+(?:\.\d+)?)\s*;\s*(?P<x>-?\d+(?:\.\d+)?)\s*$""",
-#     re.IGNORECASE | re.VERBOSE,
-# )
+
 
 _POINT_RE = re.compile(
     r"""
