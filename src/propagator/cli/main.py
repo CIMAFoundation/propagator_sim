@@ -16,7 +16,8 @@ from propagator.cli.console import (
     ok_msg,
     setup_console,
     print_model_table,
-    print_boundary_conditions_table
+    print_boundary_conditions_table,
+    status_propagator_msg
 )
 from propagator.core import Propagator, PropagatorOutOfBoundsError
 from propagator.core.numba import fuelsystem_from_dict, FUEL_SYSTEM_LEGACY
@@ -312,11 +313,12 @@ def main():
             break
         finally:
             if simulator.time % cfg.time_resolution == 0:
-                ref_date = cfg.init_date + timedelta(
-                    minutes=int(simulator.time)
-                )
-                info_msg(f"Time: {simulator.time} -> {ref_date}")
                 output = simulator.get_output()
+                status_propagator_msg(
+                    cfg.init_date,
+                    int(simulator.time),
+                    output.stats
+                )
                 # Save the output to the specified folder
                 writer.write_output(output)
 

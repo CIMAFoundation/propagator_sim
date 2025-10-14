@@ -10,8 +10,11 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
-
 from rich.traceback import install as rich_traceback_install
+
+from datetime import datetime, timedelta
+from propagator.core.models import PropagatorStats
+
 
 # Pretty tracebacks for unhandled exceptions
 rich_traceback_install(show_locals=False)
@@ -113,6 +116,27 @@ def error_msg(message: str) -> None:
     get_console().print(
         Panel.fit(Text(message, style="bold red"), border_style="red")
     )
+
+
+def status_propagator_msg(
+    init_date: datetime,
+    time: int,
+    stats: PropagatorStats
+) -> None:
+    """
+    Print a one-line status message with current time and stats.
+    """
+    date_str = (init_date + timedelta(minutes=time)).strftime("%Y-%m-%d %H:%M")
+    msg = (
+        f"Time: {time:4d} min | "
+        f"{date_str}| "
+        f"Active: {stats.n_active} | "
+        f"Mean area: {(stats.area_mean/10000):.2f} ha | "
+        f"Area 50%: {(stats.area_50/10000):.2f} ha | "
+        f"Area 75%: {(stats.area_75/10000):.2f} ha | "
+        f"Area 90%: {(stats.area_90/10000):.2f} ha"
+    )
+    get_console().print(msg)
 
 # ---------- printers ----------
 
