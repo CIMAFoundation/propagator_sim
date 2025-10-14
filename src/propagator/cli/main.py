@@ -68,9 +68,9 @@ class PropagatorCLILegacy(BaseSettings):
         description="Path to output folder where results will be saved",
     )
     isochrones: list[float] = Field(
-        [0.5, 0.75, 0.9, 0.95],
+        [0.5, 0.75, 0.9],
         description="Isochrones thresholds to be saved. \
-            Default: [0.5, 0.75, 0.9, 0.95]",
+            Default: [0.5,0.75,0.9]",
     )
     record: bool = Field(
         False,
