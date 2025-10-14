@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--config",
-                "./example/params.json",
+                "./example/config.json",
                 "--mode",
                 "geotiff",
                 "--output",
@@ -35,7 +35,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--config",
-                "./example/params_actions.json",
+                "./example/config_actions.json",
                 "--mode",
                 "geotiff",
                 "--output",
@@ -58,7 +58,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--config",
-                "./example/params_tiles.json",
+                "./example/config_tiles.json",
                 "--mode",
                 "tiles",
                 "--tilespath",
