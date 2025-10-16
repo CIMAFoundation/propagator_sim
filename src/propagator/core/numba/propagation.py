@@ -45,19 +45,13 @@ NEIGHBOURS = np.array(
         (1, 1),
     ]
 )
-NEIGHBOURS_DISTANCE = np.array([1.414, 1, 1.414, 1, 1, 1.414, 1, 1.414])
-NEIGHBOURS_ANGLE = np.array(
-    [
-        np.pi * 3 / 4,
-        np.pi / 2,
-        np.pi / 4,
-        np.pi,
-        0,
-        -np.pi * 3 / 4,
-        -np.pi / 2,
-        -np.pi / 4,
-    ]
-)
+# calculate the distance to the neighbours in a lattice from NEIGHBOURS
+NEIGHBOURS_DISTANCE = np.sqrt(NEIGHBOURS[:, 0] ** 2 + NEIGHBOURS[:, 1] ** 2)
+# calculate the angle to the neighbours in a lattice from NEIGHBOURS using meteorological convention
+# 0 is north->south, pi/2 is east->west
+NEIGHBOURS_ANGLE = (
+    np.arctan2(NEIGHBOURS[:, 1], -NEIGHBOURS[:, 0]) + np.pi
+) % (2 * np.pi)
 
 
 @jit(cache=True)

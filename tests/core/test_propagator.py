@@ -3,9 +3,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from propagator.core import BoundaryConditions, Propagator
-from propagator.core.models import PropagatorStats, UpdateBatch
-from propagator.core.scheduler import SchedulerEvent
+from propagator.core import BoundaryConditions, Propagator  # type: ignore
+from propagator.core.models import PropagatorStats, UpdateBatch  # type: ignore
+from propagator.core.scheduler import SchedulerEvent  # type: ignore
 
 
 def make_propagator(realizations: int = 2) -> Propagator:
@@ -181,10 +181,10 @@ def test_set_boundary_conditions_enqueue_event():
     np.testing.assert_allclose(
         event.moisture, np.full((2, 2), 0.3, dtype=np.float32)
     )
-    expected_wind_dir = np.array(
+    expected_wind_dir = np.radians(
         [
-            [-np.pi / 2, -np.pi],
-            [np.pi / 2, 0],
+            [0.0, 90.0],
+            [180.0, 270.0],
         ],
         dtype=np.float32,
     )

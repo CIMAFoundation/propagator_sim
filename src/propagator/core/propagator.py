@@ -281,10 +281,8 @@ class Propagator:
         if boundary_condition.wind_dir is not None:
             # wind direction is given in degrees clockwise, north is 0
             # we need to transform it to radians, counter-clockwise east is 0
-            wind_dir_radians = np.radians(270 - boundary_condition.wind_dir)
-            # then, we normalize to be in [-pi, pi]
-            wind_dir_norm = (wind_dir_radians + np.pi) % (2 * np.pi) - np.pi
-            event.wind_dir = wind_dir_norm
+            wind_dir_radians = np.radians(boundary_condition.wind_dir)
+            event.wind_dir = wind_dir_radians
         if boundary_condition.wind_speed is not None:
             # wind speed is given in km/h
             event.wind_speed = boundary_condition.wind_speed
@@ -527,7 +525,7 @@ class Propagator:
             valid_updates = self._filter_valid_updates(scheduler_event.updates)
             self._apply_updates(new_time, valid_updates)
 
-            if self.out_of_bounds_mode == "error":
+            if self.out_of_bounds_mode == "raise":
                 self._check_out_of_bounds(valid_updates)
 
             self._calculate_next_updates(valid_updates)
