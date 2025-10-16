@@ -15,9 +15,9 @@ import numpy.typing as npt
 
 from propagator.core.constants import (
     CELLSIZE,
+    MOISTURE_MODEL_DEFAULT,
     REALIZATIONS,
     ROS_DEFAULT,
-    MOISTURE_MODEL_DEFAULT
 )
 from propagator.core.models import (
     BoundaryConditions,
@@ -202,7 +202,7 @@ class Propagator:
         Returns
         -------
         numpy.ndarray
-            2D array with mean values where fire has spread; NaN otherwise.
+            2D array with mean values where fire has spread; 0 otherwise.
         """
 
         mask = self.fire > 0
@@ -224,7 +224,7 @@ class Propagator:
             warnings.simplefilter("ignore", category=RuntimeWarning)
             max_values = np.nanmax(the_var, axis=2).astype(np.float32)
 
-        max_values[~mask] = np.nan
+        max_values[~mask] = 0
         return max_values
 
     def compute_stats(
@@ -326,6 +326,8 @@ class Propagator:
         """Apply a batch of burning updates to the state.
         Parameters
         ----------
+        new_time : int
+            The simulation time of the updates.
         updates : UpdateBatch
             Batch of updates to apply at the current time step.
         Returns

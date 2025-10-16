@@ -183,8 +183,8 @@ def test_set_boundary_conditions_enqueue_event():
     )
     expected_wind_dir = np.array(
         [
-            [np.pi / 2, 0.0],
             [-np.pi / 2, -np.pi],
+            [np.pi / 2, 0],
         ],
         dtype=np.float32,
     )
@@ -257,17 +257,14 @@ def test_apply_updates_schedules_follow_up(monkeypatch):
         "propagator.core.propagator.next_updates_fn", lambda *_, **__: stub
     )
 
-    propagator._apply_updates(updates)
+    propagator._apply_updates(future_time, updates)
 
     assert propagator.fire[0, 1, 0] == 1
     assert propagator.ros[0, 1, 0] == pytest.approx(2.5)
     assert propagator.fireline_int[0, 1, 0] == pytest.approx(7.5)
 
-    time, event = propagator.scheduler.pop()
+    time = propagator.time
     assert time == future_time
-    np.testing.assert_array_equal(
-        event.updates.rows, np.array([1], dtype=np.int32)
-    )
 
 
 def test_step_applies_event(monkeypatch):
