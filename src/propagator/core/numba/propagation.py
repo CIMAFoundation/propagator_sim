@@ -65,9 +65,9 @@ def fire_spotting(
     Parameters
     ----------
     angle : float
-        The angle of the ember's trajectory (radians between [-π, π], 0 is east->west)
+        The angle of the ember's trajectory (clockwise radians, 0 is north -> south)
     w_dir : float
-        The wind direction (radians between [-π, π], 0 is east->west)
+        The wind direction (clockwise radians, 0 is north -> south)
     w_speed : float
         The wind speed (km/h)
 
@@ -118,7 +118,7 @@ def compute_spotting(
     fire : npt.NDArray[np.int8]
         The fire state array
     wind_dir : float
-        The wind direction (radians between [-π, π], 0 is east->west)
+        The wind direction (clockwise radians, 0 is north -> south)
     wind_speed : float
         The wind speed (km/h)
     fuels : FuelSystem
@@ -225,11 +225,11 @@ def calculate_fire_behavior(
     dist : float
         The distance to the target cell (m).
     angle : float
-        The angle to the target cell (radians between [-π, π], 0 is east->west).
+        The angle to the target cell (clockwise radians, 0 is north -> south).
     moisture : float
         The moisture content of the fuel (fraction).
     w_dir : float
-        The wind direction (radians between [-π, π], 0 is east->west).
+        The wind direction (clockwise radians, 0 is north -> south).
     w_speed : float
         The wind speed (km/h).
     p_time_fn: Any

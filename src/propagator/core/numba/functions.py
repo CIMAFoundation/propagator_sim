@@ -141,13 +141,13 @@ def p_time_rothermel(
     dh : float
         Elevation difference between source and neighbor cells. (m)
     angle : float
-        Direction to neighbor (radians between [-π, π], 0 is east->west)
+        Direction to neighbor (clockwise radians, 0 is north -> south)
     dist : float
         Distance between cells (m).
     moist : float
         Moisture values (fraction).
     w_dir : float
-        Wind direction (radians between [-π, π], 0 is east->west).
+        Wind direction (clockwise radians, 0 is north -> south).
     w_speed : float
         Wind speed (km/h).
 
@@ -210,13 +210,13 @@ def p_time_wang(
     dh : float
         Elevation at source and neighbor cells.
     angle : float
-        Direction to neighbor (radians between [-π, π], 0 is east->west).
+        Direction to neighbor (clockwise radians, 0 is north -> south).
     dist : float
         Distance to neighbour cell (m).
     moist : float
         Moisture values (fractional).
     w_dir : float
-        Wind direction (radians between [-π, π], 0 is east->west).
+        Wind direction (clockwise radians, 0 is north -> south).
     w_speed : float
         Wind speed (km/h).
 
@@ -277,13 +277,13 @@ def p_time_standard(
     dh : float
         Elevation difference between source and neighbor cells.
     angle : float
-        Direction to neighbor (radians between [-π, π], 0 is east->west).
+        Direction to neighbor (clockwise radians, 0 is north -> south).
     dist : float
         Distance to neighbor (m).
     moist : float
         Moisture values (%).
     w_dir : float
-        Wind direction (radians between [-π, π], 0 is east->west).
+        Wind direction (clockwise radians, 0 is north -> south).
     w_speed : float
         Wind speed (km/h).
 
@@ -316,11 +316,11 @@ def w_h_effect(
     Parameters
     ----------
     angle : float
-        The angle to the neighboring pixel (radians between [-π, π], 0 is east->west).
+        The angle to the neighboring pixel (clockwise radians, 0 is north -> south).
     w_speed : float
         The wind speed (km/h).
     w_dir : float
-        The wind direction (radians between [-π, π], 0 is east->west).
+        The wind direction (clockwise radians, 0 is north -> south).
     dh : float
         The elevation difference between source and neighbor cells (meters).
     dist : float
@@ -360,11 +360,11 @@ def w_h_effect_on_probability(
     Parameters
     ----------
     angle : float
-        The angle to the neighboring pixel (radians between [-π, π], 0 is east->west).
+        The angle to the neighboring pixel (clockwise radians, 0 is north -> south).
     w_speed : float
         The wind speed (km/h).
     w_dir : float
-        The wind direction (radians between [-π, π], 0 is east->west).
+        The wind direction (clockwise radians, 0 is north -> south).
     dh : float
         The elevation difference between source and neighbor cells (meters).
     dist : float
@@ -508,11 +508,11 @@ def get_probability_to_neighbour(
     Parameters
     ----------
     angle: float
-        The angle to the neighboring pixel (radians between [-π, π], 0 is east->west).
+        The angle to the neighboring pixel (clockwise radians, 0 is north -> south).
     dist: float
         The distance to the neighboring pixel (meters).
     w_dir: float
-        The wind direction (radians between [-π, π], 0 is east->west).
+        The wind direction (clockwise radians, 0 is north -> south).
     w_speed: float
         The wind speed (km/h).
     moisture: float
