@@ -8,7 +8,7 @@ intensity utilities used by the core propagator.
 from typing import Any, Literal
 
 import numpy as np
-from numba import jit
+from numba import jit  # type: ignore
 
 # constants for wind/slope effect
 D1 = 0.5
@@ -74,23 +74,6 @@ def clip(x: float, min: float, max: float) -> float:
     if x > max:
         return max
     return x
-
-
-@jit(cache=True)
-def normalize(angle_to_norm: float) -> float:
-    """Normalize an angle to the interval [-pi, pi).
-
-    Parameters
-    ----------
-    angle_to_norm : float
-        Angle to normalize (radians).
-
-    Returns
-    -------
-    float
-        Normalized angle (radians).
-    """
-    return (angle_to_norm + np.pi) % (2 * np.pi) - np.pi  # type: ignore[return-value]
 
 
 def get_p_time_fn(ros_model_code: RateOfSpreadModel) -> Any:
@@ -353,7 +336,7 @@ def w_h_effect(
     )
     a = (w_effect_module - 1) / 4
     w_effect_on_direction = (
-        (a + 1) * (1 - a**2) / (1 - a * np.cos(normalize(w_dir - angle)))
+        (a + 1) * (1 - a**2) / (1 - a * np.cos(w_dir - angle))
     )
     slope = dh / dist
     h_effect = 2 ** (np.tanh((slope * 3) ** 2.0 * np.sign(slope)))

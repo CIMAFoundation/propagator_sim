@@ -1,10 +1,12 @@
+from typing import Literal
+
 TICK_PRECISION = 10
 CELLSIZE = 20  # [m]
 REALIZATIONS = 100
 
 # --- DEFAULT MODELS ---
-ROS_DEFAULT = "wang"
-MOISTURE_MODEL_DEFAULT = "trucchia"
+ROS_DEFAULT: Literal["wang", "rothermel"] = "wang"
+MOISTURE_MODEL_DEFAULT: Literal["trucchia", "baghino"] = "trucchia"
 
 
 # --- FUEL SYSTEM LEGACY ---
