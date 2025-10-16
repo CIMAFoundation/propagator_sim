@@ -14,7 +14,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.21">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.22">
     
     
       
@@ -22,7 +22,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.2a3383ac.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.84d31ad4.min.css">
       
       
 
@@ -445,15 +445,6 @@
   <a href="#propagator.core.numba.functions.clip" class="md-nav__link">
     <span class="md-ellipsis">
       clip
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#propagator.core.numba.functions.normalize" class="md-nav__link">
-    <span class="md-ellipsis">
-      normalize
     </span>
   </a>
   
@@ -1363,7 +1354,7 @@ including ember spotting and cell updates.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The angle of the ember's trajectory (radians between [-π, π], 0 is east-&gt;west)</p>
+                <p>The angle of the ember's trajectory (clockwise radians, 0 is north -&gt; south)</p>
               </div>
             </td>
             <td>
@@ -1379,7 +1370,7 @@ including ember spotting and cell updates.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The wind direction (radians between [-π, π], 0 is east-&gt;west)</p>
+                <p>The wind direction (clockwise radians, 0 is north -&gt; south)</p>
               </div>
             </td>
             <td>
@@ -1547,7 +1538,7 @@ including ember spotting and cell updates.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The wind direction (radians between [-π, π], 0 is east-&gt;west)</p>
+                <p>The wind direction (clockwise radians, 0 is north -&gt; south)</p>
               </div>
             </td>
             <td>
@@ -1716,7 +1707,7 @@ including ember spotting and cell updates.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The angle to the target cell (radians between [-π, π], 0 is east-&gt;west).</p>
+                <p>The angle to the target cell (clockwise radians, 0 is north -&gt; south).</p>
               </div>
             </td>
             <td>
@@ -1748,7 +1739,7 @@ including ember spotting and cell updates.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The wind direction (radians between [-π, π], 0 is east-&gt;west).</p>
+                <p>The wind direction (clockwise radians, 0 is north -&gt; south).</p>
               </div>
             </td>
             <td>
@@ -2504,78 +2495,6 @@ intensity utilities used by the core propagator.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="propagator.core.numba.functions.normalize" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">normalize</span><span class="p">(</span><span class="n">angle_to_norm</span><span class="p">)</span></code>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Normalize an angle to the interval [-pi, pi).</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>angle_to_norm</code>
-            </td>
-            <td>
-                  <code><span title="float">float</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Angle to normalize (radians).</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="float">float</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Normalized angle (radians).</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h3 id="propagator.core.numba.functions.get_p_time_fn" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">get_p_time_fn</span><span class="p">(</span><span class="n">ros_model_code</span><span class="p">)</span></code>
 
@@ -2783,7 +2702,7 @@ intensity utilities used by the core propagator.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Direction to neighbor (radians between [-π, π], 0 is east-&gt;west)</p>
+                <p>Direction to neighbor (clockwise radians, 0 is north -&gt; south)</p>
               </div>
             </td>
             <td>
@@ -2831,7 +2750,7 @@ intensity utilities used by the core propagator.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Wind direction (radians between [-π, π], 0 is east-&gt;west).</p>
+                <p>Wind direction (clockwise radians, 0 is north -&gt; south).</p>
               </div>
             </td>
             <td>
@@ -2951,7 +2870,7 @@ intensity utilities used by the core propagator.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Direction to neighbor (radians between [-π, π], 0 is east-&gt;west).</p>
+                <p>Direction to neighbor (clockwise radians, 0 is north -&gt; south).</p>
               </div>
             </td>
             <td>
@@ -2999,7 +2918,7 @@ intensity utilities used by the core propagator.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Wind direction (radians between [-π, π], 0 is east-&gt;west).</p>
+                <p>Wind direction (clockwise radians, 0 is north -&gt; south).</p>
               </div>
             </td>
             <td>
@@ -3119,7 +3038,7 @@ intensity utilities used by the core propagator.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Direction to neighbor (radians between [-π, π], 0 is east-&gt;west).</p>
+                <p>Direction to neighbor (clockwise radians, 0 is north -&gt; south).</p>
               </div>
             </td>
             <td>
@@ -3167,7 +3086,7 @@ intensity utilities used by the core propagator.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Wind direction (radians between [-π, π], 0 is east-&gt;west).</p>
+                <p>Wind direction (clockwise radians, 0 is north -&gt; south).</p>
               </div>
             </td>
             <td>
@@ -3255,7 +3174,7 @@ intensity utilities used by the core propagator.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The angle to the neighboring pixel (radians between [-π, π], 0 is east-&gt;west).</p>
+                <p>The angle to the neighboring pixel (clockwise radians, 0 is north -&gt; south).</p>
               </div>
             </td>
             <td>
@@ -3287,7 +3206,7 @@ intensity utilities used by the core propagator.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The wind direction (radians between [-π, π], 0 is east-&gt;west).</p>
+                <p>The wind direction (clockwise radians, 0 is north -&gt; south).</p>
               </div>
             </td>
             <td>
@@ -3392,7 +3311,7 @@ This is derived from <code>w_h_effect</code> by scaling the output non linearly.
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The angle to the neighboring pixel (radians between [-π, π], 0 is east-&gt;west).</p>
+                <p>The angle to the neighboring pixel (clockwise radians, 0 is north -&gt; south).</p>
               </div>
             </td>
             <td>
@@ -3424,7 +3343,7 @@ This is derived from <code>w_h_effect</code> by scaling the output non linearly.
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The wind direction (radians between [-π, π], 0 is east-&gt;west).</p>
+                <p>The wind direction (clockwise radians, 0 is north -&gt; south).</p>
               </div>
             </td>
             <td>
@@ -3878,7 +3797,7 @@ heating value and FFMC.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The angle to the neighboring pixel (radians between [-π, π], 0 is east-&gt;west).</p>
+                <p>The angle to the neighboring pixel (clockwise radians, 0 is north -&gt; south).</p>
               </div>
             </td>
             <td>
@@ -3910,7 +3829,7 @@ heating value and FFMC.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The wind direction (radians between [-π, π], 0 is east-&gt;west).</p>
+                <p>The wind direction (clockwise radians, 0 is north -&gt; south).</p>
               </div>
             </td>
             <td>

@@ -14,7 +14,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.21">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.22">
     
     
       
@@ -22,7 +22,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.2a3383ac.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.84d31ad4.min.css">
       
       
 
@@ -407,33 +407,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#propagator.core.Propagator.apply_updates" class="md-nav__link">
-    <span class="md-ellipsis">
-      apply_updates
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#propagator.core.Propagator.decay_actions_moisture" class="md-nav__link">
-    <span class="md-ellipsis">
-      decay_actions_moisture
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#propagator.core.Propagator.get_moisture" class="md-nav__link">
-    <span class="md-ellipsis">
-      get_moisture
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#propagator.core.Propagator.step" class="md-nav__link">
     <span class="md-ellipsis">
       step
@@ -462,6 +435,15 @@
         
       </ul>
     </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.PropagatorOutOfBoundsError" class="md-nav__link">
+    <span class="md-ellipsis">
+      PropagatorOutOfBoundsError
+    </span>
+  </a>
   
 </li>
         
@@ -789,7 +771,7 @@
 
 
 <h3 id="propagator.core.Propagator" class="doc doc-heading">
-              <code class="highlight language-python"><span class="n">Propagator</span><span class="p">(</span><span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">fuels</span><span class="o">=</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">FUEL_SYSTEM_LEGACY</span><span class="p">)(),</span> <span class="n">cellsize</span><span class="o">=</span><span class="n">CELLSIZE</span><span class="p">,</span> <span class="n">do_spotting</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">realizations</span><span class="o">=</span><span class="n">REALIZATIONS</span><span class="p">,</span> <span class="n">p_time_fn</span><span class="o">=</span><span class="n">get_p_time_fn</span><span class="p">(</span><span class="s1">&#39;wang&#39;</span><span class="p">),</span> <span class="n">p_moist_fn</span><span class="o">=</span><span class="n">get_p_moisture_fn</span><span class="p">(</span><span class="s1">&#39;trucchia&#39;</span><span class="p">))</span></code>
+              <code class="highlight language-python"><span class="n">Propagator</span><span class="p">(</span><span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">fuels</span><span class="o">=</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">FUEL_SYSTEM_LEGACY</span><span class="p">)(),</span> <span class="n">cellsize</span><span class="o">=</span><span class="n">CELLSIZE</span><span class="p">,</span> <span class="n">do_spotting</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">realizations</span><span class="o">=</span><span class="n">REALIZATIONS</span><span class="p">,</span> <span class="n">p_time_fn</span><span class="o">=</span><span class="n">get_p_time_fn</span><span class="p">(</span><span class="n">ROS_DEFAULT</span><span class="p">),</span> <span class="n">p_moist_fn</span><span class="o">=</span><span class="n">get_p_moisture_fn</span><span class="p">(</span><span class="n">MOISTURE_MODEL_DEFAULT</span><span class="p">),</span> <span class="n">out_of_bounds_mode</span><span class="o">=</span><span class="s1">&#39;raise&#39;</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
@@ -909,6 +891,18 @@ Units are compliant with other functions.
                 <p>The function to compute the moisture probability (must be jit-compiled)
 Units are compliant with other functions.
     signature: (moist: float) -&gt; float</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.Propagator.out_of_bounds_mode">out_of_bounds_mode</span></code></td>
+            <td>
+                  <code>(<span title="typing.Literal">Literal</span>[&#39;ignore&#39;, &#39;error&#39;], <span title="optional">optional</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to raise an error if out-of-bounds updates are detected.
+Default is "error".</p>
               </div>
             </td>
           </tr>
@@ -1229,7 +1223,7 @@ ignoring zeros as no-spread.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Externally apply boundary conditions at desired time.</p>
+        <p>Externally set boundary conditions at desired time in the scheduler.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1265,121 +1259,6 @@ ignoring zeros as no-spread.</p>
           </tr>
       </tbody>
     </table>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h4 id="propagator.core.Propagator.apply_updates" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">apply_updates</span><span class="p">(</span><span class="n">updates</span><span class="p">)</span></code>
-
-</h4>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Apply a batch of burning updates and schedule new ones.</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>updates</code>
-            </td>
-            <td>
-                  <code><span title="list">list</span>[<span title="numpy.ndarray">ndarray</span>] | <span title="numpy.ndarray">ndarray</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Coordinates to activate as burning, each as
-[row, col, realization].</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="list">list</span>[<span title="tuple">tuple</span>[<span title="float">float</span>, <span title="numpy.ndarray">ndarray</span>]]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Pairs of (time, array[n, 3]) for future updates to schedule.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h4 id="propagator.core.Propagator.decay_actions_moisture" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">decay_actions_moisture</span><span class="p">(</span><span class="n">time_delta</span><span class="p">,</span> <span class="n">decay_factor</span><span class="o">=</span><span class="mf">0.01</span><span class="p">)</span></code>
-
-</h4>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Decay the actions moisture over time.</p>
-<p>Args:
-    time_delta (int): Elapsed simulation time since last step.
-    decay_factor (float): Per-unit-time fractional decay in [0, 1].</p>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h4 id="propagator.core.Propagator.get_moisture" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">get_moisture</span><span class="p">()</span></code>
-
-</h4>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Get the fuel moisture at the current time step.</p>
-<p>Returns:
-    np.ndarray: Base moisture plus action-derived increments,
-    clipped to [0, 1].</p>
 
 
     </div>
@@ -1450,6 +1329,36 @@ time and update state.</p>
 
 
   </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.PropagatorOutOfBoundsError" class="doc doc-heading">
+            <code>PropagatorOutOfBoundsError</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="Exception">Exception</span></code></p>
+
+
+        <p>Custom error for out-of-bounds updates in the Propagator.</p>
+
+
+
+
+
+
+
+
 
     </div>
 
