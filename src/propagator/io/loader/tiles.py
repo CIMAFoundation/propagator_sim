@@ -145,8 +145,8 @@ class PropagatorDataFromTiles(PropagatorInputDataProtocol):
         stem = f"{var}_{tile_j}_{tile_i}"
         zone_dir = self._zone_dir(zone_number, tileset)
         loaders = (
-            (zone_dir / f"{stem}.mat", self._read_mat_tile),
             (zone_dir / f"{stem}.tif", self._read_tif_tile),
+            (zone_dir / f"{stem}.mat", self._read_mat_tile),
         )
 
         for path, loader in loaders:
