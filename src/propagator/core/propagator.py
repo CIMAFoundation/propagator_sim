@@ -93,8 +93,8 @@ class Propagator:
 
     # simulation settings
     cellsize: float = field(default=CELLSIZE)
-    do_spotting: bool = False
-    realizations: int = REALIZATIONS
+    do_spotting: bool = field(default=False)
+    realizations: int = field(default=REALIZATIONS)
 
     # selected simulation functions
     p_time_fn: Any = field(default=get_p_time_fn(ROS_DEFAULT))

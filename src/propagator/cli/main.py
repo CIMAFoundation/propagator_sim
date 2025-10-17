@@ -1,12 +1,12 @@
 import json
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Literal, Optional, Mapping
-from warnings import warn
-import time
 import os
-import yaml
+import time
+from datetime import datetime
+from pathlib import Path
+from typing import Literal, Mapping, Optional
+from warnings import warn
 
+import yaml
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pyproj import CRS
@@ -14,13 +14,13 @@ from pyproj import CRS
 from propagator.cli.console import (
     info_msg,
     ok_msg,
-    setup_console,
-    print_model_table,
     print_boundary_conditions_table,
-    status_propagator_msg
+    print_model_table,
+    setup_console,
+    status_propagator_msg,
 )
 from propagator.core import Propagator, PropagatorOutOfBoundsError
-from propagator.core.numba import fuelsystem_from_dict, FUEL_SYSTEM_LEGACY
+from propagator.core.numba import FUEL_SYSTEM_LEGACY, fuelsystem_from_dict
 from propagator.core.numba.models import FuelSystem
 from propagator.io.configuration import PropagatorConfigurationLegacy
 from propagator.io.loader.geotiff import PropagatorDataFromGeotiffs
@@ -170,7 +170,7 @@ def fuels_from_yaml(path: str | Path) -> FuelSystem:
 
 
 # --- main function -----------------------------------------------------------
-def main():
+def main() -> None:
     simulation_time = datetime.now()
     start = time.time()
 
@@ -204,7 +204,9 @@ def main():
     ok_msg("Fuel system ready")
 
     info_msg("Setting up data loader...")
-    loader: PropagatorInputDataProtocol
+
+    loader: PropagatorInputDataProtocol | None = None
+
     if cli.mode == "tiles":
         # first extract middle point from configuration
         mid_point = cfg.get_ignitions_middle_point()
@@ -226,7 +228,8 @@ def main():
             veg_file=str(cli.fuel),
         )
     else:
-        raise ValueError(f"Unknown mode {cli.mode}")
+        raise ValueError(f"Unknown mode: {cli.mode}")
+
     ok_msg("Data loader ready")
 
     # Load the data
@@ -272,11 +275,6 @@ def main():
     ok_msg("Output writer ready")
 
     info_msg("Setting up simulator...")
-    args = dict()
-    if cfg.p_time_fn is not None:
-        args.update(dict(p_time_fn=cfg.p_time_fn))
-    if cfg.p_moist_fn is not None:
-        args.update(dict(p_moist_fn=cfg.p_moist_fn))
 
     simulator = Propagator(
         dem=dem,
@@ -285,7 +283,8 @@ def main():
         fuels=fuel_system,
         do_spotting=cfg.do_spotting,
         out_of_bounds_mode="raise",
-        **args,
+        p_time_fn=cfg.p_time_fn if cfg.p_time_fn is not None else None,
+        p_moist_fn=cfg.p_moist_fn if cfg.p_moist_fn is not None else None,
     )
     ok_msg("Simulator ready")
 
@@ -315,9 +314,7 @@ def main():
             if simulator.time % cfg.time_resolution == 0:
                 output = simulator.get_output()
                 status_propagator_msg(
-                    cfg.init_date,
-                    int(simulator.time),
-                    output.stats
+                    cfg.init_date, int(simulator.time), output.stats
                 )
                 # Save the output to the specified folder
                 writer.write_output(output)

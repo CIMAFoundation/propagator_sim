@@ -37,7 +37,7 @@ for boundary_condition in boundary_conditions_list:
     simulator.set_boundary_conditions(boundary_condition)
 
 start_time = time()
-while simulator.time < 3600:
+while simulator.time < 3600 * 60:
     next_time = simulator.next_time()
     if next_time is None:
         break
@@ -45,7 +45,7 @@ while simulator.time < 3600:
     step_time_init = time()
     simulator.step()
     step_time_end = time()
-    if simulator.time % 60 == 0:
+    if simulator.time % 3600 == 0:
         print(
             f"Time: {simulator.time} | elapsed: {step_time_end - step_time_init} seconds"
         )

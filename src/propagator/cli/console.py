@@ -127,7 +127,7 @@ def status_propagator_msg(
         "%Y-%m-%d %H:%M:%S"
     )
     msg = (
-        f"Time: {time:5d} s | "
+        f"Time: {timedelta(seconds=time)} | "
         f"{date_str} | "
         f"Active: {stats.n_active} | "
         f"Mean area: {(stats.area_mean / 10000):.2f} ha | "
