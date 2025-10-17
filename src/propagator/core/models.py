@@ -165,7 +165,7 @@ class BoundaryConditions:
     Attributes
     ----------
     time : int
-        Simulation time the conditions refer to.
+        Simulation time the conditions refer to (seconds from simulation start).
     moisture : Optional[npt.NDArray[np.floating]]
         Fuel moisture map (%).
     wind_dir : Optional[npt.NDArray[np.floating]]
@@ -202,6 +202,7 @@ class PropagatorStats:
     def to_dict(
         self, c_time: int, ref_date: datetime
     ) -> dict[str, float | int | str]:
+        """Serialize stats with the current simulation time expressed in seconds."""
         return dict(
             c_time=c_time,
             ref_date=ref_date.isoformat(),
@@ -217,7 +218,7 @@ class PropagatorStats:
 class PropagatorOutput:
     """Snapshot of simulation outputs at a given time step."""
 
-    time: int
+    time: int  # seconds from simulation start
     fire_probability: npt.NDArray[np.floating]
     ros_mean: npt.NDArray[np.floating]
     ros_max: npt.NDArray[np.floating]

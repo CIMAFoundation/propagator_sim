@@ -4,9 +4,9 @@
         "POINT: [52.51751;-6.82354]"
     ],
     "realizations": 10,
-    "time_limit": 2400,
+    "time_limit": 144000,
     "do_spotting": false,
-    "time_resolution": 60,
+    "time_resolution": 3600,
     "boundary_conditions": [
         {
             "time": 0,

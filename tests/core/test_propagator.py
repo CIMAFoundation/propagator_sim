@@ -220,7 +220,7 @@ def test_decay_actions_moisture_exponential():
     propagator = make_propagator(realizations=1)
     propagator.actions_moisture = np.full((2, 2), 0.5, dtype=np.float32)
 
-    propagator._decay_actions_moisture(time_delta=5, decay_factor=0.1)
+    propagator._decay_actions_moisture(time_delta=5 * 60, decay_factor=0.1)
 
     expected_value = 0.5 * (1 - 0.1) ** 5
     np.testing.assert_allclose(
@@ -296,11 +296,11 @@ def test_step_applies_event(monkeypatch):
             dtype=np.float32,
         ),
     )
-    propagator.scheduler.add_event(3, event)
+    propagator.scheduler.add_event(180, event)
 
     propagator.step()
 
-    assert propagator.time == 3
+    assert propagator.time == 180
     np.testing.assert_allclose(
         propagator.moisture, np.full((2, 2), 0.2, dtype=np.float32)
     )

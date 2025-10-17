@@ -34,7 +34,7 @@ class TimedInput(BaseModel):
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
-    time: int = Field(0, description="minutes from simulation start")
+    time: int = Field(0, description="seconds from simulation start")
 
     # Weather conditions
     w_dir: Optional[float] = Field(

@@ -15,9 +15,9 @@ from shapely import Geometry
 
 from propagator.core.constants import (
     CELLSIZE,
+    MOISTURE_MODEL_DEFAULT,
     REALIZATIONS,
     ROS_DEFAULT,
-    MOISTURE_MODEL_DEFAULT,
 )
 from propagator.core.models import BoundaryConditions
 
@@ -52,7 +52,7 @@ class PropagatorConfigurationLegacy(BaseModel):
         description="Datetime of the simulated event",
     )
     time_limit: int = Field(
-        1440, gt=0, description="Simulation limit [minutes]"
+        24 * 3600, gt=0, description="Simulation limit [seconds]"
     )
     ignitions: Optional[List[Geometry]] = Field(
         None, description="List of ignitions at simulation start (time=0)."
@@ -64,14 +64,15 @@ class PropagatorConfigurationLegacy(BaseModel):
 
     # --- settings ---
     time_resolution: int = Field(
-        60, gt=0, description="Simulation resolution [minutes]"
+        60 * 60, gt=0, description="Simulation resolution [seconds]"
     )
     cellsize: float = Field(
         CELLSIZE, gt=0.0, description="Cell size in meters"
     )
     do_spotting: bool = Field(False, description="Spotting option")
     ros_model: RateOfSpreadModel = Field(
-        ROS_DEFAULT, description="ROS model name")
+        ROS_DEFAULT, description="ROS model name"
+    )
     prob_moist_model: MoistureModel = Field(
         MOISTURE_MODEL_DEFAULT, description="Moisture model name"
     )

@@ -2,19 +2,18 @@ from __future__ import annotations
 
 import atexit
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Any, Iterable
-from pydantic import BaseModel
+from typing import Any, Iterable, Optional
 
+from pydantic import BaseModel
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 from rich.text import Text
 from rich.traceback import install as rich_traceback_install
 
-from datetime import datetime, timedelta
 from propagator.core.models import PropagatorStats
-
 
 # Pretty tracebacks for unhandled exceptions
 rich_traceback_install(show_locals=False)
@@ -119,24 +118,25 @@ def error_msg(message: str) -> None:
 
 
 def status_propagator_msg(
-    init_date: datetime,
-    time: int,
-    stats: PropagatorStats
+    init_date: datetime, time: int, stats: PropagatorStats
 ) -> None:
     """
     Print a one-line status message with current time and stats.
     """
-    date_str = (init_date + timedelta(minutes=time)).strftime("%Y-%m-%d %H:%M")
+    date_str = (init_date + timedelta(seconds=time)).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
     msg = (
-        f"Time: {time:4d} min | "
-        f"{date_str}| "
+        f"Time: {time:5d} s | "
+        f"{date_str} | "
         f"Active: {stats.n_active} | "
-        f"Mean area: {(stats.area_mean/10000):.2f} ha | "
-        f"Area 50%: {(stats.area_50/10000):.2f} ha | "
-        f"Area 75%: {(stats.area_75/10000):.2f} ha | "
-        f"Area 90%: {(stats.area_90/10000):.2f} ha"
+        f"Mean area: {(stats.area_mean / 10000):.2f} ha | "
+        f"Area 50%: {(stats.area_50 / 10000):.2f} ha | "
+        f"Area 75%: {(stats.area_75 / 10000):.2f} ha | "
+        f"Area 90%: {(stats.area_90 / 10000):.2f} ha"
     )
     get_console().print(msg)
+
 
 # ---------- printers ----------
 
@@ -145,6 +145,7 @@ def _geom_to_custom_str(g) -> str:
     """
     Return geometry as 'TYPE:[y1 y2 ...];[x1 x2 ...]'.
     """
+
     def _yx_lists_from_coords(coords):
         xs, ys = zip(*coords)  # shapely gives (x, y)
         # we want y first then x
@@ -157,17 +158,17 @@ def _geom_to_custom_str(g) -> str:
         x, y = g.x, g.y
         y_s = f"{y:.15f}".rstrip("0").rstrip(".")
         x_s = f"{x:.15f}".rstrip("0").rstrip(".")
-        return f'POINT:[{y_s};{x_s}]'
+        return f"POINT:[{y_s};{x_s}]"
 
     # LineString
     if hasattr(g, "geom_type") and g.geom_type == "LineString":
         ys_s, xs_s = _yx_lists_from_coords(g.coords)
-        return f'LINE:[{ys_s}];[{xs_s}]'
+        return f"LINE:[{ys_s}];[{xs_s}]"
 
     # Polygon (use exterior ring)
     if hasattr(g, "geom_type") and g.geom_type == "Polygon":
         ys_s, xs_s = _yx_lists_from_coords(g.exterior.coords)
-        return f'POLYGON:[{ys_s}];[{xs_s}]'
+        return f"POLYGON:[{ys_s}];[{xs_s}]"
 
     # Fallback to str()
     return str(g)
@@ -185,10 +186,13 @@ def _format_actions(actions) -> str:
         return "-"
     lines = []
     for a in actions:
-        a_type = getattr(
-            a,
-            "action_type", type(a)
-        ).__str__().split(".")[-1].replace("ActionType.", "").lower()
+        a_type = (
+            getattr(a, "action_type", type(a))
+            .__str__()
+            .split(".")[-1]
+            .replace("ActionType.", "")
+            .lower()
+        )
         geoms = getattr(a, "geometries", None) or []
         geoms_str = _format_geoms_custom(geoms)
         # one block per action
@@ -197,11 +201,7 @@ def _format_actions(actions) -> str:
     return "\n".join(lines)
 
 
-def print_model_table(
-    cfg: BaseModel,
-    *,
-    title="Title"
-):
+def print_model_table(cfg: BaseModel, *, title="Title"):
     console = get_console()
     table = Table(title=title, show_lines=False)
     table.add_column("Field", style="bold cyan")
@@ -213,8 +213,7 @@ def print_model_table(
         # read current value directly from the instance
         value = getattr(cfg, name, None)
         if name == "ignitions":
-            value_str = "-" if not value else \
-                        _format_geoms_custom(value)
+            value_str = "-" if not value else _format_geoms_custom(value)
         else:
             value_str = str(value) if value is not None else "None"
         table.add_row(name, value_str)
@@ -233,16 +232,11 @@ def print_boundary_conditions_table(
     """
     console = get_console()
     t = Table(title=title, show_lines=True)
-    t.add_column(
-        "time [min]", justify="right", style="bold cyan", no_wrap=True
-    )
+    t.add_column("time [s]", justify="right", style="bold cyan", no_wrap=True)
     t.add_column("w_dir [°]", justify="right", no_wrap=True)
     t.add_column("w_speed [km/h]", justify="right", no_wrap=True)
     t.add_column("moisture [%]", justify="right", no_wrap=True)
-    t.add_column(
-        "actions",
-        overflow="fold", style="magenta"
-    )
+    t.add_column("actions", overflow="fold", style="magenta")
     t.add_column("ignitions", overflow="fold", style="green")
 
     for ti in bcs:

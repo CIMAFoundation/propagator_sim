@@ -26,5 +26,7 @@ uv run propagator --help
 Example with sample data:
 
 ```bash
-uv run propagator -f ./example/params.json -of ./example/output -tl 24 -dem ./example/dem.tif -veg ./example/veg.tif
+uv run propagator -f ./example/params.json -of ./example/output -tl 86400 -dem ./example/dem.tif -veg ./example/veg.tif
 ```
+
+> Time-related configuration values and CLI switches expect seconds (e.g., `-tl 86400` for 24 hours).

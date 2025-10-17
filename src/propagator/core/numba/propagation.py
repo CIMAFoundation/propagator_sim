@@ -74,21 +74,23 @@ def fire_spotting(
     Returns
     -------
     tuple[float, float]
-        The spotting distance (meters) and the landing time (minutes)
+        The spotting distance (meters) and the landing time (seconds)
     """
     r_n = normal(
         SPOTTING_RN_MEAN, SPOTTING_RN_STD
     )  # main thrust of the ember: sampled from a
     # Gaussian Distribution (Alexandridis et al, 2008 and 2011)
     w_speed_ms = w_speed / 3.6  # wind speed [m/s]
+    if w_speed_ms <= 0:
+        return 0.0, 1.0
     # Alexandridis' formulation for spotting distance
     ember_distance = r_n * np.exp(
         w_speed_ms
         * FIRE_SPOTTING_DISTANCE_COEFFICIENT
         * (np.cos(w_dir - angle) - 1)
     )
-    ember_landing_time_min = int(ember_distance / w_speed_ms / 60)
-    return ember_distance, ember_landing_time_min
+    ember_landing_time_sec = ember_distance / w_speed_ms
+    return ember_distance, ember_landing_time_sec
 
 
 @jit(cache=True, nopython=True, fastmath=True)
@@ -192,7 +194,7 @@ def compute_spotting(
         if uniform() > P_c:
             continue
 
-        ember_landing_time = max(ember_landing_time, 1)
+        ember_landing_time = max(int(ember_landing_time), 1)
 
         spotting_update = (ember_landing_time, row_to, col_to, np.nan, np.nan)
         spotting_updates.append(spotting_update)

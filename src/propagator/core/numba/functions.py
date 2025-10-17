@@ -87,7 +87,7 @@ def get_p_time_fn(ros_model_code: RateOfSpreadModel) -> Any:
     Returns
     --------
         function with signature
-        `(v0, dem_from, dem_to, angle_to, dist, moist, w_dir, w_speed) -> (time, ros)`.
+        `(v0, dem_from, dem_to, angle_to, dist, moist, w_dir, w_speed) -> (time_seconds, ros)`.
     """
     match ros_model_code:
         case "standard":
@@ -154,7 +154,7 @@ def p_time_rothermel(
     Returns
     -------
     tuple[float, float]
-        (transition time [min], ROS [m/min]).
+        (transition time [s], ROS [m/min]).
     """
 
     real_dist = np.sqrt(dist**2 + dh**2)
@@ -188,7 +188,9 @@ def p_time_rothermel(
 
     t = real_dist / v_wh
 
-    return t, v_wh
+    time_seconds = t * 60.0
+
+    return time_seconds, v_wh
 
 
 @jit(cache=True)
@@ -223,7 +225,7 @@ def p_time_wang(
     Returns
     -------
     tuple[numpy.ndarray, numpy.ndarray]
-        (transition time [min], ROS [m/min]).
+        (transition time [s], ROS [m/min]).
     """
     # velocità di base modulata con la densità(tempo di attraversamento)
 
@@ -255,7 +257,9 @@ def p_time_wang(
 
     t = real_dist / v_wh
 
-    return t, v_wh
+    time_seconds = t * 60.0
+
+    return time_seconds, v_wh
 
 
 @jit(cache=True)
@@ -290,7 +294,7 @@ def p_time_standard(
     Returns
     -------
     tuple[float, float]
-        (transition time [min], ROS [m/min]).
+        (transition time [s], ROS [m/min]).
     """
     wh = w_h_effect(angle, w_speed, w_dir, dh, dist)
     moist_eff = np.exp(C_MOIST * moist)  # moisture effect
@@ -299,7 +303,8 @@ def p_time_standard(
 
     real_dist = np.sqrt(dist**2 + dh**2)
     t = real_dist / v_wh
-    return t, v_wh
+    time_seconds = t * 60.0
+    return time_seconds, v_wh
 
 
 @jit(cache=True)
