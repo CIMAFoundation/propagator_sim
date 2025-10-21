@@ -417,8 +417,11 @@ pip install -e .[dev]
 <pre><code class="language-bash">uv run propagator --help
 </code></pre>
 <p>Example with sample data:</p>
-<pre><code class="language-bash">uv run propagator -f ./example/params.json -of ./example/output -tl 24 -dem ./example/dem.tif -veg ./example/veg.tif
+<pre><code class="language-bash">uv run propagator -f ./example/params.json -of ./example/output -tl 86400 -dem ./example/dem.tif -veg ./example/veg.tif
 </code></pre>
+<blockquote>
+<p>Time-related configuration values and CLI switches expect seconds (e.g., <code>-tl 86400</code> for 24 hours).</p>
+</blockquote>
 
 
 

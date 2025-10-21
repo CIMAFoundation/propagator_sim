@@ -336,10 +336,11 @@
 <pre><code class="language-bash">uv run propagator \
   -f ./example/params.json \
   -of ./example/output \
-  -tl 24 \
+  -tl 86400 \
   -dem ./example/dem.tif \
   -veg ./example/veg.tif
 </code></pre>
+<p>All time-related flags (<code>-tl</code>, etc.) are expressed in seconds.</p>
 <p>See <code>propagator_cli/args_parser.py</code> for all flags and their meanings.</p>
 
 

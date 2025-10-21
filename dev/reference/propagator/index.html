@@ -331,6 +331,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="PropagatorStats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.PropagatorStats.to_dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      to_dict
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -616,7 +631,7 @@
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Simulation time the conditions refer to.</p>
+                <p>Simulation time the conditions refer to (seconds from simulation start).</p>
               </div>
             </td>
           </tr>
@@ -757,6 +772,24 @@
 
 
 
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.PropagatorStats.to_dict" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">to_dict</span><span class="p">(</span><span class="n">c_time</span><span class="p">,</span> <span class="n">ref_date</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Serialize stats with the current simulation time expressed in seconds.</p>
+
+
+    </div>
+
+</div>
 
 
 
@@ -1497,7 +1530,7 @@ time and update state.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>(v0, dem_from, dem_to, angle_to, dist, moist, w_dir, w_speed) -&gt; (time, ros)</code>.</p>
+                <p><code>(v0, dem_from, dem_to, angle_to, dist, moist, w_dir, w_speed) -&gt; (time_seconds, ros)</code>.</p>
               </div>
             </td>
           </tr>
