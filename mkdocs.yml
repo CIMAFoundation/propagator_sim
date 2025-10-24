@@ -5,6 +5,7 @@ site_url: ""
 
 theme:
   name: material
+  logo: img/cima.png
   features:
     - navigation.sections
     - navigation.indexes
@@ -19,8 +20,14 @@ extra:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Programmatic Workflow: programmatic.md
   - CLI Usage: cli.md
-  - API Reference: reference/index.md
+  - API Reference:
+      - Overview: reference/index.md
+      - Core: reference/propagator.md
+      - I/O: reference/io.md
+      - Numba Backend: reference/numba.md
+  - Bibliography: bibliography.md
 
 
 plugins:
@@ -46,3 +53,9 @@ plugins:
             show_signature: true
             merge_init_into_class: true
             show_submodules: false          # keep pages focused unless you want them listed
+
+extra_css:
+  - stylesheets/cima-theme.css
+
+extra_javascript:
+  - javascripts/cima-brand.js

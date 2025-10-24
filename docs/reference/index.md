@@ -1,14 +1,12 @@
 # API Reference
 
-Auto-generated reference for the public Python API.
+Auto-generated documentation for the public Python APIs. Each section links to
+mkdocstrings pages generated from the implementations under `src/`.
 
-- Packages covered:
+- [propagator core](propagator.md): high-level simulation interfaces and
+  scheduler utilities.
+- [propagator io](io.md): data loaders, writers, and shared I/O protocols.
+- [numba backend](numba.md): fast kernels and helper utilities powering the
+  simulation engine.
 
-    1. [propagator](propagator.md)
-
-    2. [numba backend](numba.md)
-
-
-- Pages are generated at build time from source under `src/`.
-
-Use the sidebar to navigate modules and subpackages.
+Use the sidebar or the links above to explore additional submodules.
