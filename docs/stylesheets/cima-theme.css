@@ -70,6 +70,11 @@
   flex: 1 1 320px;
 }
 
+.hero__content a {
+  color: rgb(255, 255, 255);
+  text-decoration: underline;
+}
+
 .hero__content h1 {
   margin: 0 0 0.75rem;
   font-size: clamp(2.4rem, 4vw, 3.2rem);

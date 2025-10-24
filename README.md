@@ -1,50 +1,133 @@
-# PROPAGATOR: An Operational Cellular-Automata Based Wildfire Simulator
+# PROPAGATOR: An Operational Cellular-Automata Wildfire Simulator
 
-This repository contains the python implementation of the PROPAGATOR wildfire simulation algorithm, developed by CIMA Research Foundation.
-The package contains the core simulation engine in the `core` module, I/O utilities in the `io` module, and a command line interface (CLI) in the `cli` module.
+PROPAGATOR is an operational wildfire spread model developed by
+[CIMA Research Foundation](https://www.cimafoundation.org). The project couples
+a Numba-accelerated cellular automata core (`propagator.core`), reusable I/O
+pipelines (`propagator.io`), and a configurable CLI for stochastic
+fire propagation modeling. Comprehensive documentation lives under `docs/`, covering quick starts, API reference, and
+programmatic guides.
 
-Link to the research paper: [PROPAGATOR: An Operational Cellular-Automata Based Wildfire Simulator](https://www.mdpi.com/2571-6255/3/3/26)
+## Quick Start
 
-## How to use it as a library
-
-Install the package using pip, poetry, uv or any other tool that can install from a git repository.
-
-```bash
-pip install git+https://github.com/CIMAFOUNDATION/propagator_sim.git
-```
-
-Then, you can use the `propagator` package in your python code.
-This command will install the latest version from the `main` branch. It will resolve to the minimal dependencies for the core simulation engine.
-If you want to use the I/O utilities or the CLI, you need to install the extra dependencies as well.
+Clone the repository and create an environment with the CLI and I/O extras:
 
 ```bash
-pip install git+https://github.com/CIMAFOUNDATION/propagator_sim.git[io,cli]
+uv sync --dev --all-extras
 ```
 
-You can find an example of how to use the package in the `examples/example.py` file.
-
-## How to develop
-
-Clone this repository. Use `uv sync --dev --all-extras` to create a virtual environment and install the required dependencies.
+or, using plain `pip`:
 
 ```bash
-uv sync
+python -m venv .venv
+source .venv/bin/activate
+pip install -e '.[cli,io]'
 ```
 
-## Launch a simulation
+This installs the PROPAGATOR package in editable mode together with the optional
+extras required for raster handling, the CLI, and documentation tooling.
 
+## Running Simulations
+
+Launch the CLI over the bundled GeoTIFF sample:
 
 ```bash
-uv run propagator
+uv run propagator \
+  --config example/config.json \
+  --mode geotiff \
+  --dem example/dem.tif \
+  --fuel example/veg.tif \
+  --output results/quickstart
 ```
 
-See `uv run propagator --help` for command line args.
+See `uv run propagator --help` or `docs/cli.md` for the full argument table.
+
+### Programmatic API
+
+You can embed PROPAGATOR directly into Python workflows:
+
+```python
+import numpy as np
+from propagator.core import BoundaryConditions, FUEL_SYSTEM_LEGACY, Propagator
+
+dem = np.zeros((2000, 2000), dtype=np.float32)
+veg = np.full_like(dem, 5, dtype=np.int32)
+
+sim = Propagator(
+    dem=dem,
+    veg=veg,
+    realizations=10,
+    fuels=FUEL_SYSTEM_LEGACY,
+    do_spotting=False,
+    out_of_bounds_mode="raise",
+)
+
+ignition_mask = np.zeros_like(dem, dtype=np.uint8)
+ignition_mask[dem.shape[0] // 2, dem.shape[1] // 2] = 1
+
+sim.set_boundary_conditions(
+    BoundaryConditions(
+        time=0,
+        ignition_mask=ignition_mask,
+        wind_speed=np.ones_like(dem) * 40,
+        wind_dir=np.ones_like(dem) * 90,
+        moisture=np.zeros_like(dem),
+    )
+)
+
+while (next_time := sim.next_time()) is not None and sim.time <= 3600:
+    sim.step()
+    if sim.time % 600 == 0:
+        fire_prob = sim.compute_fire_probability()
+        # Persist or visualise probability grids here.
+```
+
+For an end-to-end script that mirrors the CLI pipeline (including loaders and
+writers), see `docs/programmatic.md` or the `example/example.py` file.
 
 ## Documentation
 
-This repo uses MkDocs with the Material theme and mkdocstrings for API reference.
+The MkDocs site covers:
 
-- Serve locally: `uv run mkdocs serve`
-- Build static site: `uv run mkdocs build`
+- **Getting Started** (`docs/getting-started.md`): prerequisites, environment
+  setup, quick run instructions, and programmatic usage tips.
+- **CLI Usage** (`docs/cli.md`): operating modes, flag reference, output
+  products, and troubleshooting.
+- **Programmatic Workflow** (`docs/programmatic.md`): loader/writer pipeline
+  example with `propagator.io`.
+- **API Reference** (`docs/reference/`): mkdocstrings pages for the core,
+  I/O, and Numba packages.
+- **Bibliography** (`docs/bibliography.md`): peer-reviewed work describing
+  PROPAGATOR and its operational deployments.
 
-Docs live under `docs/` and are configured by `mkdocs.yml`.
+Serve the docs locally:
+
+```bash
+uv run mkdocs serve
+```
+
+Build the static site:
+
+```bash
+uv run mkdocs build
+```
+
+## How to Contribute
+
+We welcome issues and pull requests! To contribute:
+
+1. Fork the repository and create a feature branch (`git checkout -b feat/xyz`).
+2. Set up the development environment with `uv sync --dev --all-extras`.
+3. Make your changes, keeping module structure and style guidelines in mind.
+4. Run the quality gates before submitting:
+   ```bash
+   uv run ruff check src tests
+   uv run pytest -q
+   uv run mkdocs build
+   ```
+5. Commit using Conventional Commit messages (e.g., `feat(core): add wind bias`).
+6. Open a pull request describing the change, verification steps, and any
+   relevant screenshots or artefacts.
+
+For major features or architectural changes, please open an issue first to
+discuss the proposal. Contributors are encouraged to reference the documentation
+pages above when adding or modifying features.
