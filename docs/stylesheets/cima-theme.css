@@ -3,10 +3,10 @@
   --md-primary-fg-color--light: #1f4f6e;
   --md-primary-fg-color--dark: #001829;
 
-  --md-accent-fg-color: #fdb813;
-  --md-accent-fg-color--light: #ffd56b;
-  --md-accent-fg-color--dark: #c98900;
-  --md-accent-fg-color--transparent: rgba(253, 184, 19, 0.15);
+  --md-accent-fg-color: #dd7600;
+  --md-accent-fg-color--light: #f29b3d;
+  --md-accent-fg-color--dark: #a85400;
+  --md-accent-fg-color--transparent: rgba(221, 118, 0, 0.18);
 
   --md-default-bg-color: #f5f7fa;
   --md-default-fg-color: #1f2d3a;
@@ -47,45 +47,41 @@
 
 .hero {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2.5rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.75rem;
   padding: 2.5rem;
   margin-bottom: 3rem;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #002d4b 0%, #13496b 55%, #021a2c 100%);
+  border-radius: 20px;
+  background: linear-gradient(140deg, #002d4b 0%, #13496b 55%, #021a2c 100%);
   color: #f5fbff;
   box-shadow: 0 18px 40px rgba(0, 45, 75, 0.25);
 }
 
-.hero__media img {
-  max-width: 210px;
-  width: 100%;
-  border-radius: 12px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
-  border: 2px solid rgba(255, 255, 255, 0.15);
+.hero__logo {
+  width: 150px;
+  max-width: 60%;
+  border-radius: 18px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
-.hero__content {
-  flex: 1 1 320px;
-}
-
-.hero__content a {
-  color: rgb(255, 255, 255);
-  text-decoration: underline;
-}
-
-.hero__content h1 {
-  margin: 0 0 0.75rem;
-  font-size: clamp(2.4rem, 4vw, 3.2rem);
+.hero__title {
+  margin: 0;
+  font-size: clamp(2.8rem, 5vw, 4rem);
   color: #ffffff;
 }
 
-.hero__content p {
-  margin: 0 0 1.5rem;
-  font-size: 1.05rem;
-  line-height: 1.6;
+.hero__lead {
+  margin: 0;
+  font-size: 1.1rem;
+  line-height: 1.65;
   color: rgba(245, 251, 255, 0.9);
+}
+
+.hero__lead a {
+  color: #ffffff;
+  text-decoration: underline;
 }
 
 .hero__actions {
@@ -111,7 +107,7 @@
 
 .hero__actions .md-button:not(.md-button--primary) {
   color: #f5fbff;
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .hero__actions .md-button:not(.md-button--primary):hover {
@@ -119,12 +115,17 @@
   color: #ffffff;
 }
 
-@media screen and (max-width: 768px) {
+@media screen and (max-width: 640px) {
   .hero {
     padding: 1.75rem;
+    gap: 1.35rem;
   }
 
-  .hero__media {
-    order: -1;
+  .hero__logo {
+    width: 120px;
+  }
+
+  .hero__actions {
+    gap: 0.75rem;
   }
 }

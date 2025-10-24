@@ -1,19 +1,17 @@
 <div class="hero">
-  <div class="hero__content">
-    <h1>PROPAGATOR Sim</h1>
-    <p>
-      An operational cellular-automata wildfire simulator developed by <a href="https://www.cimafoundation.org/">CIMA Research Foundation</a>. PROPAGATOR couples a Numba-powered propagation
-      core with reusable I/O pipelines and a configurable CLI for deterministic
-      or ensemble fire forecasting.
-    </p>
-    <div class="hero__actions">
-      <a class="md-button md-button--primary" href="getting-started/">Get started</a>
-      <a class="md-button" href="programmatic/">Programmatic workflow</a>
-      <a class="md-button" href="bibliography/">Bibliography</a>
-    </div>
-  </div>
-  <div class="hero__media">
-    <img src="img/propagator.png" alt="PROPAGATOR wildfire simulator logo" />
+  <img class="hero__logo" src="img/propagator.png" alt="PROPAGATOR wildfire simulator logo" />
+  <h1 class="hero__title">PROPAGATOR Sim</h1>
+  <p class="hero__lead">
+    An operational cellular-automata wildfire simulator developed by
+    <a href="https://www.cimafoundation.org" target="_blank" rel="noopener">CIMA Research Foundation</a>.
+    PROPAGATOR couples a Numba-powered propagation core with reusable I/O pipelines
+    and a configurable CLI for deterministic or ensemble fire forecasting.
+  </p>
+  <div class="hero__actions">
+    <a class="md-button md-button--primary" href="getting-started/">Get started</a>
+    <a class="md-button" href="programmatic/">Programmatic workflow</a>
+    <a class="md-button" href="reference/propagator/">API reference</a>
+    <a class="md-button" href="bibliography/">Bibliography</a>
   </div>
 </div>
 
