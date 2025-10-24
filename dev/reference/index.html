@@ -14,13 +14,15 @@
         <link rel="prev" href="../cli/">
       
       
+        <link rel="next" href="propagator/">
+      
       
       <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.22">
     
     
       
-        <title>API Reference - PROPAGATOR Sim</title>
+        <title>Overview - PROPAGATOR Sim</title>
       
     
     
@@ -44,6 +46,8 @@
     
     
       <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../stylesheets/cima-theme.css">
     
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -86,8 +90,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href=".." title="PROPAGATOR Sim" class="md-header__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../img/cima.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -104,7 +107,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              API Reference
+              Overview
             
           </span>
         </div>
@@ -184,8 +187,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href=".." title="PROPAGATOR Sim" class="md-nav__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../img/cima.png" alt="logo">
 
     </a>
     PROPAGATOR Sim
@@ -244,6 +246,28 @@
   
   
     <li class="md-nav__item">
+      <a href="../programmatic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Programmatic Workflow
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../cli/" class="md-nav__link">
         
   
@@ -267,16 +291,38 @@
   
   
   
-    <li class="md-nav__item md-nav__item--active">
+    
+    
       
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
+        
+          
+        
       
         
       
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
         
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="./" class="md-nav__link md-nav__link--active">
+              
   
   
   <span class="md-ellipsis">
@@ -285,8 +331,118 @@
   </span>
   
 
+            </a>
+            
+              
+              <label class="md-nav__link md-nav__link--active" for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="propagator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Core
+    
+  </span>
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    I/O
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="numba/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Numba Backend
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bibliography/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Bibliography
+    
+  </span>
+  
+
+      </a>
     </li>
   
 
@@ -326,24 +482,16 @@
 
 
 <h1 id="api-reference">API Reference</h1>
-<p>Auto-generated reference for the public Python API.</p>
+<p>Auto-generated documentation for the public Python APIs. Each section links to
+mkdocstrings pages generated from the implementations under <code>src/</code>.</p>
 <ul>
-<li>
-<p>Packages covered:</p>
-<ol>
-<li>
-<p><a href="propagator/">propagator</a></p>
-</li>
-<li>
-<p><a href="numba/">numba backend</a></p>
-</li>
-</ol>
-</li>
-<li>
-<p>Pages are generated at build time from source under <code>src/</code>.</p>
-</li>
+<li><a href="propagator/">propagator core</a>: high-level simulation interfaces and
+  scheduler utilities.</li>
+<li><a href="io/">propagator io</a>: data loaders, writers, and shared I/O protocols.</li>
+<li><a href="numba/">numba backend</a>: fast kernels and helper utilities powering the
+  simulation engine.</li>
 </ul>
-<p>Use the sidebar to navigate modules and subpackages.</p>
+<p>Use the sidebar or the links above to explore additional submodules.</p>
 
 
 
@@ -396,6 +544,8 @@
     
     
       <script src="../assets/javascripts/bundle.f55a23d4.min.js"></script>
+      
+        <script src="../javascripts/cima-brand.js"></script>
       
     
   </body>

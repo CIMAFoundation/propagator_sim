@@ -11,6 +11,10 @@
       
       
       
+        <link rel="prev" href="../io/">
+      
+      
+        <link rel="next" href="../../bibliography/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -18,7 +22,7 @@
     
     
       
-        <title>NUMBA Backend - PROPAGATOR Sim</title>
+        <title>Numba Backend - PROPAGATOR Sim</title>
       
     
     
@@ -43,6 +47,8 @@
     
       <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
+      <link rel="stylesheet" href="../../stylesheets/cima-theme.css">
+    
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -62,7 +68,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#numba-backend" class="md-skip">
+        <a href="#propagatorcorenumba" class="md-skip">
           Skip to content
         </a>
       
@@ -84,8 +90,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="PROPAGATOR Sim" class="md-header__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../img/cima.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -102,7 +107,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              NUMBA Backend
+              Numba Backend
             
           </span>
         </div>
@@ -182,8 +187,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="PROPAGATOR Sim" class="md-nav__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../img/cima.png" alt="logo">
 
     </a>
     PROPAGATOR Sim
@@ -242,6 +246,28 @@
   
   
     <li class="md-nav__item">
+      <a href="../../programmatic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Programmatic Workflow
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../cli/" class="md-nav__link">
         
   
@@ -261,11 +287,42 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../" class="md-nav__link">
+  
+    
+    
+      
         
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
@@ -274,23 +331,112 @@
   </span>
   
 
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../propagator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Core
+    
+  </span>
+  
+
       </a>
     </li>
   
 
-    
-  </ul>
-</nav>
-                  </div>
-                </div>
-              </div>
-            
+              
             
               
-              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
-                <div class="md-sidebar__scrollwrap">
-                  <div class="md-sidebar__inner">
-                    
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    I/O
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Numba Backend
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Numba Backend
+    
+  </span>
+  
+
+      </a>
+      
+        
 
 <nav class="md-nav md-nav--secondary" aria-label="Table of contents">
   
@@ -304,6 +450,15 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#public-facade" class="md-nav__link">
+    <span class="md-ellipsis">
+      Public Facade
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#propagator.core.numba" class="md-nav__link">
@@ -372,55 +527,47 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#propagator.core.numba.propagation" class="md-nav__link">
+  <a href="#fuel-and-model-definitions" class="md-nav__link">
     <span class="md-ellipsis">
-      propagation
+      Fuel and Model Definitions
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="propagation">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.core.numba.models" class="md-nav__link">
+    <span class="md-ellipsis">
+      models
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="models">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#propagator.core.numba.propagation.fire_spotting" class="md-nav__link">
+  <a href="#propagator.core.numba.models.Fuel" class="md-nav__link">
     <span class="md-ellipsis">
-      fire_spotting
+      Fuel
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#propagator.core.numba.propagation.compute_spotting" class="md-nav__link">
+  <a href="#propagator.core.numba.models.FuelSystem" class="md-nav__link">
     <span class="md-ellipsis">
-      compute_spotting
+      FuelSystem
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="FuelSystem">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#propagator.core.numba.propagation.calculate_fire_behavior" class="md-nav__link">
+  <a href="#propagator.core.numba.models.FuelSystem.add_fuel" class="md-nav__link">
     <span class="md-ellipsis">
-      calculate_fire_behavior
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#propagator.core.numba.propagation.single_cell_updates" class="md-nav__link">
-    <span class="md-ellipsis">
-      single_cell_updates
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#propagator.core.numba.propagation.next_updates_fn" class="md-nav__link">
-    <span class="md-ellipsis">
-      next_updates_fn
+      add_fuel
     </span>
   </a>
   
@@ -428,6 +575,20 @@
         
       </ul>
     </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probability-and-rate-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Probability and Rate Functions
+    </span>
+  </a>
   
 </li>
       
@@ -563,6 +724,481 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#propagation-kernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      Propagation Kernels
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.core.numba.propagation" class="md-nav__link">
+    <span class="md-ellipsis">
+      propagation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="propagation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.propagation.fire_spotting" class="md-nav__link">
+    <span class="md-ellipsis">
+      fire_spotting
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.propagation.compute_spotting" class="md-nav__link">
+    <span class="md-ellipsis">
+      compute_spotting
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.propagation.calculate_fire_behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      calculate_fire_behavior
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.propagation.single_cell_updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      single_cell_updates
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.propagation.next_updates_fn" class="md-nav__link">
+    <span class="md-ellipsis">
+      next_updates_fn
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../bibliography/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Bibliography
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#public-facade" class="md-nav__link">
+    <span class="md-ellipsis">
+      Public Facade
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.core.numba" class="md-nav__link">
+    <span class="md-ellipsis">
+      numba
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="numba">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.FuelSystem" class="md-nav__link">
+    <span class="md-ellipsis">
+      FuelSystem
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FuelSystem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.FuelSystem.add_fuel" class="md-nav__link">
+    <span class="md-ellipsis">
+      add_fuel
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.get_p_moisture_fn" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_p_moisture_fn
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.get_p_time_fn" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_p_time_fn
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.next_updates_fn" class="md-nav__link">
+    <span class="md-ellipsis">
+      next_updates_fn
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fuel-and-model-definitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fuel and Model Definitions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.core.numba.models" class="md-nav__link">
+    <span class="md-ellipsis">
+      models
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.models.Fuel" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fuel
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.models.FuelSystem" class="md-nav__link">
+    <span class="md-ellipsis">
+      FuelSystem
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FuelSystem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.models.FuelSystem.add_fuel" class="md-nav__link">
+    <span class="md-ellipsis">
+      add_fuel
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probability-and-rate-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Probability and Rate Functions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      functions
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.clip" class="md-nav__link">
+    <span class="md-ellipsis">
+      clip
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.get_p_time_fn" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_p_time_fn
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.get_p_moisture_fn" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_p_moisture_fn
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.p_time_rothermel" class="md-nav__link">
+    <span class="md-ellipsis">
+      p_time_rothermel
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.p_time_wang" class="md-nav__link">
+    <span class="md-ellipsis">
+      p_time_wang
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.p_time_standard" class="md-nav__link">
+    <span class="md-ellipsis">
+      p_time_standard
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.w_h_effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      w_h_effect
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.w_h_effect_on_probability" class="md-nav__link">
+    <span class="md-ellipsis">
+      w_h_effect_on_probability
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.p_moisture_trucchia" class="md-nav__link">
+    <span class="md-ellipsis">
+      p_moisture_trucchia
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.p_moisture_baghino" class="md-nav__link">
+    <span class="md-ellipsis">
+      p_moisture_baghino
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.lhv_fuel" class="md-nav__link">
+    <span class="md-ellipsis">
+      lhv_fuel
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.fireline_intensity" class="md-nav__link">
+    <span class="md-ellipsis">
+      fireline_intensity
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.get_probability_to_neighbour" class="md-nav__link">
+    <span class="md-ellipsis">
+      get_probability_to_neighbour
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagation-kernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      Propagation Kernels
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.core.numba.propagation" class="md-nav__link">
+    <span class="md-ellipsis">
+      propagation
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="propagation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.propagation.fire_spotting" class="md-nav__link">
+    <span class="md-ellipsis">
+      fire_spotting
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.propagation.compute_spotting" class="md-nav__link">
+    <span class="md-ellipsis">
+      compute_spotting
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.propagation.calculate_fire_behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      calculate_fire_behavior
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.propagation.single_cell_updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      single_cell_updates
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.propagation.next_updates_fn" class="md-nav__link">
+    <span class="md-ellipsis">
+      next_updates_fn
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -579,7 +1215,11 @@
 
 
 
-<h1 id="numba-backend">NUMBA Backend</h1>
+<h1 id="propagatorcorenumba">propagator.core.numba</h1>
+<p>Numba-accelerated kernels, models, and helper functions backing the simulation
+engine. Use these interfaces when you need to customise the low-level spread
+behaviour or integrate new stochastic components.</p>
+<h2 id="public-facade">Public Facade</h2>
 
 
 <div class="doc doc-object doc-module">
@@ -1199,7 +1839,7 @@
                 <code>fuels</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="FuelSystem(n_fuels) (propagator.core.numba.models.FuelSystem)" href="#propagator.core.numba.FuelSystem">FuelSystem</a></code>
+                  <code><a class="autorefs autorefs-internal" title="FuelSystem(n_fuels) (propagator.core.numba.models.FuelSystem)" href="#propagator.core.numba.models.FuelSystem">FuelSystem</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -1282,23 +1922,259 @@
 
     </div>
 
-</div>
+</div><h2 id="fuel-and-model-definitions">Fuel and Model Definitions</h2>
+
 
 <div class="doc doc-object doc-module">
 
 
 
-<h2 id="propagator.core.numba.propagation" class="doc doc-heading">
-            <code>propagator.core.numba.propagation</code>
+<h2 id="propagator.core.numba.models" class="doc doc-heading">
+            <code>propagator.core.numba.models</code>
 
 
 </h2>
 
     <div class="doc doc-contents first">
 
-        <p>Propagation functions for fire spread simulation.</p>
-<p>This module contains functions for simulating fire spread in a grid environment,
-including ember spotting and cell updates.</p>
+        <p>Models and data structures for the Numba JIT-compiled wildfire propagation engine.</p>
+<p>This file defines the data structures used in the Numba JIT-compiled wildfire propagation engine.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.numba.models.Fuel" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">Fuel</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">v0</span><span class="p">,</span> <span class="n">d0</span><span class="p">,</span> <span class="n">hhv</span><span class="p">,</span> <span class="n">d1</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">humidity</span><span class="o">=-</span><span class="mf">9999.0</span><span class="p">,</span> <span class="n">spotting</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">prob_ign_by_embers</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">burn</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+
+        <p>Initialize a Fuel object.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The name of the fuel type</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>v0</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The initial spread rate (m/min)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>d0</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The dead fuel density (kg/m^2)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>hhv</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The higher heating value (KJ/kg)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>d1</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The live fuel density (kg/m^2)</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>humidity</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fuel moisture content (fraction)</p>
+              </div>
+            </td>
+            <td>
+                  <code>-9999.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>spotting</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether the fuel type is prone to spotting (default is False)</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>prob_ign_by_embers</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The probability of ignition by embers (default is 0.0)</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>burn</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether the fuel type is combustible (default is True)</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.numba.models.FuelSystem" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">FuelSystem</span><span class="p">(</span><span class="n">n_fuels</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+
 
 
 
@@ -1323,15 +2199,15 @@ including ember spotting and cell updates.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="propagator.core.numba.propagation.fire_spotting" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">fire_spotting</span><span class="p">(</span><span class="n">angle</span><span class="p">,</span> <span class="n">w_dir</span><span class="p">,</span> <span class="n">w_speed</span><span class="p">)</span></code>
+<h4 id="propagator.core.numba.models.FuelSystem.add_fuel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">add_fuel</span><span class="p">(</span><span class="n">fuel_id</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">v0</span><span class="p">,</span> <span class="n">d0</span><span class="p">,</span> <span class="n">hhv</span><span class="p">,</span> <span class="n">d1</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">humidity</span><span class="o">=-</span><span class="mf">9999.0</span><span class="p">,</span> <span class="n">spotting</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">prob_ign_by_embers</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">burn</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
 
-</h3>
+</h4>
 
 
     <div class="doc doc-contents ">
 
-        <p>Evaluate spotting distance using Alexandridis' formulation.</p>
+        <p>Adds a Fuel object to the FuelSystem.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1347,118 +2223,14 @@ including ember spotting and cell updates.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                <code>angle</code>
-            </td>
-            <td>
-                  <code><span title="float">float</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The angle of the ember's trajectory (clockwise radians, 0 is north -&gt; south)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>w_dir</code>
-            </td>
-            <td>
-                  <code><span title="float">float</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The wind direction (clockwise radians, 0 is north -&gt; south)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>w_speed</code>
-            </td>
-            <td>
-                  <code><span title="float">float</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The wind speed (km/h)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="tuple">tuple</span>[<span title="float">float</span>, <span title="float">float</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The spotting distance (meters) and the landing time (seconds)</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="propagator.core.numba.propagation.compute_spotting" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">compute_spotting</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">fire</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">fuels</span><span class="p">)</span></code>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Compute ember spotting updates for a given cell.</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>row</code>
+                <code>fuel_id</code>
             </td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The row index of the current cell</p>
+                <p>The unique identifier for the fuel type</p>
               </div>
             </td>
             <td>
@@ -1467,14 +2239,14 @@ including ember spotting and cell updates.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>col</code>
+                <code>name</code>
             </td>
             <td>
-                  <code><span title="int">int</span></code>
+                  <code><span title="str">str</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The column index of the current cell</p>
+                <p>The name of the fuel type</p>
               </div>
             </td>
             <td>
@@ -1483,14 +2255,14 @@ including ember spotting and cell updates.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>cellsize</code>
+                <code>v0</code>
             </td>
             <td>
                   <code><span title="float">float</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The size of each cell (m)</p>
+                <p>The initial spread rate (m/min)</p>
               </div>
             </td>
             <td>
@@ -1499,46 +2271,14 @@ including ember spotting and cell updates.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>veg</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The vegetation type array</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>fire</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.int8">int8</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The fire state array</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>wind_dir</code>
+                <code>d0</code>
             </td>
             <td>
                   <code><span title="float">float</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The wind direction (clockwise radians, 0 is north -&gt; south)</p>
+                <p>The dead fuel density (kg/m^2)</p>
               </div>
             </td>
             <td>
@@ -1547,14 +2287,14 @@ including ember spotting and cell updates.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>wind_speed</code>
+                <code>hhv</code>
             </td>
             <td>
                   <code><span title="float">float</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The wind speed (km/h)</p>
+                <p>The higher heating value (KJ/kg)</p>
               </div>
             </td>
             <td>
@@ -1563,776 +2303,82 @@ including ember spotting and cell updates.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>fuels</code>
-            </td>
-            <td>
-                  <code><a class="autorefs autorefs-internal" title="FuelSystem(n_fuels) (propagator.core.numba.models.FuelSystem)" href="#propagator.core.numba.FuelSystem">FuelSystem</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The fuel system object</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="list">list</span>[<span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span>, <span title="int">int</span>, <span title="float">float</span>, <span title="float">float</span>]]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>A list of spotting updates, each represented as a tuple
-(transition_times, rows, cols, rates_of_spread, fireline_intensities)</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="propagator.core.numba.propagation.calculate_fire_behavior" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">calculate_fire_behavior</span><span class="p">(</span><span class="n">fuel_from</span><span class="p">,</span> <span class="n">fuel_to</span><span class="p">,</span> <span class="n">dh</span><span class="p">,</span> <span class="n">dist</span><span class="p">,</span> <span class="n">angle</span><span class="p">,</span> <span class="n">moisture</span><span class="p">,</span> <span class="n">w_dir</span><span class="p">,</span> <span class="n">w_speed</span><span class="p">,</span> <span class="n">p_time_fn</span><span class="p">)</span></code>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Calculate fire behaviour during propagation between cells</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>fuel_from</code>
-            </td>
-            <td>
-                  <code><span title="propagator.core.numba.models.Fuel">Fuel</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The fuel object for the source cell.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>fuel_to</code>
-            </td>
-            <td>
-                  <code><span title="propagator.core.numba.models.Fuel">Fuel</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The fuel object for the target cell.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>dh</code>
+                <code>d1</code>
             </td>
             <td>
                   <code><span title="float">float</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The elevation difference between the source and target cells (m).</p>
+                <p>The live fuel density (kg/m^2)</p>
               </div>
             </td>
             <td>
-                <em>required</em>
+                  <code>0.0</code>
             </td>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>dist</code>
+                <code>humidity</code>
             </td>
             <td>
                   <code><span title="float">float</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The distance to the target cell (m).</p>
+                <p>The fuel moisture content (fraction)</p>
               </div>
             </td>
             <td>
-                <em>required</em>
+                  <code>-9999.0</code>
             </td>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>angle</code>
+                <code>spotting</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether the fuel type is prone to spotting (default is False)</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>prob_ign_by_embers</code>
             </td>
             <td>
                   <code><span title="float">float</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The angle to the target cell (clockwise radians, 0 is north -&gt; south).</p>
+                <p>The probability of ignition by embers (default is 0.0)</p>
               </div>
             </td>
             <td>
-                <em>required</em>
+                  <code>0.0</code>
             </td>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>moisture</code>
+                <code>burn</code>
             </td>
             <td>
-                  <code><span title="float">float</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The moisture content of the fuel (fraction).</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>w_dir</code>
-            </td>
-            <td>
-                  <code><span title="float">float</span></code>
+                  <code><span title="bool">bool</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The wind direction (clockwise radians, 0 is north -&gt; south).</p>
+                <p>Whether the fuel type is combustible (default is True)</p>
               </div>
             </td>
             <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>w_speed</code>
-            </td>
-            <td>
-                  <code><span title="float">float</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The wind speed (km/h).</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>p_time_fn</code>
-            </td>
-            <td>
-                  <code><span title="typing.Any">Any</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The function to compute the spread time (must be jit-compiled). Units are compliant with other functions.
-    signature: (v0: float, dh: float, angle_to: float, dist: float, moist: float, w_dir: float, w_speed: float) -&gt; tuple[float, float]</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="tuple">tuple</span>[<span title="int">int</span>, <span title="float">float</span>, <span title="float">float</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>A tuple containing the transition time, rate of spread, and fireline intensity.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="propagator.core.numba.propagation.single_cell_updates" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">single_cell_updates</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">fire</span><span class="p">,</span> <span class="n">moisture</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">fuels</span><span class="p">,</span> <span class="n">p_time_fn</span><span class="p">,</span> <span class="n">p_moist_fn</span><span class="p">)</span></code>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Apply fire spread to a single cell and get the next spread updates.</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>row</code>
-            </td>
-            <td>
-                  <code><span title="int">int</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The row index of the current cell</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>col</code>
-            </td>
-            <td>
-                  <code><span title="int">int</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The column index of the current cell</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>cellsize</code>
-            </td>
-            <td>
-                  <code><span title="float">float</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The size of each cell (in meters)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>veg</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D vegetation array</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>dem</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D digital elevation model array</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>fire</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.int8">int8</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D current fire state</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>moisture</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D moisture array (units: fraction [0, 1])</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>wind_dir</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D wind direction array (units: radians between [-π, π], 0 is east-&gt;west)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>wind_speed</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D wind speed array (units: km/h)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>fuels</code>
-            </td>
-            <td>
-                  <code><a class="autorefs autorefs-internal" title="FuelSystem(n_fuels) (propagator.core.numba.models.FuelSystem)" href="#propagator.core.numba.FuelSystem">FuelSystem</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The fuel system</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>p_time_fn</code>
-            </td>
-            <td>
-                  <code><span title="typing.Any">Any</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The function to compute the spread time (must be jit-compiled). Units are compliant with other functions.
-    signature: (v0: float, dh: float, angle_to: float, dist: float, moist: float, w_dir: float, w_speed: float) -&gt; tuple[float, float]</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>p_moist_fn</code>
-            </td>
-            <td>
-                  <code><span title="typing.Any">Any</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The function to compute the moisture probability (must be jit-compiled). Units are compliant with other functions.
-    signature: (moist: float) -&gt; float</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="list">list</span>[<span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span>, <span title="int">int</span>, <span title="float">float</span>, <span title="float">float</span>]]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>A list of fire spread updates (transition_times, rows, cols, rates_of_spread, fireline_intensities)</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="propagator.core.numba.propagation.next_updates_fn" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">next_updates_fn</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">cols</span><span class="p">,</span> <span class="n">realizations</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">fire</span><span class="p">,</span> <span class="n">moisture</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">fuels</span><span class="p">,</span> <span class="n">p_time_fn</span><span class="p">,</span> <span class="n">p_moist_fn</span><span class="p">)</span></code>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Compute the next updates for the fire spread simulation.</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>rows</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The row indices of the fire spread updates.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>cols</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The column indices of the fire spread updates.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>realizations</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The realization indices of the fire spread updates.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>cellsize</code>
-            </td>
-            <td>
-                  <code><span title="float">float</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The size of each cell (in meters)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>time</code>
-            </td>
-            <td>
-                  <code><span title="int">int</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The current time step.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>veg</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D vegetation array</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>dem</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D digital elevation model array</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>fire</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.int8">int8</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 3D current fire state</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>moisture</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D moisture array (units: fraction [0, 1])</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>wind_dir</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D wind direction array (units: radians between [-π, π], 0 is east-&gt;west)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>wind_speed</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D wind speed array (units: km/h)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>fuels</code>
-            </td>
-            <td>
-                  <code><a class="autorefs autorefs-internal" title="FuelSystem(n_fuels) (propagator.core.numba.models.FuelSystem)" href="#propagator.core.numba.FuelSystem">FuelSystem</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The fuel system</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>p_time_fn</code>
-            </td>
-            <td>
-                  <code><span title="typing.Any">Any</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The function to compute the spread time (must be jit-compiled). Units are compliant with other functions.
-    signature: (v0: float, dh: float, angle_to: float, dist: float, moist: float, w_dir: float, w_speed: float) -&gt; tuple[float, float]</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>p_moist_fn</code>
-            </td>
-            <td>
-                  <code><span title="typing.Any">Any</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The function to compute the moisture probability (must be jit-compiled). Units are compliant with other functions.
-    signature: (moist: float) -&gt; float</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="propagator.core.models.UpdateBatchTuple">UpdateBatchTuple</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>A tuple containing the arrays for the next updates.
-(next_times, next_rows, next_cols, next_realizations, next_ros, next_fireline_intensities)</p>
-              </div>
+                  <code>True</code>
             </td>
           </tr>
       </tbody>
@@ -2350,6 +2396,16 @@ including ember spotting and cell updates.</p>
     </div>
 
 </div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="probability-and-rate-functions">Probability and Rate Functions</h2>
+
 
 <div class="doc doc-object doc-module">
 
@@ -3954,6 +4010,1074 @@ heating value and FFMC.</p>
 
     </div>
 
+</div><h2 id="propagation-kernels">Propagation Kernels</h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="propagator.core.numba.propagation" class="doc doc-heading">
+            <code>propagator.core.numba.propagation</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Propagation functions for fire spread simulation.</p>
+<p>This module contains functions for simulating fire spread in a grid environment,
+including ember spotting and cell updates.</p>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="propagator.core.numba.propagation.fire_spotting" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fire_spotting</span><span class="p">(</span><span class="n">angle</span><span class="p">,</span> <span class="n">w_dir</span><span class="p">,</span> <span class="n">w_speed</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Evaluate spotting distance using Alexandridis' formulation.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>angle</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The angle of the ember's trajectory (clockwise radians, 0 is north -&gt; south)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>w_dir</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The wind direction (clockwise radians, 0 is north -&gt; south)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>w_speed</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The wind speed (km/h)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="tuple">tuple</span>[<span title="float">float</span>, <span title="float">float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The spotting distance (meters) and the landing time (seconds)</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="propagator.core.numba.propagation.compute_spotting" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_spotting</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">fire</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">fuels</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute ember spotting updates for a given cell.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>row</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The row index of the current cell</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>col</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The column index of the current cell</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cellsize</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The size of each cell (m)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>veg</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The vegetation type array</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fire</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.int8">int8</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fire state array</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>wind_dir</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The wind direction (clockwise radians, 0 is north -&gt; south)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>wind_speed</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The wind speed (km/h)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fuels</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="FuelSystem(n_fuels) (propagator.core.numba.models.FuelSystem)" href="#propagator.core.numba.models.FuelSystem">FuelSystem</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fuel system object</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span>, <span title="int">int</span>, <span title="float">float</span>, <span title="float">float</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A list of spotting updates, each represented as a tuple
+(transition_times, rows, cols, rates_of_spread, fireline_intensities)</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="propagator.core.numba.propagation.calculate_fire_behavior" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">calculate_fire_behavior</span><span class="p">(</span><span class="n">fuel_from</span><span class="p">,</span> <span class="n">fuel_to</span><span class="p">,</span> <span class="n">dh</span><span class="p">,</span> <span class="n">dist</span><span class="p">,</span> <span class="n">angle</span><span class="p">,</span> <span class="n">moisture</span><span class="p">,</span> <span class="n">w_dir</span><span class="p">,</span> <span class="n">w_speed</span><span class="p">,</span> <span class="n">p_time_fn</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Calculate fire behaviour during propagation between cells</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>fuel_from</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Fuel(name, v0, d0, hhv, d1=0.0, humidity=-9999.0, spotting=False, prob_ign_by_embers=0.0, burn=True) (propagator.core.numba.models.Fuel)" href="#propagator.core.numba.models.Fuel">Fuel</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fuel object for the source cell.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fuel_to</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Fuel(name, v0, d0, hhv, d1=0.0, humidity=-9999.0, spotting=False, prob_ign_by_embers=0.0, burn=True) (propagator.core.numba.models.Fuel)" href="#propagator.core.numba.models.Fuel">Fuel</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fuel object for the target cell.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dh</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The elevation difference between the source and target cells (m).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dist</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The distance to the target cell (m).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>angle</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The angle to the target cell (clockwise radians, 0 is north -&gt; south).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>moisture</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The moisture content of the fuel (fraction).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>w_dir</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The wind direction (clockwise radians, 0 is north -&gt; south).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>w_speed</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The wind speed (km/h).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>p_time_fn</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The function to compute the spread time (must be jit-compiled). Units are compliant with other functions.
+    signature: (v0: float, dh: float, angle_to: float, dist: float, moist: float, w_dir: float, w_speed: float) -&gt; tuple[float, float]</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="tuple">tuple</span>[<span title="int">int</span>, <span title="float">float</span>, <span title="float">float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A tuple containing the transition time, rate of spread, and fireline intensity.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="propagator.core.numba.propagation.single_cell_updates" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">single_cell_updates</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">fire</span><span class="p">,</span> <span class="n">moisture</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">fuels</span><span class="p">,</span> <span class="n">p_time_fn</span><span class="p">,</span> <span class="n">p_moist_fn</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Apply fire spread to a single cell and get the next spread updates.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>row</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The row index of the current cell</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>col</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The column index of the current cell</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cellsize</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The size of each cell (in meters)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>veg</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The 2D vegetation array</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dem</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The 2D digital elevation model array</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fire</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.int8">int8</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The 2D current fire state</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>moisture</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The 2D moisture array (units: fraction [0, 1])</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>wind_dir</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The 2D wind direction array (units: radians between [-π, π], 0 is east-&gt;west)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>wind_speed</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The 2D wind speed array (units: km/h)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fuels</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="FuelSystem(n_fuels) (propagator.core.numba.models.FuelSystem)" href="#propagator.core.numba.models.FuelSystem">FuelSystem</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fuel system</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>p_time_fn</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The function to compute the spread time (must be jit-compiled). Units are compliant with other functions.
+    signature: (v0: float, dh: float, angle_to: float, dist: float, moist: float, w_dir: float, w_speed: float) -&gt; tuple[float, float]</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>p_moist_fn</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The function to compute the moisture probability (must be jit-compiled). Units are compliant with other functions.
+    signature: (moist: float) -&gt; float</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<span title="tuple">tuple</span>[<span title="int">int</span>, <span title="int">int</span>, <span title="int">int</span>, <span title="float">float</span>, <span title="float">float</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A list of fire spread updates (transition_times, rows, cols, rates_of_spread, fireline_intensities)</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="propagator.core.numba.propagation.next_updates_fn" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">next_updates_fn</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">cols</span><span class="p">,</span> <span class="n">realizations</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">fire</span><span class="p">,</span> <span class="n">moisture</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">fuels</span><span class="p">,</span> <span class="n">p_time_fn</span><span class="p">,</span> <span class="n">p_moist_fn</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute the next updates for the fire spread simulation.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>rows</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The row indices of the fire spread updates.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cols</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The column indices of the fire spread updates.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>realizations</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The realization indices of the fire spread updates.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>cellsize</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The size of each cell (in meters)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>time</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The current time step.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>veg</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The 2D vegetation array</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>dem</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The 2D digital elevation model array</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fire</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.int8">int8</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The 3D current fire state</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>moisture</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The 2D moisture array (units: fraction [0, 1])</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>wind_dir</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The 2D wind direction array (units: radians between [-π, π], 0 is east-&gt;west)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>wind_speed</code>
+            </td>
+            <td>
+                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The 2D wind speed array (units: km/h)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fuels</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="FuelSystem(n_fuels) (propagator.core.numba.models.FuelSystem)" href="#propagator.core.numba.models.FuelSystem">FuelSystem</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fuel system</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>p_time_fn</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The function to compute the spread time (must be jit-compiled). Units are compliant with other functions.
+    signature: (v0: float, dh: float, angle_to: float, dist: float, moist: float, w_dir: float, w_speed: float) -&gt; tuple[float, float]</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>p_moist_fn</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The function to compute the moisture probability (must be jit-compiled). Units are compliant with other functions.
+    signature: (moist: float) -&gt; float</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="propagator.core.models.UpdateBatchTuple">UpdateBatchTuple</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A tuple containing the arrays for the next updates.
+(next_times, next_rows, next_cols, next_realizations, next_ros, next_fireline_intensities)</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
 </div>
 
 
@@ -4007,6 +5131,8 @@ heating value and FFMC.</p>
     
     
       <script src="../../assets/javascripts/bundle.f55a23d4.min.js"></script>
+      
+        <script src="../../javascripts/cima-brand.js"></script>
       
     
   </body>
