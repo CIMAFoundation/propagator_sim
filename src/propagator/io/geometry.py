@@ -6,10 +6,10 @@ from enum import Enum
 from typing import List, Optional, Sequence, Tuple, Union
 
 import numpy as np
-import rasterio.enums as rio_enums
+import rasterio.enums as rio_enums  # type: ignore
 import shapely
 from pyproj import CRS, Transformer
-from rasterio.features import rasterize
+from rasterio.features import rasterize  # type: ignore
 from shapely import (
     Geometry,
     LineString,
@@ -37,7 +37,7 @@ def get_middle_point(ignition: Geometry) -> Optional[Tuple[float, float]]:
     Calculate the barycenter (average of coordinates) of a Shapely geometry.
     Works for any geometry type. Returns None if geometry is None or empty.
     """
-    if ignition is None or ignition.is_empty:
+    if ignition is None:
         return None
 
     if isinstance(ignition, Point):

@@ -7,15 +7,14 @@ from typing import Literal, Mapping, Optional
 from warnings import warn
 
 import yaml
-from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, CliImplicitFlag, SettingsConfigDict
 from pyproj import CRS
 
 from propagator.cli.console import (
     info_msg,
-    ok_msg,
     print_boundary_conditions_table,
-    print_model_table,
+    print_table,
     setup_console,
     status_propagator_msg,
 )
@@ -72,9 +71,16 @@ class PropagatorCLILegacy(BaseSettings):
         description="Isochrones thresholds to be saved. \
             Default: [0.5,0.75,0.9]",
     )
-    record: bool = Field(
+
+    record: CliImplicitFlag[bool] = Field(
         False,
         description="Export run logs",
+    )
+
+    # Quiet mode to suppress console output, set to true when --quiet is passed
+    verbose: CliImplicitFlag[bool] = Field(
+        False,
+        description="Enable verbose output",
     )
 
     # ---------- checks ----------
@@ -115,10 +121,7 @@ class PropagatorCLILegacy(BaseSettings):
         # if you provide dem and fuel, then automatically set in geotiff mode
         if self.dem is not None and self.fuel is not None:
             if self.mode == "tiles":
-                warn(
-                    "DEM and FUEL files provided, switching to 'geotiff' mode"
-                )
-            self.mode = "geotiff"
+                self.mode = "geotiff"
 
         # check required files based on mode
         if self.mode == "geotiff":
@@ -174,36 +177,41 @@ def main() -> None:
     simulation_time = datetime.now()
     start = time.time()
 
-    info_msg("Initializing CLI...")
     # pydantic-settings is taking care of it
     cli = PropagatorCLILegacy()  # type: ignore
-    ok_msg("CLI initialized")
 
     if cli.record:
         setup_console(record_path=cli.output, basename="run")
     else:
         setup_console()
-    ok_msg("Console initialized")
-    info_msg(f"Run time: {simulation_time}")
 
-    print_model_table(cli, title="CLI Settings")
+    if cli.verbose:
+        info_msg(f"Run time: {simulation_time}")
 
-    info_msg("Loading configuration from JSON file...")
     cfg = cli.build_configuration()
-    ok_msg("Configuration loaded")
 
-    print_model_table(cfg, title="Simulation Configuration")
+    if cli.verbose:
+        table_data: dict[str, BaseModel | dict] = {
+            "Run Info": {"Sim time": simulation_time.isoformat()},
+            "CLI Args": cli,
+            "Loaded Config": cfg,
+        }
+        print_table(
+            table_data,
+            title="Simulation Configuration",
+            skip_fields=["boundary_conditions", "verbose"],  # too verbose
+            header_style="bold green",
+            section_style="bold yellow",
+        )
 
-    info_msg("Loading fuel system...")
     if cli.fuel_config is not None:
         fuel_system = fuels_from_yaml(cli.fuel_config)
-        info_msg(f"Fuel system loaded from {cli.fuel_config}")
+        if cli.verbose:
+            info_msg(f"Fuel system loaded from {cli.fuel_config}")
     else:
         fuel_system = FUEL_SYSTEM_LEGACY
-        info_msg("Using legacy fuel system")
-    ok_msg("Fuel system ready")
-
-    info_msg("Setting up data loader...")
+        if cli.verbose:
+            info_msg("Using legacy fuel system")
 
     loader: PropagatorInputDataProtocol | None = None
 
@@ -230,16 +238,12 @@ def main() -> None:
     else:
         raise ValueError(f"Unknown mode: {cli.mode}")
 
-    ok_msg("Data loader ready")
-
     # Load the data
     dem = loader.get_dem()
     veg = loader.get_veg()
     geo_info = loader.get_geo_info()
     dst_crs = CRS.from_epsg(4326)
-    ok_msg("Static data loaded")
 
-    info_msg("Setting up output writer...")
     raster_writer = GeoTiffWriter(
         start_date=cfg.init_date,
         raster_variables_mapping={
@@ -272,9 +276,6 @@ def main() -> None:
         metadata_writer=metadata_writer,
         isochrones_writer=isochrones_writer,
     )
-    ok_msg("Output writer ready")
-
-    info_msg("Setting up simulator...")
 
     simulator = Propagator(
         dem=dem,
@@ -286,20 +287,17 @@ def main() -> None:
         p_time_fn=cfg.p_time_fn if cfg.p_time_fn is not None else None,
         p_moist_fn=cfg.p_moist_fn if cfg.p_moist_fn is not None else None,
     )
-    ok_msg("Simulator ready")
 
-    info_msg("Setting up boundary conditions...")
     non_vegetated = fuel_system.get_non_vegetated()
     boundary_conditions_list = cfg.get_boundary_conditions(
         geo_info, non_vegetated
     )
     for boundary_condition in boundary_conditions_list:
         simulator.set_boundary_conditions(boundary_condition)
-    ok_msg("Boundary conditions set")
 
-    print_boundary_conditions_table(cfg.boundary_conditions)
+    if cli.verbose:
+        print_boundary_conditions_table(cfg.boundary_conditions)
 
-    info_msg("Start simulation...")
     while True:
         next_time = simulator.next_time()
         if next_time is None:
@@ -321,10 +319,10 @@ def main() -> None:
 
         if simulator.time > cfg.time_limit:
             break
-    ok_msg("Simulation completed")
 
     end = time.time()
-    info_msg(f"Execution time: {end - start:.2f} seconds")
+    if cli.verbose:
+        info_msg(f"Execution time: {end - start:.2f} seconds")
 
 
 # %%
