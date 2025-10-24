@@ -10,7 +10,14 @@ import rasterio.enums as rio_enums
 import shapely
 from pyproj import CRS, Transformer
 from rasterio.features import rasterize
-from shapely import Geometry, LineString, Point, Polygon
+from shapely import (
+    Geometry,
+    LineString,
+    MultiLineString,
+    MultiPolygon,
+    Point,
+    Polygon,
+)
 from shapely.ops import transform
 
 from propagator.io.geo import GeographicInfo
@@ -30,22 +37,32 @@ def get_middle_point(ignition: Geometry) -> Optional[Tuple[float, float]]:
     Calculate the barycenter (average of coordinates) of a Shapely geometry.
     Works for any geometry type. Returns None if geometry is None or empty.
     """
-    if ignition is None:
-        return None
-    coords = list(ignition.coords) if hasattr(ignition, "coords") else []  # type: ignore
-
-    # recursively collect coords if geometry has parts
-    if not coords and hasattr(ignition, "geoms"):
-        for g in ignition.geoms:  # type: ignore
-            sub = get_middle_point(g)
-            if sub:
-                coords.append(sub)
-
-    if not coords:
+    if ignition is None or ignition.is_empty:
         return None
 
-    xs, ys = zip(*coords)
-    return (sum(xs) / len(xs), sum(ys) / len(ys))
+    if isinstance(ignition, Point):
+        return (ignition.x, ignition.y)
+
+    elif isinstance(ignition, LineString):
+        coords = np.array(ignition.coords)
+        return tuple(coords.mean(axis=0))
+
+    elif isinstance(ignition, MultiLineString):
+        all_coords = np.concatenate(
+            [np.array(line.coords) for line in ignition.geoms]
+        )
+        return tuple(all_coords.mean(axis=0))
+
+    elif isinstance(ignition, Polygon):
+        return ignition.centroid.x, ignition.centroid.y
+
+    elif isinstance(ignition, MultiPolygon):
+        centroids = np.array(
+            [poly.centroid.coords[0] for poly in ignition.geoms]
+        )
+        return tuple(centroids.mean(axis=0))
+    else:
+        return None
 
 
 def reproject_geometry(
