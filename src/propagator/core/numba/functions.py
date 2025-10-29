@@ -122,7 +122,7 @@ def get_p_moisture_fn(moist_model_code: MoistureModel) -> Any:
     raise ValueError(f"Unknown moist_model_code: {moist_model_code!r}")
 
 
-@jit(cache=True)
+@jit(cache=False)
 def p_time_rothermel(
     v0: float,
     dh: float,
@@ -193,7 +193,7 @@ def p_time_rothermel(
     return time_seconds, v_wh
 
 
-@jit(cache=True)
+@jit(cache=False)
 def p_time_wang(
     v0: float,
     dh: float,
@@ -262,7 +262,7 @@ def p_time_wang(
     return time_seconds, v_wh
 
 
-@jit(cache=True)
+@jit(cache=False)
 def p_time_standard(
     v0: float,
     dh: float,
@@ -391,7 +391,7 @@ def w_h_effect_on_probability(
     return wh
 
 
-@jit(cache=True)
+@jit(cache=False)
 def p_moisture_trucchia(
     moist: float,
 ) -> float:
@@ -424,7 +424,7 @@ def p_moisture_trucchia(
     return p_moist
 
 
-@jit(cache=True)
+@jit(cache=False)
 def p_moisture_baghino(
     moist: float,
 ) -> float:
