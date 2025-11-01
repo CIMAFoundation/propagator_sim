@@ -93,7 +93,7 @@ def fire_spotting(
     return ember_distance, ember_landing_time_sec
 
 
-@jit(cache=True, nopython=True, fastmath=True)
+@jit(cache=False, nopython=True, fastmath=True)
 def compute_spotting(
     row: int,
     col: int,
@@ -274,7 +274,7 @@ def calculate_fire_behavior(
     return transition_time, ros_value, fireline_intensity_value
 
 
-@jit(cache=True, parallel=False, nopython=True, fastmath=True)
+@jit(cache=False, parallel=False, nopython=True, fastmath=True)
 def single_cell_updates(
     row: int,
     col: int,
@@ -415,7 +415,7 @@ def single_cell_updates(
     return fire_spread_updates
 
 
-@jit(cache=True, parallel=False, nopython=True, fastmath=True)
+@jit(cache=False, parallel=False, nopython=True, fastmath=True)
 def next_updates_fn(
     rows: npt.NDArray[np.integer],
     cols: npt.NDArray[np.integer],
