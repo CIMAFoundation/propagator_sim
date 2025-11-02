@@ -8,6 +8,7 @@ summary statistics, and output snapshots suitable for CLI and IO layers.
 
 import warnings
 from dataclasses import dataclass, field
+from importlib import import_module
 from typing import Any, Literal
 
 import numpy as np
@@ -15,6 +16,7 @@ import numpy.typing as npt
 
 from propagator.core.constants import (
     CELLSIZE,
+    FUEL_SYSTEM_LEGACY_DICT,
     MOISTURE_MODEL_DEFAULT,
     REALIZATIONS,
     ROS_DEFAULT,
@@ -26,14 +28,53 @@ from propagator.core.models import (
     UpdateBatch,
     UpdateBatchWithTime,
 )
-from propagator.core.numba import (
-    FUEL_SYSTEM_LEGACY,
-    FuelSystem,
-    get_p_moisture_fn,
-    get_p_time_fn,
-    next_updates_fn,
-)
 from propagator.core.scheduler import Scheduler, SchedulerEvent
+
+BackendName = Literal["numba", "numpy"]
+
+_BACKEND_MODULES: dict[BackendName, str] = {
+    "numba": "propagator.core.numba",
+    "numpy": "propagator.core.numpy",
+}
+_BACKEND_CACHE: dict[BackendName, Any] = {}
+
+
+def _load_backend(name: BackendName) -> Any:
+    """Load backend module by name, caching the import."""
+    if name not in _BACKEND_MODULES:
+        raise ValueError(f"Unsupported backend {name!r}")
+
+    if name in _BACKEND_CACHE:
+        return _BACKEND_CACHE[name]
+
+    module_path = _BACKEND_MODULES[name]
+    module = import_module(module_path)
+    required_attrs = (
+        "FuelSystem",
+        "get_p_moisture_fn",
+        "get_p_time_fn",
+        "next_updates_fn",
+        "fuelsystem_from_dict",
+    )
+    missing = [attr for attr in required_attrs if not hasattr(module, attr)]
+    if missing:
+        raise RuntimeError(
+            f"Backend {name!r} missing required attributes: {missing}"
+        )
+
+    _BACKEND_CACHE[name] = module
+    return module
+
+
+_DEFAULT_BACKEND_NAME: BackendName = "numba"
+_DEFAULT_BACKEND_MODULE = _load_backend(_DEFAULT_BACKEND_NAME)
+
+# Backwards-compatible exports expected by external callers and tests.
+next_updates_fn = _DEFAULT_BACKEND_MODULE.next_updates_fn
+get_p_time_fn = _DEFAULT_BACKEND_MODULE.get_p_time_fn
+get_p_moisture_fn = _DEFAULT_BACKEND_MODULE.get_p_moisture_fn
+FuelSystem = _DEFAULT_BACKEND_MODULE.FuelSystem
+FUEL_SYSTEM_LEGACY = _DEFAULT_BACKEND_MODULE.FUEL_SYSTEM_LEGACY
 
 
 class PropagatorOutOfBoundsError(Exception):
@@ -59,8 +100,8 @@ class Propagator:
     dem : numpy.ndarray
         2D array of elevation values (meters above sea level).
     fuels: FuelSystem, optional
-        Object defining fuels types and fire propagation
-        probability between fuel types
+        Object defining fuels types and fire propagation probability between
+        fuel types. If omitted, the backend default is used.
     cellsize : float, optional
         The size of lattice (meters).
     do_spotting : bool, optional
@@ -68,14 +109,16 @@ class Propagator:
     realizations : int, optional
         Number of stochastic realizations to simulate.
     p_time_fn: Any, optional
-        The function to compute the spread time (must be jit-compiled).
-        Units are compliant with other functions.
+        The function to compute the spread time. Units are compliant
+        with other functions.
             signature: (v0: float, dh: float, angle_to: float, dist: float,
             moist: float, w_dir: float, w_speed: float) -> tuple[float, float]
     p_moist_fn: Any, optional
-        The function to compute the moisture probability (must be jit-compiled)
-        Units are compliant with other functions.
+        The function to compute the moisture probability. Units are compliant
+        with other functions.
             signature: (moist: float) -> float
+    backend: Literal["numba", "numpy"], optional
+        Selects the computational backend. Defaults to "numba".
 
     out_of_bounds_mode: Literal["ignore", "error"], optional
         Whether to raise an error if out-of-bounds updates are detected.
@@ -89,7 +132,7 @@ class Propagator:
     dem: npt.NDArray[np.floating]
 
     # set fuels
-    fuels: FuelSystem = field(default_factory=lambda: FUEL_SYSTEM_LEGACY)
+    fuels: Any | None = None
 
     # simulation settings
     cellsize: float = field(default=CELLSIZE)
@@ -97,8 +140,12 @@ class Propagator:
     realizations: int = field(default=REALIZATIONS)
 
     # selected simulation functions
-    p_time_fn: Any = field(default=get_p_time_fn(ROS_DEFAULT))
-    p_moist_fn: Any = field(default=get_p_moisture_fn(MOISTURE_MODEL_DEFAULT))
+    p_time_fn: Any | None = None
+    p_moist_fn: Any | None = None
+
+    backend: BackendName = "numba"
+    backend_module: Any = field(init=False, repr=False)
+    _next_updates_fn: Any = field(init=False, repr=False)
 
     # scheduler object
     scheduler: Scheduler = field(init=False)
@@ -119,8 +166,20 @@ class Propagator:
     out_of_bounds_mode: Literal["ignore", "raise"] = "raise"
 
     def __post_init__(self):
-        """Allocate internal state arrays based
-        on the vegetation grid shape."""
+        """Allocate internal state arrays based on the vegetation grid shape."""
+        self.backend_module = _load_backend(self.backend)
+        if self.fuels is None:
+            self.fuels = self.backend_module.fuelsystem_from_dict(
+                FUEL_SYSTEM_LEGACY_DICT
+            )
+        if self.p_time_fn is None:
+            self.p_time_fn = self.backend_module.get_p_time_fn(ROS_DEFAULT)
+        if self.p_moist_fn is None:
+            self.p_moist_fn = self.backend_module.get_p_moisture_fn(
+                MOISTURE_MODEL_DEFAULT
+            )
+        self._next_updates_fn = self.backend_module.next_updates_fn
+
         shape = self.veg.shape
         self.scheduler = Scheduler(realizations=self.realizations)
         self.fire = np.zeros(shape + (self.realizations,), dtype=np.int8)
@@ -360,7 +419,7 @@ class Propagator:
 
         moisture = self._get_moisture()
 
-        new_updates_tuple = next_updates_fn(
+        new_updates_tuple = self._next_updates_fn(
             updates.rows,
             updates.cols,
             updates.realizations,
