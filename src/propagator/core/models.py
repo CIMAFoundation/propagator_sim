@@ -173,7 +173,7 @@ class BoundaryConditions:
     wind_speed : Optional[npt.NDArray[np.floating]]
         Wind speed map (km/h).
     ignition_mask : Optional[npt.NDArray[np.bool_]]
-        Boolean mask of new ignition points.
+        2D or 3D Boolean mask of new ignition points.
     additional_moisture : Optional[npt.NDArray[np.floating]]
         Extra moisture to add to fuel (%), can be sparse.
     vegetation_changes : Optional[npt.NDArray[np.floating]]

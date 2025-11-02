@@ -296,10 +296,18 @@ class Propagator:
 
         if boundary_condition.ignition_mask is not None:
             ign_arr = boundary_condition.ignition_mask
-            points = np.argwhere(ign_arr > 0)
+            # check ignition_mask shape beforehand
 
-            points_repeated = np.repeat(points, self.realizations, axis=0)
-            realizations = np.tile(np.arange(self.realizations), len(points))
+            points = np.argwhere(ign_arr)
+
+            if len(boundary_condition.ignition_mask.shape) == 2:
+                points_repeated = np.repeat(points, self.realizations, axis=0)
+                realizations = np.tile(
+                    np.arange(self.realizations), len(points)
+                )
+            else:
+                points_repeated = points
+                realizations = points[:, 2]
 
             fireline_intensity = np.zeros_like(
                 points_repeated[:, 0], dtype=np.float32
