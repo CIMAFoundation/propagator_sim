@@ -31,7 +31,7 @@ for r in range(N_REALIZATIONS):
     # set central pixel as ignition point
     x, y = (
         center_x + int(random() * 400) - 200,
-        int(center_y + int(random() * 400)) - 200,
+        center_y + int(random() * 400) - 200,
     )
     ignition_array[x, y, r] = 1
 
