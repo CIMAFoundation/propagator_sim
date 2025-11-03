@@ -1,4 +1,5 @@
 from datetime import timedelta
+from random import random
 from time import time
 
 import matplotlib.pyplot as plt
@@ -13,20 +14,26 @@ from propagator.core import (  # type: ignore
 
 veg = np.full((2000, 2000), 5, dtype=np.int32)
 dem = np.zeros((2000, 2000), dtype=np.float32)
+N_REALIZATIONS = 30
 
 simulator = Propagator(
     dem=dem,
     veg=veg,
-    realizations=10,
+    realizations=N_REALIZATIONS,
     fuels=FUEL_SYSTEM_LEGACY,
     do_spotting=False,
-    out_of_bounds_mode="raise",
+    out_of_bounds_mode="ignore",
 )
 
-ignition_array = np.zeros(dem.shape, dtype=np.uint8)
-# set central pixel as ignition point
+ignition_array = np.zeros(dem.shape + (N_REALIZATIONS,), dtype=np.uint8)
 center_x, center_y = dem.shape[0] // 2, dem.shape[1] // 2
-ignition_array[center_x, center_y] = 1
+for r in range(N_REALIZATIONS):
+    # set central pixel as ignition point
+    x, y = (
+        center_x + int(random() * 400) - 200,
+        int(center_y + int(random() * 400)) - 200,
+    )
+    ignition_array[x, y, r] = 1
 
 
 boundary_condition = BoundaryConditions(
