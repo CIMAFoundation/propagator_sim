@@ -11,10 +11,10 @@
       
       
       
-        <link rel="prev" href="../programmatic/">
+        <link rel="prev" href="../getting-started/">
       
       
-        <link rel="next" href="../reference/">
+        <link rel="next" href="../cli/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -22,7 +22,7 @@
     
     
       
-        <title>CLI Usage - PROPAGATOR Sim</title>
+        <title>Programmatic Workflow - PROPAGATOR Sim</title>
       
     
     
@@ -68,7 +68,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#cli-usage" class="md-skip">
+        <a href="#programmatic-workflow" class="md-skip">
           Skip to content
         </a>
       
@@ -107,7 +107,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              CLI Usage
+              Programmatic Workflow
             
           </span>
         </div>
@@ -243,28 +243,6 @@
       
   
   
-  
-  
-    <li class="md-nav__item">
-      <a href="../programmatic/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Programmatic Workflow
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
     
   
   
@@ -282,7 +260,7 @@
   
   
   <span class="md-ellipsis">
-    CLI Usage
+    Programmatic Workflow
     
   </span>
   
@@ -295,7 +273,7 @@
   
   
   <span class="md-ellipsis">
-    CLI Usage
+    Programmatic Workflow
     
   </span>
   
@@ -318,47 +296,44 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#basic-invocation" class="md-nav__link">
+  <a href="#scenario-overview" class="md-nav__link">
     <span class="md-ellipsis">
-      Basic Invocation
+      Scenario Overview
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#operating-modes" class="md-nav__link">
+  <a href="#complete-script" class="md-nav__link">
     <span class="md-ellipsis">
-      Operating Modes
+      Complete Script
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Complete Script">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-elements" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Elements
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#argument-reference" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#going-further" class="md-nav__link">
     <span class="md-ellipsis">
-      Argument Reference
+      Going Further
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#output-products" class="md-nav__link">
-    <span class="md-ellipsis">
-      Output Products
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      Troubleshooting
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -366,6 +341,28 @@
   
 </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    CLI Usage
+    
+  </span>
+  
+
+      </a>
     </li>
   
 
@@ -559,47 +556,44 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#basic-invocation" class="md-nav__link">
+  <a href="#scenario-overview" class="md-nav__link">
     <span class="md-ellipsis">
-      Basic Invocation
+      Scenario Overview
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#operating-modes" class="md-nav__link">
+  <a href="#complete-script" class="md-nav__link">
     <span class="md-ellipsis">
-      Operating Modes
+      Complete Script
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Complete Script">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#key-elements" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Elements
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#argument-reference" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#going-further" class="md-nav__link">
     <span class="md-ellipsis">
-      Argument Reference
+      Going Further
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#output-products" class="md-nav__link">
-    <span class="md-ellipsis">
-      Output Products
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      Troubleshooting
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -619,126 +613,130 @@
 
 
 
-<h1 id="cli-usage">CLI Usage</h1>
-<p>The <code>propagator</code> command drives simulations from the terminal. It validates
-input files, prepares rasters, runs the propagation loop, and writes outputs on
-every reporting interval.</p>
-<pre><code class="language-bash">uv run propagator --help
+<h1 id="programmatic-workflow">Programmatic Workflow</h1>
+<p>This guide walks through a richer example that mirrors the CLI pipeline but is
+implemented entirely in Python. It combines pieces from <code>propagator.core</code> and
+<code>propagator.io</code> to load rasters, configure simulations, and write artefacts on
+each reporting interval.</p>
+<h2 id="scenario-overview">Scenario Overview</h2>
+<p>We will:</p>
+<ol>
+<li>Parse a JSON configuration for ignition geometry and model options.</li>
+<li>Load DEM and fuel rasters from GeoTIFF files using the high-level loader.</li>
+<li>Instantiate the simulator with a custom fuel system.</li>
+<li>Generate raster, GeoJSON, and metadata outputs with the writer utilities.</li>
+</ol>
+<p>The example uses the datasets under <code>example/</code> so you can run it without
+additional downloads.</p>
+<h2 id="complete-script">Complete Script</h2>
+<pre><code class="language-python">from pathlib import Path
+
+from pyproj import CRS
+
+from propagator.core import FUEL_SYSTEM_LEGACY, Propagator
+from propagator.io.configuration import PropagatorConfigurationLegacy
+from propagator.io.loader.geotiff import PropagatorDataFromGeotiffs
+from propagator.io.writer import (
+    GeoTiffWriter,
+    IsochronesGeoJSONWriter,
+    MetadataJSONWriter,
+    OutputWriter,
+)
+
+ROOT = Path(__file__).resolve().parent
+config_path = ROOT / &quot;config.json&quot;
+dem_path = ROOT / &quot;dem.tif&quot;
+fuel_path = ROOT / &quot;fuel.tif&quot;
+output_dir = ROOT / &quot;output-programmatic&quot;
+
+cfg = PropagatorConfigurationLegacy.model_validate_json(config_path.read_text())
+
+loader = PropagatorDataFromGeotiffs(
+    dem_file=str(dem_path),
+    veg_file=str(fuel_path),
+)
+dem = loader.get_dem()
+veg = loader.get_veg()
+geo_info = loader.get_geo_info()
+
+sim = Propagator(
+    dem=dem,
+    veg=veg,
+    realizations=cfg.realizations,
+    fuels=FUEL_SYSTEM_LEGACY,
+    do_spotting=cfg.do_spotting,
+    out_of_bounds_mode=&quot;ignore&quot;,
+    p_time_fn=cfg.p_time_fn,
+    p_moist_fn=cfg.p_moist_fn,
+)
+
+writers = OutputWriter(
+    raster_writer=GeoTiffWriter(
+        start_date=cfg.init_date,
+        output_folder=output_dir,
+        geo_info=geo_info,
+        dst_crs=CRS.from_epsg(4326),
+        raster_variables_mapping={
+            &quot;fire_probability&quot;: lambda out: out.fire_probability,
+            &quot;ros_mean&quot;: lambda out: out.ros_mean,
+            &quot;ros_max&quot;: lambda out: out.ros_max,
+        },
+    ),
+    metadata_writer=MetadataJSONWriter(
+        start_date=cfg.init_date,
+        output_folder=output_dir,
+        prefix=&quot;metadata&quot;,
+    ),
+    isochrones_writer=IsochronesGeoJSONWriter(
+        start_date=cfg.init_date,
+        output_folder=output_dir,
+        prefix=&quot;isochrones&quot;,
+        thresholds=[0.3, 0.6, 0.9],
+        geo_info=geo_info,
+        dst_crs=CRS.from_epsg(4326),
+    ),
+)
+
+non_vegetated = sim.fuels.get_non_vegetated()
+for bc in cfg.get_boundary_conditions(geo_info, non_vegetated):
+    sim.set_boundary_conditions(bc)
+
+while True:
+    next_time = sim.next_time()
+    if next_time is None or next_time &gt; cfg.time_limit:
+        break
+
+    sim.step()
+    if sim.time % cfg.time_resolution == 0:
+        output = sim.get_output()
+        writers.write_output(output)
+
+final_output = sim.get_output()
+print(f&quot;Final simulated time: {final_output.time} seconds&quot;)
 </code></pre>
-<h2 id="basic-invocation">Basic Invocation</h2>
-<pre><code class="language-bash">uv run propagator \
-  --config example/config.json \
-  --mode geotiff \
-  --dem example/dem.tif \
-  --fuel example/fuel.tif \
-  --output results/run-2025-02-19
-</code></pre>
-<p>CLI arguments are powered by <code>pydantic-settings</code>; required inputs raise clear
-validation errors before the simulation starts.</p>
-<h2 id="operating-modes">Operating Modes</h2>
+<h3 id="key-elements">Key Elements</h3>
 <ul>
-<li><strong>GeoTIFF mode</strong> (<code>--mode geotiff</code>): supply explicit DEM (<code>--dem</code>) and fuel
-  (<code>--fuel</code>) GeoTIFF rasters. Use this for bespoke datasets or the bundled
-  quickstart sample.</li>
-<li><strong>Tiles mode</strong> (<code>--mode tiles</code>, default): point to a directory of tiled DEM
-  and vegetation rasters with <code>--tilespath</code> and choose a tileset via
-  <code>--tileset</code>. The simulator infers the geographic window from ignition
-  coordinates defined in the configuration.</li>
+<li><strong>Configuration parsing</strong>: <code>PropagatorConfigurationLegacy.model_validate_json</code>
+  applies the same schema enforced by the CLI, ensuring you reuse existing
+  validation.</li>
+<li><strong>Raster loading</strong>: <code>PropagatorDataFromGeotiffs</code> handles <code>rasterio</code> opening and
+  returns NumPy arrays along with spatial metadata in <code>geo_info</code>.</li>
+<li><strong>Output orchestration</strong>: <code>OutputWriter</code> coordinates the specialized writers.
+  You can add or remove raster variables by editing the <code>raster_variables_mapping</code>
+  dictionary.</li>
+<li><strong>Simulation loop</strong>: keep calling <code>next_time()</code> until it returns <code>None</code> or you
+  exceed <code>time_limit</code>, then advance with <code>step()</code>. Every reporting interval,
+  <code>get_output()</code> captures derived stats and raw fields ready for persistence.</li>
 </ul>
-<p>Switching between modes controls which arguments are required; passing both
-<code>--dem</code> and <code>--fuel</code> automatically activates GeoTIFF mode even if <code>--mode</code> is
-left at the default.</p>
-<h2 id="argument-reference">Argument Reference</h2>
-<table>
-<thead>
-<tr>
-<th>Flag</th>
-<th>Type / Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>--config PATH</code></td>
-<td>required</td>
-<td>JSON configuration file parsed into <code>PropagatorConfigurationLegacy</code>.</td>
-</tr>
-<tr>
-<td><code>--fuel-config PATH</code></td>
-<td>optional</td>
-<td>YAML file defining a custom fuel system (<code>fuels</code> mapping).</td>
-</tr>
-<tr>
-<td><code>--mode {tiles,geotiff}</code></td>
-<td><code>tiles</code></td>
-<td>Select how static rasters are loaded (see above).</td>
-</tr>
-<tr>
-<td><code>--dem PATH</code></td>
-<td>required in geotiff mode</td>
-<td>DEM GeoTIFF when running in geotiff mode.</td>
-</tr>
-<tr>
-<td><code>--fuel PATH</code></td>
-<td>required in geotiff mode</td>
-<td>Fuel/vegetation GeoTIFF when running in geotiff mode.</td>
-</tr>
-<tr>
-<td><code>--tilespath PATH</code></td>
-<td>required in tiles mode</td>
-<td>Base directory containing tiled rasters.</td>
-</tr>
-<tr>
-<td><code>--tileset NAME</code></td>
-<td>optional</td>
-<td>Tileset to use within <code>tilespath</code> (defaults to <code>default</code>).</td>
-</tr>
-<tr>
-<td><code>--output PATH</code></td>
-<td>required</td>
-<td>Destination directory; created if missing. Stores GeoTIFF, GeoJSON, and JSON outputs.</td>
-</tr>
-<tr>
-<td><code>--isochrones FLOAT …</code></td>
-<td><code>0.5 0.75 0.9</code></td>
-<td>Probability thresholds for GeoJSON isochrone export. Repeat the flag to set multiple values.</td>
-</tr>
-<tr>
-<td><code>--record</code></td>
-<td>flag, default off</td>
-<td>When enabled, saves a Rich console log in the output directory.</td>
-</tr>
-<tr>
-<td><code>--ignore-out-of-bounds</code></td>
-<td>flag, default off</td>
-<td>Continue the simulation when the fire reaches the DEM boundary.</td>
-</tr>
-<tr>
-<td><code>--verbose</code></td>
-<td>flag, default off</td>
-<td>Print status tables, boundary conditions, and timing information.</td>
-</tr>
-</tbody>
-</table>
-<p>Boolean switches use implicit flags: including <code>--verbose</code>, <code>--record</code>, or
-<code>--ignore-out-of-bounds</code> turns each behaviour on.</p>
-<h2 id="output-products">Output Products</h2>
-<p>During the run, the CLI periodically writes:
-- GeoTIFF rasters for fire probability, fireline intensity (mean/max), and rate
-  of spread (mean/max).
-- GeoJSON isochrones for configured probability thresholds.
-- Metadata JSON capturing CLI arguments, execution time, and summary statistics.</p>
-<p>Set <code>--record</code> to capture the Rich console log alongside these artefacts, which
-is useful for post-run audits.</p>
-<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="going-further">Going Further</h3>
 <ul>
-<li>Missing GeoTIFFs or tiles raise validation errors before the simulation
-  boots; check path spelling if you hit them.</li>
-<li>If dependency wheels complain about PROJ/GDAL, ensure the native libraries
-  are installed (see <a href="../getting-started/#prerequisites">Getting Started</a>).</li>
-<li>For reproducible runs across multiple ignitions or meteorological scenarios,
-  adjust <code>realizations</code>, <code>time_limit</code>, and <code>boundary_conditions</code> inside the
-  JSON configuration file.</li>
+<li>Swap <code>PropagatorDataFromGeotiffs</code> for <code>PropagatorDataFromTiles</code> when working
+  with tiled rasters and dynamic midpoints.</li>
+<li>Load a custom fuel system using <code>fuels_from_yaml</code> or programmatically (see <code>cli.main</code>) if the
+  legacy fuel system does not match your fuel types.</li>
+<li>Instead of the bundled writers, feed <code>PropagatorOutput</code> into your own
+  analytics pipeline—store arrays in cloud buckets, stream summaries to a
+  dashboard, or trigger scheduling logic for subsequent model runs.</li>
 </ul>
 
 
