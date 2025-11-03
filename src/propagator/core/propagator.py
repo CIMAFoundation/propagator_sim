@@ -298,7 +298,7 @@ class Propagator:
             ign_arr = boundary_condition.ignition_mask
             # check ignition_mask shape beforehand
 
-            points = np.argwhere(ign_arr)
+            points = np.argwhere(ign_arr > 0)
 
             if len(boundary_condition.ignition_mask.shape) == 2:
                 points_repeated = np.repeat(points, self.realizations, axis=0)
