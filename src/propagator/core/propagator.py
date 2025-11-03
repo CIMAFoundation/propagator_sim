@@ -296,10 +296,11 @@ class Propagator:
 
         if boundary_condition.ignition_mask is not None:
             ign_arr = boundary_condition.ignition_mask
+
+
+            points = np.argwhere(ign_arr)
+
             # check ignition_mask shape beforehand
-
-            points = np.argwhere(ign_arr > 0)
-
             if len(boundary_condition.ignition_mask.shape) == 2:
                 points_repeated = np.repeat(points, self.realizations, axis=0)
                 realizations = np.tile(
