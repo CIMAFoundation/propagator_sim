@@ -38,7 +38,7 @@ for r in range(N_REALIZATIONS):
 
 boundary_condition = BoundaryConditions(
     time=0,
-    ignition_mask=ignition_array,  # type: ignore
+    ignitions=ignition_array,  # type: ignore
     wind_speed=np.ones(dem.shape) * 40,  # km/h
     wind_dir=np.ones(dem.shape) * 90,  # degrees from north
     moisture=np.ones(dem.shape) * 0,  # percentage

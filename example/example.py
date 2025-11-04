@@ -31,10 +31,10 @@ ignition_array[center_x, center_y] = 1
 
 boundary_condition = BoundaryConditions(
     time=0,
-    ignition_mask=ignition_array,  # type: ignore
-    wind_speed=np.ones(dem.shape) * 40,  # km/h
-    wind_dir=np.ones(dem.shape) * 90,  # degrees from north
-    moisture=np.ones(dem.shape) * 0,  # percentage
+    ignitions=[(center_x, center_y)],  # type: ignore
+    wind_speed=40.0,  # km/h
+    wind_dir=90.0,  # degrees from north
+    moisture=0.0,  # percentage
 )
 simulator.set_boundary_conditions(boundary_condition)
 

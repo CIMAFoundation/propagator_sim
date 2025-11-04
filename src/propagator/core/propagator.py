@@ -35,6 +35,8 @@ from propagator.core.numba import (
 )
 from propagator.core.scheduler import Scheduler, SchedulerEvent
 
+from .utils import upcast_to_ndarray
+
 
 class PropagatorOutOfBoundsError(Exception):
     """Custom error for out-of-bounds updates in the Propagator."""
@@ -277,15 +279,24 @@ class Propagator:
 
         if boundary_condition.moisture is not None:
             # moisture is given as % we need to transform it to fraction
-            event.moisture = boundary_condition.moisture / 100.0
+            moisture = upcast_to_ndarray(
+                boundary_condition.moisture, self.dem.shape
+            )
+            event.moisture = moisture / 100.0
         if boundary_condition.wind_dir is not None:
             # wind direction is given in degrees clockwise, north is 0
             # we need to transform it to radians, counter-clockwise east is 0
-            wind_dir_radians = np.radians(boundary_condition.wind_dir)
+            wind_dir_radians = upcast_to_ndarray(
+                np.radians(boundary_condition.wind_dir), self.dem.shape
+            )
+
             event.wind_dir = wind_dir_radians
         if boundary_condition.wind_speed is not None:
             # wind speed is given in km/h
-            event.wind_speed = boundary_condition.wind_speed
+            wind_speed = upcast_to_ndarray(
+                boundary_condition.wind_speed, self.dem.shape
+            )
+            event.wind_speed = wind_speed
         if boundary_condition.additional_moisture is not None:
             # additional moisture is given as % > transform in fraction
             event.additional_moisture = (
@@ -294,21 +305,46 @@ class Propagator:
         if boundary_condition.vegetation_changes is not None:
             event.vegetation_changes = boundary_condition.vegetation_changes
 
-        if boundary_condition.ignition_mask is not None:
-            ign_arr = boundary_condition.ignition_mask
+        if boundary_condition.ignitions is not None:
+            ign_arr = boundary_condition.ignitions
+            if isinstance(ign_arr, list):
+                points = np.array(ign_arr, dtype=np.int32)
 
+                if len(points.shape) == 2 and points.shape[1] == 2:
+                    # 2D points, repeat for all realizations
+                    points_repeated = np.repeat(
+                        points, self.realizations, axis=0
+                    )
+                    realizations = np.tile(
+                        np.arange(self.realizations), len(points)
+                    )
+                elif len(points.shape) == 2 and points.shape[1] == 3:
+                    # 3D points with realization index
+                    points_repeated = points[:, :2]
+                    realizations = points[:, 2]
+                else:
+                    raise ValueError(
+                        "Invalid ignition_mask format in BoundaryConditions."
+                    )
 
-            points = np.argwhere(ign_arr)
+            elif isinstance(ign_arr, np.ndarray):  # np.ndarray case
+                points = np.argwhere(ign_arr > 0)  # type: ignore
 
-            # check ignition_mask shape beforehand
-            if len(boundary_condition.ignition_mask.shape) == 2:
-                points_repeated = np.repeat(points, self.realizations, axis=0)
-                realizations = np.tile(
-                    np.arange(self.realizations), len(points)
-                )
+                # check ignition_mask shape beforehand
+                if len(ign_arr.shape) == 2:
+                    points_repeated = np.repeat(
+                        points, self.realizations, axis=0
+                    )
+                    realizations = np.tile(
+                        np.arange(self.realizations), len(points)
+                    )
+                else:
+                    points_repeated = points
+                    realizations = points[:, 2]
             else:
-                points_repeated = points
-                realizations = points[:, 2]
+                raise ValueError(
+                    "Invalid ignition_mask format in BoundaryConditions."
+                )
 
             fireline_intensity = np.zeros_like(
                 points_repeated[:, 0], dtype=np.float32

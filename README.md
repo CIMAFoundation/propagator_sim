@@ -61,13 +61,12 @@ sim = Propagator(
     out_of_bounds_mode="raise",
 )
 
-ignition_mask = np.zeros_like(dem, dtype=np.uint8)
-ignition_mask[dem.shape[0] // 2, dem.shape[1] // 2] = 1
+ignitions = [(dem.shape[0] // 2, dem.shape[1] // 2)]
 
 sim.set_boundary_conditions(
     BoundaryConditions(
         time=0,
-        ignition_mask=ignition_mask,
+        ignitions=ignitions,
         wind_speed=np.ones_like(dem) * 40,
         wind_dir=np.ones_like(dem) * 90,
         moisture=np.zeros_like(dem),
@@ -80,6 +79,9 @@ while (next_time := sim.next_time()) is not None and sim.time <= 3600:
         fire_prob = sim.compute_fire_probability()
         # Persist or visualise probability grids here.
 ```
+
+- `ignitions` accepts either boolean rasters or `(row, col[, realization])`
+  tuples, so you can mix masks from remote sensing products with ad-hoc points.
 
 For an end-to-end script that mirrors the CLI pipeline (including loaders and
 writers), see `docs/programmatic.md` or the `example/example.py` file.

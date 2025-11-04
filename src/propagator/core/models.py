@@ -172,8 +172,13 @@ class BoundaryConditions:
         Wind direction map (weather convention, degrees clockwise, north is 0).
     wind_speed : Optional[npt.NDArray[np.floating]]
         Wind speed map (km/h).
-    ignition_mask : Optional[npt.NDArray[np.bool_]]
-        2D or 3D Boolean mask of new ignition points.
+    ignitions : Optional[
+        npt.NDArray[np.bool_]
+        | list[tuple[int, int] | tuple[int, int, int]]
+    ]
+        Ignitions to enqueue. Accepts either a boolean raster (2D applies to
+        every realisation; 3D maps explicit `realization` planes) or a list of
+        `(row, col)` / `(row, col, realization)` tuples.
     additional_moisture : Optional[npt.NDArray[np.floating]]
         Extra moisture to add to fuel (%), can be sparse.
     vegetation_changes : Optional[npt.NDArray[np.floating]]
@@ -181,10 +186,12 @@ class BoundaryConditions:
     """
 
     time: int
-    moisture: Optional[npt.NDArray[np.floating]] = None
-    wind_dir: Optional[npt.NDArray[np.floating]] = None
-    wind_speed: Optional[npt.NDArray[np.floating]] = None
-    ignition_mask: Optional[npt.NDArray[np.bool_]] = None
+    moisture: Optional[npt.ArrayLike] = None
+    wind_dir: Optional[npt.ArrayLike] = None
+    wind_speed: Optional[npt.ArrayLike] = None
+    ignitions: Optional[
+        npt.NDArray[np.bool_] | list[tuple[int, int] | tuple[int, int, int]]
+    ] = None
     additional_moisture: Optional[npt.NDArray[np.floating]] = None
     vegetation_changes: Optional[npt.NDArray[np.floating]] = None
 

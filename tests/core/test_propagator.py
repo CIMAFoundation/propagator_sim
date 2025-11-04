@@ -157,7 +157,7 @@ def test_set_boundary_conditions_enqueue_event():
             dtype=np.float32,
         ),
         wind_speed=np.full((2, 2), 12.0, dtype=np.float32),
-        ignition_mask=np.array(
+        ignitions=np.array(
             [
                 [True, False],
                 [False, False],
