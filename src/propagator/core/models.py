@@ -177,7 +177,7 @@ class BoundaryConditions:
         | list[tuple[int, int] | tuple[int, int, int]]
     ]
         Ignitions to enqueue. Accepts either a boolean raster (2D applies to
-        every realisation; 3D maps explicit `realization` planes) or a list of
+        every realization; 3D maps explicit `realization` planes) or a list of
         `(row, col)` / `(row, col, realization)` tuples.
     additional_moisture : Optional[npt.NDArray[np.floating]]
         Extra moisture to add to fuel (%), can be sparse.
