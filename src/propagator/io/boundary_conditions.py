@@ -182,7 +182,7 @@ class TimedInput(BaseModel):
             wind_speed=w_speed_arr,
             wind_dir=w_dir_arr,
             moisture=moisture_arr,
-            ignition_mask=ignition_mask,
+            ignitions=ignition_mask,
             additional_moisture=additional_moisture,
             vegetation_changes=vegetation_changes,
         )

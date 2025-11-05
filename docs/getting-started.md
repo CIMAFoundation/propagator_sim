@@ -88,13 +88,12 @@ sim = Propagator(
     out_of_bounds_mode="raise",
 )
 
-ignition_mask = np.zeros_like(dem, dtype=np.uint8)
-ignition_mask[dem.shape[0] // 2, dem.shape[1] // 2] = 1
+ignitions = [(dem.shape[0] // 2, dem.shape[1] // 2)]
 
 sim.set_boundary_conditions(
     BoundaryConditions(
         time=0,
-        ignition_mask=ignition_mask,
+        ignitions=ignitions,
         wind_speed=np.ones_like(dem) * 40,
         wind_dir=np.ones_like(dem) * 90,
         moisture=np.zeros_like(dem),
@@ -111,6 +110,7 @@ while (next_time := sim.next_time()) is not None and sim.time <= 3600:
 Key points:
 - Provide DEM/fuel rasters as NumPy arrays; no disk I/O is required unless you
   need it.
+- `ignitions` accepts boolean rasters or `(row, col[, realization])` tuples.
 - Boundary conditions can be updated over time—compute time-dependent wind or
   moisture fields before calling `set_boundary_conditions`.
 - The main loop alternates between `next_time()` to schedule time steps and

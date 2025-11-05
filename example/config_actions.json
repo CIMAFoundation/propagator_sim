@@ -6,6 +6,7 @@
     "time_limit": 144000,
     "do_spotting": true,
     "time_resolution": 1800,
+    "init_date": "2024-10-01 00:03:00",
     "boundary_conditions": [
         {
             "time": 0,

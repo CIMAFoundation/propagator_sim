@@ -156,6 +156,26 @@ class PropagatorError(Exception):
     """Domain-specific error raised by PROPAGATOR."""
 
 
+def validate_ignitions(ignitions):
+    if isinstance(ignitions, list):
+        for item in ignitions:
+            if not (
+                isinstance(item, tuple)
+                and len(item) in (2, 3)
+                and all(isinstance(x, int) for x in item)
+            ):
+                raise ValueError(
+                    "Ignition list items must be (row, col) or (row, col, realization) tuples"
+                )
+    elif isinstance(ignitions, np.ndarray):
+        if ignitions.ndim not in (2, 3):
+            raise ValueError("Ignition ndarray must be 2D or 3D boolean array")
+    else:
+        raise ValueError(
+            "Ignitions must be either a list of tuples or a boolean ndarray"
+        )
+
+
 @dataclass(frozen=True)
 class BoundaryConditions:
     """
@@ -172,8 +192,13 @@ class BoundaryConditions:
         Wind direction map (weather convention, degrees clockwise, north is 0).
     wind_speed : Optional[npt.NDArray[np.floating]]
         Wind speed map (km/h).
-    ignition_mask : Optional[npt.NDArray[np.bool_]]
-        Boolean mask of new ignition points.
+    ignitions : Optional[
+        npt.NDArray[np.bool_]
+        | list[tuple[int, int] | tuple[int, int, int]]
+    ]
+        Ignitions to enqueue. Accepts either a boolean raster (2D applies to
+        every realization; 3D maps explicit `realization` planes) or a list of
+        `(row, col)` / `(row, col, realization)` tuples.
     additional_moisture : Optional[npt.NDArray[np.floating]]
         Extra moisture to add to fuel (%), can be sparse.
     vegetation_changes : Optional[npt.NDArray[np.floating]]
@@ -181,12 +206,20 @@ class BoundaryConditions:
     """
 
     time: int
-    moisture: Optional[npt.NDArray[np.floating]] = None
-    wind_dir: Optional[npt.NDArray[np.floating]] = None
-    wind_speed: Optional[npt.NDArray[np.floating]] = None
-    ignition_mask: Optional[npt.NDArray[np.bool_]] = None
+    moisture: Optional[npt.ArrayLike] = None
+    wind_dir: Optional[npt.ArrayLike] = None
+    wind_speed: Optional[npt.ArrayLike] = None
+    ignitions: Optional[
+        npt.NDArray[np.bool_] | list[tuple[int, int] | tuple[int, int, int]]
+    ] = None
     additional_moisture: Optional[npt.NDArray[np.floating]] = None
     vegetation_changes: Optional[npt.NDArray[np.floating]] = None
+
+    def __post_init__(self):
+        if self.time < 0:
+            raise ValueError("BoundaryConditions time must be non-negative")
+        if self.ignitions is not None:
+            validate_ignitions(self.ignitions)
 
 
 @dataclass(frozen=True)

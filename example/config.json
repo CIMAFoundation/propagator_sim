@@ -13,6 +13,12 @@
             "w_dir": 0,
             "w_speed": 30,
             "moisture": 0
+        },
+        {
+            "time": 7200,
+            "w_dir": 90,
+            "w_speed": 30,
+            "moisture": 0
         }
     ]
 }

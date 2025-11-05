@@ -72,6 +72,18 @@
             }
         },
         {
+            "name": "Python Debugger: run propagator_cli.cli tiles mode",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "propagator.cli.main",
+            "console": "integratedTerminal",
+            "args": "--config example/config_from_staging_runner.json --output example/output --tilespath /share/propagator/data --tileset default",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PROJ_LIB": ".venv/share/proj/"
+            }
+        },
+        {
             "name": "Python Debugger: run example",
             "type": "debugpy",
             "request": "launch",
