@@ -216,10 +216,6 @@ class BoundaryConditions:
                     raise ValueError(
                         "Ignition ndarray must be 2D or 3D boolean array"
                     )
-                if not np.issubdtype(self.ignitions.dtype, np.bool_):
-                    raise ValueError(
-                        "Ignition ndarray must be of boolean dtype"
-                    )
             else:
                 raise ValueError(
                     "Ignitions must be either a list of tuples or a boolean ndarray"

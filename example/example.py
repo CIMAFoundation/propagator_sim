@@ -31,7 +31,7 @@ ignition_array[center_x, center_y] = 1
 
 boundary_condition = BoundaryConditions(
     time=0,
-    ignitions=[(center_x, center_y)],  # type: ignore
+    ignitions=ignition_array,  # [(center_x, center_y)],  # type: ignore
     wind_speed=40.0,  # km/h
     wind_dir=90.0,  # degrees from north
     moisture=0.0,  # percentage
