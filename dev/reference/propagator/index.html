@@ -1512,7 +1512,7 @@ the supporting data models and scheduling helpers.</p>
 
 
 <h3 id="propagator.core.BoundaryConditions" class="doc doc-heading">
-              <code class="highlight language-python"><span class="n">BoundaryConditions</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">moisture</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">wind_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">wind_speed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ignition_mask</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">additional_moisture</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vegetation_changes</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+              <code class="highlight language-python"><span class="n">BoundaryConditions</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">moisture</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">wind_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">wind_speed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ignitions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">additional_moisture</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vegetation_changes</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
@@ -1582,13 +1582,26 @@ the supporting data models and scheduling helpers.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="propagator.core.BoundaryConditions.ignition_mask">ignition_mask</span></code></td>
+            <td><code><span title="propagator.core.BoundaryConditions.ignitions">ignitions</span></code></td>
             <td>
-                  <code><span title="typing.Optional">Optional</span>[<span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.bool_">bool_</span>]]</code>
+                  <code>Optional[</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>2D or 3D Boolean mask of new ignition points.</p>
+                <p>npt.NDArray[np.bool_]
+| list[tuple[int, int] | tuple[int, int, int]]</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.BoundaryConditions.]">]</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Ignitions to enqueue. Accepts either a boolean raster (2D applies to
+every realization; 3D maps explicit <code>realization</code> planes) or a list of
+<code>(row, col)</code> / <code>(row, col, realization)</code> tuples.</p>
               </div>
             </td>
           </tr>
@@ -2188,7 +2201,7 @@ ignoring zeros as no-spread.</p>
                 <code>boundary_condition</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="BoundaryConditions(time, moisture=None, wind_dir=None, wind_speed=None, ignition_mask=None, additional_moisture=None, vegetation_changes=None)
+                  <code><a class="autorefs autorefs-internal" title="BoundaryConditions(time, moisture=None, wind_dir=None, wind_speed=None, ignitions=None, additional_moisture=None, vegetation_changes=None)
 
   
       dataclass
@@ -2536,7 +2549,7 @@ summary statistics, and output snapshots suitable for CLI and IO layers.</p>
 
 
 <h3 id="propagator.core.models.BoundaryConditions" class="doc doc-heading">
-              <code class="highlight language-python"><span class="n">BoundaryConditions</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">moisture</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">wind_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">wind_speed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ignition_mask</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">additional_moisture</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vegetation_changes</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+              <code class="highlight language-python"><span class="n">BoundaryConditions</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">moisture</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">wind_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">wind_speed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ignitions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">additional_moisture</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vegetation_changes</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
@@ -2606,13 +2619,26 @@ summary statistics, and output snapshots suitable for CLI and IO layers.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="propagator.core.models.BoundaryConditions.ignition_mask">ignition_mask</span></code></td>
+            <td><code><span title="propagator.core.models.BoundaryConditions.ignitions">ignitions</span></code></td>
             <td>
-                  <code><span title="typing.Optional">Optional</span>[<span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.bool_">bool_</span>]]</code>
+                  <code>Optional[</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>2D or 3D Boolean mask of new ignition points.</p>
+                <p>npt.NDArray[np.bool_]
+| list[tuple[int, int] | tuple[int, int, int]]</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.models.BoundaryConditions.]">]</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Ignitions to enqueue. Accepts either a boolean raster (2D applies to
+every realization; 3D maps explicit <code>realization</code> planes) or a list of
+<code>(row, col)</code> / <code>(row, col, realization)</code> tuples.</p>
               </div>
             </td>
           </tr>
@@ -3337,7 +3363,7 @@ ignoring zeros as no-spread.</p>
                 <code>boundary_condition</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="BoundaryConditions(time, moisture=None, wind_dir=None, wind_speed=None, ignition_mask=None, additional_moisture=None, vegetation_changes=None)
+                  <code><a class="autorefs autorefs-internal" title="BoundaryConditions(time, moisture=None, wind_dir=None, wind_speed=None, ignitions=None, additional_moisture=None, vegetation_changes=None)
 
   
       dataclass
