@@ -324,13 +324,12 @@ class Propagator:
                     realizations = points[:, 2]
                 else:
                     raise ValueError(
-                        "Invalid ignition_mask format in BoundaryConditions."
+                        "Invalid ignitions format in BoundaryConditions."
                     )
 
             elif isinstance(ign_arr, np.ndarray):  # np.ndarray case
                 points = np.argwhere(ign_arr > 0)  # type: ignore
 
-                # check ignition_mask shape beforehand
                 if len(ign_arr.shape) == 2:
                     points_repeated = np.repeat(
                         points, self.realizations, axis=0
@@ -343,7 +342,7 @@ class Propagator:
                     realizations = points[:, 2]
             else:
                 raise ValueError(
-                    "Invalid ignition_mask format in BoundaryConditions."
+                    "Invalid ignitions format in BoundaryConditions."
                 )
 
             fireline_intensity = np.zeros_like(
