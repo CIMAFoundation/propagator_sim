@@ -110,8 +110,7 @@ while (next_time := sim.next_time()) is not None and sim.time <= 3600:
 Key points:
 - Provide DEM/fuel rasters as NumPy arrays; no disk I/O is required unless you
   need it.
-- `ignitions` accepts boolean rasters or `(row, col[, realization])` tuples, so
-  you can bring in remote sensing edges or only reseed specific realisations.
+- `ignitions` accepts boolean rasters or `(row, col[, realization])` tuples.
 - Boundary conditions can be updated over time—compute time-dependent wind or
   moisture fields before calling `set_boundary_conditions`.
 - The main loop alternates between `next_time()` to schedule time steps and
