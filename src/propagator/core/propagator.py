@@ -327,7 +327,7 @@ class Propagator:
                         "Invalid ignitions format in BoundaryConditions."
                     )
 
-            elif isinstance(ign_arr, np.ndarray):  # np.ndarray case
+            elif isinstance(ign_arr, np.ndarray):  # Handle ignition mask as ndarray: extract ignition points
                 points = np.argwhere(ign_arr > 0)  # type: ignore
 
                 if len(ign_arr.shape) == 2:
