@@ -1,0 +1,28 @@
+name: Mirror main to pcm-dpc
+
+on:
+  push:
+    branches:
+      - push-to-pcm-dpc-test
+
+jobs:
+  mirror:
+    name: Push to pcm-dpc/propagator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push main to downstream repository
+        env:
+          TARGET_REPO: pcm-dpc/propagator.git
+          PUSH_TOKEN: ${{ secrets.PROPAGATOR_PUSH_TO_PCMDPC_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "propagator mirror bot"
+          git config user.email "propagator@users.noreply.github.com"
+          git remote add downstream "https://x-access-token:${PUSH_TOKEN}@github.com/${TARGET_REPO}"
+          git push downstream main:main --force-with-lease
+          git push downstream --tags
