@@ -195,6 +195,36 @@ class BoundaryConditions:
     additional_moisture: Optional[npt.NDArray[np.floating]] = None
     vegetation_changes: Optional[npt.NDArray[np.floating]] = None
 
+    def __post_init__(self):
+        if self.time < 0:
+            raise ValueError("BoundaryConditions time must be non-negative")
+        if self.ignitions is not None:
+            if isinstance(self.ignitions, list):
+                # check tuples are 2D or 3D
+                for item in self.ignitions:
+                    if not (
+                        isinstance(item, tuple)
+                        and len(item) in (2, 3)
+                        and all(isinstance(x, int) for x in item)
+                    ):
+                        raise ValueError(
+                            "Ignition list items must be (row, col) or (row, col, realization) tuples"
+                        )
+                # check ndarray is 2d or 3d
+            elif isinstance(self.ignitions, np.ndarray):
+                if self.ignitions.ndim not in (2, 3):
+                    raise ValueError(
+                        "Ignition ndarray must be 2D or 3D boolean array"
+                    )
+                if self.ignitions.dtype != np.bool_:
+                    raise ValueError(
+                        "Ignition ndarray must be of boolean dtype"
+                    )
+            else:
+                raise ValueError(
+                    "Ignitions must be either a list of tuples or a boolean ndarray"
+                )
+
 
 @dataclass(frozen=True)
 class PropagatorStats:
