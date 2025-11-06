@@ -13,9 +13,11 @@ readme = "README.md"
 
 
 requires-python = ">=3.11"
-dependencies = ["numba==0.62.1", "scipy>=1.16.1"]
+dependencies = ["scipy>=1.16.1"]
 
 [project.optional-dependencies]
+numba = ["numba==0.62.1"]
+
 cli = [
     "angles>=2.0",
     "fiona>=1.10.1",

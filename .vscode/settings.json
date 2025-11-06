@@ -10,5 +10,6 @@
     "editor.formatOnSave": true,
     "ruff.organizeImports": true,
     "ruff.lint.enable": true,
-    "pre-commit-helper.runOnSave": "all hooks"
+    "pre-commit-helper.runOnSave": "all hooks",
+    "python.defaultInterpreterPath": "/Users/mirko/dev/fire/propagator/propagator_sim/.venv/bin/python"
 }
