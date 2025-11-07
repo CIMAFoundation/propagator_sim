@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from propagator.core import (  # type: ignore
-    FUEL_SYSTEM_LEGACY,
     BoundaryConditions,
     Propagator,
     PropagatorOutOfBoundsError,
@@ -18,9 +17,9 @@ simulator = Propagator(
     dem=dem,
     veg=veg,
     realizations=10,
-    fuels=FUEL_SYSTEM_LEGACY,
     do_spotting=False,
     out_of_bounds_mode="raise",
+    backend="numpy",
 )
 
 # set central pixel as ignition point

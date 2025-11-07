@@ -4,12 +4,6 @@ from .models import (
     BoundaryConditions,
     PropagatorStats,
 )
-from .numba import (
-    FUEL_SYSTEM_LEGACY,
-    fuelsystem_from_dict,
-    get_p_moisture_fn,
-    get_p_time_fn,
-)
 from .propagator import (
     Propagator,
     PropagatorOutOfBoundsError,
@@ -25,9 +19,5 @@ __all__ = [
     "Propagator",
     "PropagatorOutOfBoundsError",
     "PropagatorStats",
-    "FUEL_SYSTEM_LEGACY",
-    "fuelsystem_from_dict",
-    "get_p_moisture_fn",
-    "get_p_time_fn",
     "__version__",
 ]

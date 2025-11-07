@@ -19,8 +19,11 @@ from propagator.cli.console import (
     status_propagator_msg,
 )
 from propagator.core import Propagator, PropagatorOutOfBoundsError
-from propagator.core.numba import FUEL_SYSTEM_LEGACY, fuelsystem_from_dict
-from propagator.core.numba.models import FuelSystem
+from propagator.core.numba_backend import (
+    FUEL_SYSTEM_LEGACY,
+    fuelsystem_from_dict,
+)
+from propagator.core.numba_backend.models import FuelSystem
 from propagator.io.configuration import PropagatorConfigurationLegacy
 from propagator.io.loader.geotiff import PropagatorDataFromGeotiffs
 from propagator.io.loader.protocol import PropagatorInputDataProtocol

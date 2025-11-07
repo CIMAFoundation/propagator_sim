@@ -35,8 +35,8 @@ from .utils import upcast_to_ndarray
 BackendName = Literal["numba", "numpy"]
 
 _BACKEND_MODULES: dict[BackendName, str] = {
-    "numba": "propagator.core.numba",
-    "numpy": "propagator.core.numpy",
+    "numba": "propagator.core.numba_backend",
+    "numpy": "propagator.core.numpy_backend",
 }
 _BACKEND_CACHE: dict[BackendName, Any] = {}
 
@@ -66,17 +66,6 @@ def _load_backend(name: BackendName) -> Any:
 
     _BACKEND_CACHE[name] = module
     return module
-
-
-_DEFAULT_BACKEND_NAME: BackendName = "numba"
-_DEFAULT_BACKEND_MODULE = _load_backend(_DEFAULT_BACKEND_NAME)
-
-# Backwards-compatible exports expected by external callers and tests.
-next_updates_fn = _DEFAULT_BACKEND_MODULE.next_updates_fn
-get_p_time_fn = _DEFAULT_BACKEND_MODULE.get_p_time_fn
-get_p_moisture_fn = _DEFAULT_BACKEND_MODULE.get_p_moisture_fn
-FuelSystem = _DEFAULT_BACKEND_MODULE.FuelSystem
-FUEL_SYSTEM_LEGACY = _DEFAULT_BACKEND_MODULE.FUEL_SYSTEM_LEGACY
 
 
 class PropagatorOutOfBoundsError(Exception):

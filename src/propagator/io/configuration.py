@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import List, Optional, Tuple
-import pytz
 
 import numpy as np
+import pytz
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -23,7 +23,7 @@ from propagator.core.constants import (
 from propagator.core.models import BoundaryConditions
 
 # ---- project utils ----------------------------------------------------------
-from propagator.core.numba import (
+from propagator.core.numba_backend import (
     MoistureModel,
     RateOfSpreadModel,
     get_p_moisture_fn,

@@ -1,28 +1,28 @@
 import numpy as np
 
 from propagator.core import Propagator
-from propagator.core.numba import (
+from propagator.core.numba_backend import (
     fuelsystem_from_dict as numba_fuelsystem_from_dict,
 )
-from propagator.core.numba import (
+from propagator.core.numba_backend import (
     get_p_moisture_fn as numba_get_p_moisture_fn,
 )
-from propagator.core.numba import (
+from propagator.core.numba_backend import (
     get_p_time_fn as numba_get_p_time_fn,
 )
-from propagator.core.numba import (
+from propagator.core.numba_backend import (
     next_updates_fn as numba_next_updates_fn,
 )
-from propagator.core.numpy import (
+from propagator.core.numpy_backend import (
     fuelsystem_from_dict as numpy_fuelsystem_from_dict,
 )
-from propagator.core.numpy import (
+from propagator.core.numpy_backend import (
     get_p_moisture_fn as numpy_get_p_moisture_fn,
 )
-from propagator.core.numpy import (
+from propagator.core.numpy_backend import (
     get_p_time_fn as numpy_get_p_time_fn,
 )
-from propagator.core.numpy import (
+from propagator.core.numpy_backend import (
     next_updates_fn as numpy_next_updates_fn,
 )
 
