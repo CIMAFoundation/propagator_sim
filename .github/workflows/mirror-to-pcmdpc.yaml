@@ -30,3 +30,11 @@ jobs:
           git config user.email "maplite@protezionecivile.it"
 
           git remote add downstream "https://x-access-token:${PUSH_TOKEN}@github.com/pcm-dpc/propagator.git"
+
+          # Probe access early
+          git ls-remote --heads downstream >/dev/null || { echo "No access to pcm-dpc/propagator with provided token"; exit 1; }
+
+          # Make lease meaningful
+          git fetch downstream main || true
+          git push downstream HEAD:main --force-with-lease=refs/heads/main
+          git push downstream --prune --tags
