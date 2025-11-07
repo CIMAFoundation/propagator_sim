@@ -324,10 +324,13 @@ class Propagator:
                     realizations = points[:, 2]
                 else:
                     raise ValueError(
-                        "Invalid ignitions format in BoundaryConditions."
+                        "Invalid ignitions format in BoundaryConditions: "
+                        "If providing a list, each tuple must be either (row, col) or (row, col, realization)."
                     )
 
-            elif isinstance(ign_arr, np.ndarray):  # Handle ignition mask as ndarray: extract ignition points
+            elif isinstance(
+                ign_arr, np.ndarray
+            ):  # Handle ignition mask as ndarray: extract ignition points
                 points = np.argwhere(ign_arr > 0)  # type: ignore
 
                 if len(ign_arr.shape) == 2:
@@ -342,7 +345,8 @@ class Propagator:
                     realizations = points[:, 2]
             else:
                 raise ValueError(
-                    "Invalid ignitions format in BoundaryConditions."
+                    "Invalid ignitions format in BoundaryConditions: "
+                    "If providing a numpy array, expected a 2D or 3D ignition mask."
                 )
 
             fireline_intensity = np.zeros_like(
