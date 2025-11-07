@@ -17,7 +17,7 @@ jobs:
 
       - name: Push main to downstream repository
         env:
-          TARGET_REPO: pcm-dpc/propagator.git
+          TARGET_REPO: pcm-dpc/propagator
           PUSH_TOKEN: ${{ secrets.PROPAGATOR_PUSH_TO_PCMDPC_REPO_TOKEN }}
         run: |
           set -euo pipefail
