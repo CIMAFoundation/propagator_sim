@@ -17,12 +17,12 @@ jobs:
 
       - name: Push main to downstream repository
         env:
-          TARGET_REPO: pcm-dpc/propagator
-          PUSH_TOKEN: ${{ secrets.PROPAGATOR_PUSH_TO_PCMDPC_REPO_TOKEN }}
+          TARGET_REPO: pcm-dpc/propagator.git
+          #PUSH_TOKEN: ${{ secrets.PROPAGATOR_PUSH_TO_PCMDPC_REPO_TOKEN }}
         run: |
           set -euo pipefail
           git config user.name "pcmdpc"
           git config user.email "maplite@protezionecivile.it"
-          git remote add downstream "https://pcmdpc:${PUSH_TOKEN}@github.com/${TARGET_REPO}"
+          git remote add downstream "https://x-access-token:${{secrets.PROPAGATOR_PUSH_TO_PCMDPC_REPO_TOKEN}}@github.com/${TARGET_REPO}"
           git push downstream HEAD:main --force-with-lease
           git push downstream --tags
