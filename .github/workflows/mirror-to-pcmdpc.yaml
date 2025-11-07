@@ -21,8 +21,8 @@ jobs:
           PUSH_TOKEN: ${{ secrets.PROPAGATOR_PUSH_TO_PCMDPC_REPO_TOKEN }}
         run: |
           set -euo pipefail
-          git config user.name "mirkodandrea"
-          git config user.email "mirko.dandrea@cimafoundation.org"
+          git config user.name "pcmdpc"
+          git config user.email "maplite@protezionecivile.it"
           git remote add downstream "https://x-access-token:${PUSH_TOKEN}@github.com/${TARGET_REPO}"
           git push downstream HEAD:main --force-with-lease
           git push downstream --tags
