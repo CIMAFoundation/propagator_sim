@@ -137,3 +137,4 @@ work/
 
 output/
 example/*.xml
+example/__marimo__/
