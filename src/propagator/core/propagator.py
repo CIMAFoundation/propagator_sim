@@ -60,9 +60,9 @@ class Propagator:
         2D array of vegetation codes as defined in the provided FuelSystem
     dem : numpy.ndarray
         2D array of elevation values (meters above sea level).
-    cbh : numpy.ndarray
+    cbh : numpy.ndarray, optional
         2D array of canopy base height values (meters).
-    cbd : numpy.ndarray
+    cbd : numpy.ndarray, optional
         2D array of canopy bulk density values (kg/m^3).
     fuels: FuelSystem, optional
         Object defining fuels types and fire propagation
@@ -94,9 +94,13 @@ class Propagator:
     veg: npt.NDArray[np.integer]
     dem: npt.NDArray[np.floating]
 
-    # canopy parameters
-    cbh: npt.NDArray[np.floating]  # canopy base height
-    cbd: npt.NDArray[np.floating]  # canopy bulk density
+    # canopy parameters (optional)
+    cbh: npt.NDArray[np.floating] | None = field(
+        default=None, init=False
+    )  # canopy base height [meters]
+    cbd: npt.NDArray[np.floating] | None = field(
+        default=None, init=False
+    )  # canopy bulk density [kg/m3]
 
     # set fuels
     fuels: FuelSystem = field(default_factory=lambda: FUEL_SYSTEM_LEGACY)
@@ -138,6 +142,11 @@ class Propagator:
         self.fireline_int = np.zeros(
             shape + (self.realizations,), dtype=np.float32
         )
+        # if no cbh/cbd provided, set to zeros
+        if self.cbh is None:
+            self.cbh = np.zeros(shape, dtype=np.float32)
+        if self.cbd is None:
+            self.cbd = np.zeros(shape, dtype=np.float32)
         if not self.do_spotting:
             self.fuels.disable_spotting()
 
@@ -455,8 +464,8 @@ class Propagator:
             self.time,
             self.veg,
             self.dem,
-            self.cbh,
-            self.cbd,
+            self.cbh,  # type: ignore[arg-type]
+            self.cbd,  # type: ignore[arg-type]
             self.fire,
             moisture,
             self.wind_dir,
