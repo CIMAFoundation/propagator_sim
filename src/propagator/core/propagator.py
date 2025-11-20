@@ -60,6 +60,10 @@ class Propagator:
         2D array of vegetation codes as defined in the provided FuelSystem
     dem : numpy.ndarray
         2D array of elevation values (meters above sea level).
+    cbh : numpy.ndarray
+        2D array of canopy base height values (meters).
+    cbd : numpy.ndarray
+        2D array of canopy bulk density values (kg/m^3).
     fuels: FuelSystem, optional
         Object defining fuels types and fire propagation
         probability between fuel types
@@ -89,6 +93,10 @@ class Propagator:
     # input
     veg: npt.NDArray[np.integer]
     dem: npt.NDArray[np.floating]
+
+    # canopy parameters
+    cbh: npt.NDArray[np.floating]  # canopy base height
+    cbd: npt.NDArray[np.floating]  # canopy bulk density
 
     # set fuels
     fuels: FuelSystem = field(default_factory=lambda: FUEL_SYSTEM_LEGACY)
@@ -141,7 +149,33 @@ class Propagator:
         numpy.ndarray
             2D array with values in [0, 1].
         """
-        values = np.mean(self.fire, axis=2).astype(np.float32)
+        where_fire = np.where(self.fire > 0, 1, 0)  # considering also other status
+        values = np.mean(where_fire, axis=2).astype(np.float32)
+        return values
+
+    def compute_crowning_probability(self) -> npt.NDArray[np.floating]:
+        """Return mean crowning probability across realizations for each cell.
+
+        Returns
+        -------
+        numpy.ndarray
+            2D array with values in [0, 1].
+        """
+        # compute where crowning, either passive or active
+        is_crowning = np.where((self.fire == 2) | (self.fire == 3), 1, 0)
+        values = np.mean(is_crowning, axis=2).astype(np.float32)
+        return values
+
+    def compute_active_crowning_probability(self) -> npt.NDArray[np.floating]:
+        """Return mean crowning probability across realizations for each cell.
+
+        Returns
+        -------
+        numpy.ndarray
+            2D array with values in [0, 1].
+        """
+        is_active_crowning = np.where(self.fire == 3, 1, 0)
+        values = np.mean(is_active_crowning, axis=2).astype(np.float32)
         return values
 
     def compute_ros_max(self) -> npt.NDArray[np.floating]:
@@ -354,9 +388,13 @@ class Propagator:
             )
 
             ros = np.zeros_like(points_repeated[:, 0], dtype=np.float32)
+            status = np.ones_like(
+                points_repeated[:, 0], dtype=np.int8
+            )  # set as burning
             event.updates = UpdateBatch(
                 rows=points_repeated[:, 0],
                 cols=points_repeated[:, 1],
+                status=status,
                 realizations=realizations,
                 fireline_intensities=fireline_intensity,
                 rates_of_spread=ros,
@@ -385,10 +423,11 @@ class Propagator:
         rows = updates.rows
         cols = updates.cols
         realizations = updates.realizations
+        status = updates.status
         ros = updates.rates_of_spread
         fireline_intensity = updates.fireline_intensities
 
-        self.fire[rows, cols, realizations] = 1
+        self.fire[rows, cols, realizations] = status
         self.ros[rows, cols, realizations] = ros
         self.fireline_int[rows, cols, realizations] = fireline_intensity
 
@@ -416,6 +455,8 @@ class Propagator:
             self.time,
             self.veg,
             self.dem,
+            self.cbh,
+            self.cbd,
             self.fire,
             moisture,
             self.wind_dir,
@@ -510,6 +551,7 @@ class Propagator:
         rows = updates.rows[must_be_updated]
         cols = updates.cols[must_be_updated]
         realizations = updates.realizations[must_be_updated]
+        status = updates.status[must_be_updated]
         ros = updates.rates_of_spread[must_be_updated]
         fireline_intensity = updates.fireline_intensities[must_be_updated]
 
@@ -517,6 +559,7 @@ class Propagator:
             rows=rows,
             cols=cols,
             realizations=realizations,
+            status=status,
             rates_of_spread=ros,
             fireline_intensities=fireline_intensity,
         )
@@ -589,6 +632,8 @@ class Propagator:
                 RoS, intensity, stats.
         """
         fire_probability = self.compute_fire_probability()
+        crowning_probability = self.compute_crowning_probability()
+        active_crowning_probability = self.compute_active_crowning_probability()
         ros_max = self.compute_ros_max()
         ros_mean = self.compute_ros_mean()
         fireline_intensity_max = self.compute_fireline_int_max()
@@ -598,6 +643,8 @@ class Propagator:
         return PropagatorOutput(
             time=int(self.time),
             fire_probability=fire_probability,
+            crowning_probability=crowning_probability,
+            active_crowning_probability=active_crowning_probability,
             ros_mean=ros_mean,
             ros_max=ros_max,
             fli_mean=fireline_intensity_mean,

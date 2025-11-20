@@ -544,3 +544,91 @@ def get_probability_to_neighbour(
     p_prob = clip(p_prob * moisture_effect, 0, 1.0)
     # try the propagation
     return p_prob
+
+
+@jit(cache=True, nopython=True, fastmath=True)
+def probability_crowning(
+    wind_speed: float,  # km/h - at 10m
+    canopy_base_height: float,  # Fuel Strata Gap (FSG) in original publication
+    surface_fuel_consumption: float,  # surface fuel for combustion (kg/m2)
+    ffmc: float,  # fine fuel moisture content (fraction)
+) -> float:
+    """
+    Determine if crown fire initiation occurs
+    From: Cruz et al. (2004)
+    "Modeling the Likelihood of Crown Fire Occurrence in Conifer Forest Stands"
+
+    Parameters
+    ----------
+    wind_speed : float
+        Wind speed at 10 meters (km/h).
+    canopy_base_height : float
+        Canopy base height (m).
+    surface_fuel_consumption : float
+        Available surface fuel for combustion (kg/m2).
+    ffmc : float
+        Fine fuel moisture content (fraction).
+
+    Returns
+    -------
+    float
+        porbability of crowning.
+    """
+    ffmc_perc = ffmc * 100  # convert to percentage
+    if surface_fuel_consumption <= 1.0:
+        d_1 = 1.0
+        d_2 = 0.0
+    elif surface_fuel_consumption <= 2.0:
+        d_1 = 0.0
+        d_2 = 1.0
+    else:
+        d_1 = 0.0
+        d_2 = 0.0
+    # constants
+    b0 = 4.236
+    b1 = 0.357
+    b2 = -0.710
+    b31 = -4.613
+    b32 = -1.856
+    b5 = -0.331
+    # function
+    g_x = b0 + b1*wind_speed + b2*canopy_base_height + \
+        b31 * d_1 + b32 * d_2 + b5*ffmc_perc
+    # probability of crowning
+    p_crown = np.exp(g_x) / (1 + np.exp(g_x))
+    return p_crown
+
+
+@jit(cache=True, nopython=True, fastmath=True)
+def criterion_active_crowning(
+    wind_speed: float,  # km/h
+    canopy_bulk_density: float,   # canopy bulk density (kg/m3)
+    ffmc: float,  # fine fuel moisture content (fraction)
+) -> float:
+    """
+    Estimate crown fire rate of spread based on wind speed at 10 meters.
+    Alexander and Cruz (2005)
+    "Evaluating a model for predicting active crown fire rate
+    of spread using wildfire observations"
+
+    Parameters
+    ----------
+    wind_speed : float
+        Wind speed at 10 meters (km/h).
+    canopy_bulk_density : float
+        Canopy bulk density (kg/m3).
+    ffmc : float
+        Fine fuel moisture content (fraction).
+
+    Returns
+    -------
+    float
+        Crown fire active crowning criterion (CAC).
+    """
+    ffmc_perc = ffmc * 100  # convert to percentage
+    # active crowning
+    ros_crown_active = 11.02*(wind_speed**0.9)*(
+        canopy_bulk_density**0.9)*np.exp(-0.17*ffmc_perc)
+    # CAC : criteria for active crowning
+    cac = ros_crown_active / (3 / canopy_bulk_density)
+    return cac

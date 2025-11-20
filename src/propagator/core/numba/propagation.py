@@ -19,6 +19,8 @@ from .functions import (
     fireline_intensity,
     get_probability_to_neighbour,
     lhv_fuel,
+    probability_crowning,
+    criterion_active_crowning
 )
 from .models import Fuel, FuelSystem
 
@@ -103,7 +105,7 @@ def compute_spotting(
     wind_dir: float,
     wind_speed: float,
     fuels: FuelSystem,
-) -> list[tuple[int, int, int, float, float]]:
+) -> list[tuple[int, int, int, int, float, float]]:
     """
     Compute ember spotting updates for a given cell.
 
@@ -196,7 +198,7 @@ def compute_spotting(
 
         ember_landing_time = max(int(ember_landing_time), 1)
 
-        spotting_update = (ember_landing_time, row_to, col_to, np.nan, np.nan)
+        spotting_update = (ember_landing_time, row_to, col_to, 1, np.nan, np.nan)
         spotting_updates.append(spotting_update)
 
     return spotting_updates
@@ -206,6 +208,8 @@ def compute_spotting(
 def calculate_fire_behavior(
     fuel_from: Fuel,
     fuel_to: Fuel,
+    cbh_to: float,  # canopy base height of target cell
+    cbd_to: float,  # canopy bulk density of target cell
     dh: float,
     dist: float,
     angle: float,
@@ -213,7 +217,7 @@ def calculate_fire_behavior(
     w_dir: float,
     w_speed: float,
     p_time_fn: Any,
-) -> tuple[int, float, float]:
+) -> tuple[int, int, float, float]:
     """Calculate fire behaviour during propagation between cells
 
     Parameters
@@ -222,6 +226,10 @@ def calculate_fire_behavior(
         The fuel object for the source cell.
     fuel_to : Fuel
         The fuel object for the target cell.
+    cbh_to : float
+        The canopy base height of the target cell (m).
+    cbd_to : float
+        The canopy bulk density of the target cell (kg/m3).
     dh : float
         The elevation difference between the source and target cells (m).
     dist : float
@@ -271,7 +279,30 @@ def calculate_fire_behavior(
         lhv_dead_fuel_value,
         lhv_canopy_value,
     )
-    return transition_time, ros_value, fireline_intensity_value
+    status = 1  # surface fire
+
+    # CROWNING
+    if cbh_to <= 0.0 or cbd_to <= 0.0:  # no canopy
+        return transition_time, status, ros_value, fireline_intensity_value
+    # check for crownfire initiation
+    p_crown = probability_crowning(
+        w_speed,
+        cbh_to,
+        fuel_to.d0,
+        moisture
+    )
+    if p_crown > 0.5:  # crown fire
+        # compute criterion for active crowning
+        cac = criterion_active_crowning(
+            w_speed,
+            cbd_to,
+            moisture,
+        )
+        if cac >= 1.0:  # crowning active
+            status = 3  # active crown fire
+        else:
+            status = 2  # passive crown fire
+    return transition_time, status, ros_value, fireline_intensity_value
 
 
 @jit(cache=False, parallel=False, nopython=True, fastmath=True)
@@ -281,6 +312,8 @@ def single_cell_updates(
     cellsize: float,
     veg: npt.NDArray[np.integer],
     dem: npt.NDArray[np.floating],
+    cbh: npt.NDArray[np.floating],
+    cbd: npt.NDArray[np.floating],
     fire: npt.NDArray[np.int8],
     moisture: npt.NDArray[np.floating],
     wind_dir: npt.NDArray[np.floating],
@@ -288,7 +321,7 @@ def single_cell_updates(
     fuels: FuelSystem,
     p_time_fn: Any,
     p_moist_fn: Any,
-) -> list[tuple[int, int, int, float, float]]:
+) -> list[tuple[int, int, int, int, float, float]]:
     """
     Apply fire spread to a single cell and get the next spread updates.
 
@@ -304,6 +337,10 @@ def single_cell_updates(
         The 2D vegetation array
     dem : npt.NDArray[np.floating]
         The 2D digital elevation model array
+    cbh : npt.NDArray[np.floating]
+        The 2D canopy base height array (units: meters)
+    cbd : npt.NDArray[np.floating]
+        The 2D canopy bulk density array (units: kg/m3)
     fire: npt.NDArray[np.int8]
         The 2D current fire state
     moisture: npt.NDArray[np.floating]
@@ -356,6 +393,10 @@ def single_cell_updates(
         veg_to = veg[row_to, col_to]
         dist_to = dist_to_lattice * cellsize
 
+        # crowning
+        cbh_to = cbh[row_to, col_to]
+        cbd_to = cbd[row_to, col_to]
+
         # keep only pixels where fire can spread
         if fire[row_to, col_to] != 0 or veg_to == NO_FUEL:
             continue
@@ -384,9 +425,11 @@ def single_cell_updates(
 
         fuel_to = fuels.get_fuel(veg_to)  # type: ignore
 
-        transition_time, ros, fireline_intensity = calculate_fire_behavior(
+        transition_time, status, ros, fireline_intensity = calculate_fire_behavior(
             fuel_from,
             fuel_to,
+            cbh_to,  # type: ignore
+            cbd_to,  # type: ignore
             dh,
             dist_to,
             angle_to,
@@ -396,7 +439,7 @@ def single_cell_updates(
             p_time_fn,
         )
         fire_spread_updates.append(
-            (transition_time, row_to, col_to, ros, fireline_intensity)
+            (transition_time, row_to, col_to, status, ros, fireline_intensity)
         )
 
     if fuel_from.spotting:
@@ -424,6 +467,8 @@ def next_updates_fn(
     time: int,
     veg: npt.NDArray[np.integer],
     dem: npt.NDArray[np.floating],
+    cbh: npt.NDArray[np.floating],
+    cbd: npt.NDArray[np.floating],
     fire: npt.NDArray[np.int8],
     moisture: npt.NDArray[np.floating],
     wind_dir: npt.NDArray[np.floating],
@@ -451,6 +496,10 @@ def next_updates_fn(
         The 2D vegetation array
     dem : npt.NDArray[np.floating]
         The 2D digital elevation model array
+    cbh : npt.NDArray[np.floating]
+        The 2D canopy base height array (units: meters)
+    cbd : npt.NDArray[np.floating]
+        The 2D canopy bulk density array (units: kg/m^3)
     fire: npt.NDArray[np.int8]
         The 3D current fire state
     moisture: npt.NDArray[np.floating]
@@ -477,6 +526,7 @@ def next_updates_fn(
     next_rows = []
     next_cols = []
     next_realizations = []
+    next_status = []
     next_times = []
     next_ros = []
     next_fireline_intensities = []
@@ -492,6 +542,8 @@ def next_updates_fn(
             cellsize,
             veg,
             dem,
+            cbh,
+            cbd,
             fire[:, :, realization],
             moisture,
             wind_dir,
@@ -502,13 +554,14 @@ def next_updates_fn(
         )
 
         for fire_spread in fire_spread_update:
-            (transition_time, row_to, col_to, ros, fireline_intensity) = (
+            (transition_time, row_to, col_to, status, ros, fireline_intensity) = (
                 fire_spread
             )
             next_times.append(time + transition_time)
             next_rows.append(row_to)
             next_cols.append(col_to)
             next_realizations.append(realization)
+            next_status.append(status)
             next_ros.append(ros)
             next_fireline_intensities.append(fireline_intensity)
 
@@ -517,6 +570,7 @@ def next_updates_fn(
         np.array(next_rows),
         np.array(next_cols),
         np.array(next_realizations),
+        np.array(next_status),
         np.array(next_ros),
         np.array(next_fireline_intensities),
     )

@@ -18,12 +18,13 @@ import numpy.typing as npt
 FireBehaviourUpdate = tuple[int, int, int, float, float]
 
 UpdateBatchTuple = tuple[
-    npt.NDArray[np.integer],
-    npt.NDArray[np.integer],
-    npt.NDArray[np.integer],
-    npt.NDArray[np.integer],
-    npt.NDArray[np.float32],
-    npt.NDArray[np.float32],
+    npt.NDArray[np.integer],  # time
+    npt.NDArray[np.integer],  # row
+    npt.NDArray[np.integer],  # col
+    npt.NDArray[np.integer],  # realization
+    npt.NDArray[np.integer],  # status
+    npt.NDArray[np.float32],  # rate_of_spread
+    npt.NDArray[np.float32],  # fireline_intensity
 ]
 
 
@@ -38,6 +39,10 @@ class UpdateBatch:
     )
 
     realizations: npt.NDArray[np.integer] = field(
+        default_factory=lambda: np.empty((0,), dtype=np.int32)
+    )
+
+    status: npt.NDArray[np.integer] = field(
         default_factory=lambda: np.empty((0,), dtype=np.int32)
     )
 
@@ -56,6 +61,7 @@ class UpdateBatch:
         if not (
             len(self.cols) == n
             and len(self.realizations) == n
+            and len(self.status) == n
             and len(self.rates_of_spread) == n
             and len(self.fireline_intensities) == n
         ):
@@ -77,6 +83,7 @@ class UpdateBatch:
         self.realizations = np.concatenate(
             [self.realizations, other.realizations]
         )
+        self.status = np.concatenate([self.status, other.status])
         self.rates_of_spread = np.concatenate(
             [self.rates_of_spread, other.rates_of_spread]
         )
@@ -107,6 +114,7 @@ class UpdateBatchWithTime:
     rows: npt.NDArray[np.integer]
     cols: npt.NDArray[np.integer]
     realizations: npt.NDArray[np.integer]
+    status: npt.NDArray[np.integer]
     rates_of_spread: npt.NDArray[np.float32]
     fireline_intensities: npt.NDArray[np.float32]
 
@@ -117,6 +125,7 @@ class UpdateBatchWithTime:
             rows,
             cols,
             realizations,
+            status,
             rates_of_spread,
             fireline_intensities,
         ) = data
@@ -125,6 +134,7 @@ class UpdateBatchWithTime:
             rows=rows,
             cols=cols,
             realizations=realizations,
+            status=status,
             rates_of_spread=rates_of_spread,
             fireline_intensities=fireline_intensities,
         )
@@ -137,6 +147,7 @@ class UpdateBatchWithTime:
             cols_at_time = self.cols[index]
             rows_at_time = self.rows[index]
             realizations_at_time = self.realizations[index]
+            status_at_time = self.status[index]
             ros_at_time = self.rates_of_spread[index]
             fireline_intensity_at_time = self.fireline_intensities[index]
 
@@ -144,6 +155,7 @@ class UpdateBatchWithTime:
                 rows_at_time,
                 cols_at_time,
                 realizations_at_time,
+                status_at_time,
                 ros_at_time,
                 fireline_intensity_at_time,
             )
@@ -253,6 +265,8 @@ class PropagatorOutput:
 
     time: int  # seconds from simulation start
     fire_probability: npt.NDArray[np.floating]
+    crowning_probability: npt.NDArray[np.floating]
+    active_crowning_probability: npt.NDArray[np.floating]
     ros_mean: npt.NDArray[np.floating]
     ros_max: npt.NDArray[np.floating]
     fli_mean: npt.NDArray[np.floating]
