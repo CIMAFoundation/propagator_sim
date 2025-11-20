@@ -60,10 +60,6 @@ class Propagator:
         2D array of vegetation codes as defined in the provided FuelSystem
     dem : numpy.ndarray
         2D array of elevation values (meters above sea level).
-    cbh : numpy.ndarray, optional
-        2D array of canopy base height values (meters).
-    cbd : numpy.ndarray, optional
-        2D array of canopy bulk density values (kg/m^3).
     fuels: FuelSystem, optional
         Object defining fuels types and fire propagation
         probability between fuel types
@@ -83,6 +79,11 @@ class Propagator:
         Units are compliant with other functions.
             signature: (moist: float) -> float
 
+    cbh : numpy.ndarray, optional
+        2D array of canopy base height values (meters).
+    cbd : numpy.ndarray, optional
+        2D array of canopy bulk density values (kg/m^3).
+
     out_of_bounds_mode: Literal["ignore", "error"], optional
         Whether to raise an error if out-of-bounds updates are detected.
         Default is "error".
@@ -93,14 +94,6 @@ class Propagator:
     # input
     veg: npt.NDArray[np.integer]
     dem: npt.NDArray[np.floating]
-
-    # canopy parameters (optional)
-    cbh: npt.NDArray[np.floating] | None = field(
-        default=None, init=False
-    )  # canopy base height [meters]
-    cbd: npt.NDArray[np.floating] | None = field(
-        default=None, init=False
-    )  # canopy bulk density [kg/m3]
 
     # set fuels
     fuels: FuelSystem = field(default_factory=lambda: FUEL_SYSTEM_LEGACY)
@@ -129,6 +122,10 @@ class Propagator:
         default=None, init=False
     )  # additional moisture due to fighting actions
     # (ideally it should decay over time)
+
+    # canopy parameters (optional)
+    cbh: npt.NDArray[np.floating] | None = None  # canopy base height [meters]
+    cbd: npt.NDArray[np.floating] | None = None  # canopy bulk density [kg/m3]
 
     out_of_bounds_mode: Literal["ignore", "raise"] = "raise"
 

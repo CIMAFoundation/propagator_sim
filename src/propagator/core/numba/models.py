@@ -20,6 +20,7 @@ spec = [
     ("spotting", types.boolean),
     ("prob_ign_by_embers", types.float64),
     ("burn", types.boolean),
+    ("crowning", types.boolean),
     ("name", types.string),
 ]
 
@@ -37,6 +38,7 @@ class Fuel:
         spotting: bool = False,
         prob_ign_by_embers: float = 0.0,
         burn: bool = True,
+        crowning: bool = False,
     ):
         """
         Initialize a Fuel object.
@@ -61,6 +63,8 @@ class Fuel:
             The probability of ignition by embers (default is 0.0)
         burn : bool, optional
             Whether the fuel type is combustible (default is True)
+        crowning : bool, optional
+            Whether the fuel type is prone to crowning (default is False)
         """
         self.v0 = v0
         self.d0 = d0
@@ -71,6 +75,7 @@ class Fuel:
         self.prob_ign_by_embers = prob_ign_by_embers
         self.burn = burn
         self.name = name
+        self.crowning = crowning
 
 
 spec = [
@@ -84,6 +89,7 @@ spec = [
     ("spotting", types.boolean[:]),
     ("prob_ign_by_embers", types.float64[:]),
     ("burn", types.boolean[:]),
+    ("crowning", types.boolean[:]),
     ("name", types.DictType(types.int64, types.string)),
     ("_non_vegetated", types.int64),
 ]
@@ -106,6 +112,7 @@ class FuelSystem:
         self.spotting = np.zeros(n_fuels, dtype=np.bool_)
         self.prob_ign_by_embers = np.zeros(n_fuels, dtype=np.float64)
         self.burn = np.ones(n_fuels, dtype=np.bool_)
+        self.crowning = np.zeros(n_fuels, dtype=np.bool_)
         self.name = Dict.empty(key_type=types.int64, value_type=types.string)
         self._non_vegetated = -1
 
@@ -137,6 +144,7 @@ class FuelSystem:
         spotting: bool = False,
         prob_ign_by_embers: float = 0.0,
         burn: bool = True,
+        crowning: bool = False,
     ) -> None:
         """
         Adds a Fuel object to the FuelSystem.
@@ -163,6 +171,8 @@ class FuelSystem:
             The probability of ignition by embers (default is 0.0)
         burn : bool, optional
             Whether the fuel type is combustible (default is True)
+        crowning : bool, optional
+            Whether the fuel type is prone to crowning (default is False)
         """
         n = len(self.fuels_id.keys())
         if fuel_id in self.fuels_id:
@@ -177,6 +187,7 @@ class FuelSystem:
         self.prob_ign_by_embers[n] = prob_ign_by_embers
         self.burn[n] = burn
         self.name[n] = name
+        self.crowning[n] = crowning
         if not burn:
             self._non_vegetated = fuel_id
 
@@ -205,6 +216,7 @@ class FuelSystem:
             self.spotting[i],  # type: ignore
             self.prob_ign_by_embers[i],  # type: ignore
             self.burn[i],  # type: ignore
+            self.crowning[i],  # type: ignore
         )
 
     def disable_spotting(self):
@@ -239,6 +251,7 @@ def fuelsystem_from_dict(fuels: dict[int, dict]) -> FuelSystem:
             fuel.get("spotting", False),
             fuel.get("prob_ign_by_embers", 0.0),
             fuel.get("burn", True),
+            fuel.get("crowning", False),
         )
     for from_id, fuel in fuels.items():
         for to_id, prob in fuel["spread_probability"].items():

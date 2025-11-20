@@ -282,7 +282,8 @@ def calculate_fire_behavior(
     status = 1  # surface fire
 
     # CROWNING
-    if cbh_to <= 0.0 or cbd_to <= 0.0:  # no canopy
+    do_crowning = fuel_to.crowning and (cbh_to > 0.0) and (cbd_to > 0.0)
+    if not do_crowning:  # skip crowning module
         return transition_time, status, ros_value, fireline_intensity_value
     # check for crownfire initiation
     p_crown = probability_crowning(
