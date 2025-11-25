@@ -137,4 +137,4 @@ work/
 
 output/
 example/*.xml
-example/__marimo__/
+example/__marimo__/*
