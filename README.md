@@ -35,7 +35,7 @@ uv run propagator \
   --config example/config.json \
   --mode geotiff \
   --dem example/dem.tif \
-  --fuel example/veg.tif \
+  --fuel example/fuel.tif \
   --output results/quickstart
 ```
 
