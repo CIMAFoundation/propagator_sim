@@ -1,0 +1,294 @@
+fuels:
+  0:  # fuel type ID > code in the fuel map
+    name: "not vegetated"
+    v0: 20  # nominal rate of spread [m/h]
+    d0: 0.1  # dead fuel load [kg/m2]
+    hhv: 100  # higher heating value [kJ/kg]
+    # d1:  # live fuel load [kg/m2] (optional)
+    # humidity:  # fuel moisture content [%] (optional)
+    spread_probability: {  # probability of fire spread on other fuels
+        0: 0.005,
+        1: 0.005,
+        2: 0.005,
+        3: 0.005,
+        4: 0.005,
+        5: 0.005,
+        6: 0.005,
+        7: 0.005,
+        8: 0.005,
+        9: 0.005,
+        10: 0.005,
+        11: 0.005,
+        12: 0.005,
+    }
+    burn: False  # whether this fuel can burn (default: True, optional)
+    # spotting:  # whether this fuel can generate embers (default: False, optional)
+    # prob_ign_by_embers:  # probability of ignition by embers (optional)
+  #### GRASSLAND FUELS
+  1:
+    name: "grassland - low susceptibility"
+    v0: 60
+    d0: 0.5
+    hhv: 17000
+    spread_probability: {
+        0: 0.005,
+        1: 0.075,
+        2: 0.475,
+        3: 0.475,
+        4: 0.075,
+        5: 0.25,
+        6: 0.25,
+        7: 0.075,
+        8: 0.375,
+        9: 0.375,
+        10: 0.075,
+        11: 0.35,
+        12: 0.35,
+    }
+  2:
+    name: "grassland - medium susceptibility"
+    v0: 120
+    d0: 0.5
+    hhv: 17000
+    spread_probability: {
+        0: 0.005,
+        1: 0.075,
+        2: 0.475,
+        3: 0.475,
+        4: 0.075,
+        5: 0.25,
+        6: 0.25,
+        7: 0.075,
+        8: 0.35,
+        9: 0.35,
+        10: 0.075,
+        11: 0.25,
+        12: 0.25,
+    }
+  3:
+    name: "grassland - high susceptibility"
+    v0: 120
+    d0: 0.5
+    hhv: 17000
+    spread_probability: {
+        0: 0.005,
+        1: 0.075,
+        2: 0.475,
+        3: 0.475,
+        4: 0.075,
+        5: 0.25,
+        6: 0.25,
+        7: 0.075,
+        8: 0.35,
+        9: 0.35,
+        10: 0.075,
+        11: 0.25,
+        12: 0.25,
+    }
+  #### BROADLEAVES FUELS
+  4:
+    name: "broadleaves - low susceptibility"
+    v0: 60
+    d0: 1.5
+    hhv: 20000
+    d1: 3  
+    humidity: 60
+    spread_probability: {
+        0: 0.005,
+        1: 0.075,
+        2: 0.475,
+        3: 0.475,
+        4: 0.075,
+        5: 0.25,
+        6: 0.25,
+        7: 0.075,
+        8: 0.375,
+        9: 0.375,
+        10: 0.075,
+        11: 0.35,
+        12: 0.35,
+    }
+  5:
+    name: "broadleaves - medium susceptibility"
+    v0: 140
+    d0: 1.5
+    hhv: 20000
+    d1: 3  
+    humidity: 60
+    spread_probability: {
+        0: 0.005,
+        1: 0.075,
+        2: 0.45,
+        3: 0.45,
+        4: 0.075,
+        5: 0.3,
+        6: 0.3,
+        7: 0.075,
+        8: 0.375,
+        9: 0.375,
+        10: 0.075,
+        11: 0.225,
+        12: 0.225,
+    }
+  6:
+    name: "broadleaves - high susceptibility"
+    v0: 140
+    d0: 1.5
+    hhv: 20000
+    d1: 3  
+    humidity: 60
+    spread_probability: {
+        0: 0.005,
+        1: 0.075,
+        2: 0.45,
+        3: 0.45,
+        4: 0.075,
+        5: 0.3,
+        6: 0.3,
+        7: 0.075,
+        8: 0.375,
+        9: 0.375,
+        10: 0.075,
+        11: 0.225,
+        12: 0.225,
+    }
+  #### SHRUBS FUELS
+  7:
+    name: "shrubs - low susceptibility"
+    v0: 60
+    d0: 1
+    hhv: 21000
+    d1: 3  
+    humidity: 45
+    spread_probability: {
+        0: 0.005,
+        1: 0.075,
+        2: 0.475,
+        3: 0.475,
+        4: 0.075,
+        5: 0.25,
+        6: 0.25,
+        7: 0.075,
+        8: 0.375,
+        9: 0.375,
+        10: 0.075,
+        11: 0.35,
+        12: 0.35,
+    }
+  8:
+    name: "shrubs - medium susceptibility"
+    v0: 140
+    d0: 1
+    hhv: 21000
+    d1: 3  
+    humidity: 45
+    spread_probability: {
+        0: 0.005,
+        1: 0.1,
+        2: 0.475,
+        3: 0.475,
+        4: 0.1,
+        5: 0.375,
+        6: 0.375,
+        7: 0.1,
+        8: 0.375,
+        9: 0.375,
+        10: 0.1,
+        11: 0.325,
+        12: 0.325,
+    }
+  9:
+    name: "shrubs - high susceptibility"
+    v0: 140
+    d0: 1
+    hhv: 21000
+    d1: 3  
+    humidity: 45
+    spread_probability: {
+        0: 0.005,
+        1: 0.1,
+        2: 0.475,
+        3: 0.475,
+        4: 0.1,
+        5: 0.375,
+        6: 0.375,
+        7: 0.1,
+        8: 0.375,
+        9: 0.375,
+        10: 0.1,
+        11: 0.325,
+        12: 0.325,
+    }
+  #### CONIFERS FUELS
+  10:
+    name: "conifers - low susceptibility"
+    v0: 60
+    d0: 1
+    hhv: 21000
+    d1: 4  
+    humidity: 55
+    spread_probability: {
+        0: 0.005,
+        1: 0.075,
+        2: 0.475,
+        3: 0.475,
+        4: 0.075,
+        5: 0.25,
+        6: 0.25,
+        7: 0.075,
+        8: 0.375,
+        9: 0.375,
+        10: 0.075,
+        11: 0.35,
+        12: 0.35,
+    }
+    spotting: True  # whether this fuel can generate embers (default: False, optional)
+    prob_ign_by_embers: 0.4  # probability of ignition by embers (optional)
+  11:
+    name: "conifers - medium susceptibility"
+    v0: 200
+    d0: 1
+    hhv: 21000
+    d1: 4  
+    humidity: 55
+    spread_probability: {
+        0: 0.005,
+        1: 0.275,
+        2: 0.475,
+        3: 0.475,
+        4: 0.275,
+        5: 0.275,
+        6: 0.275,
+        7: 0.275,
+        8: 0.4,
+        9: 0.4,
+        10: 0.275,
+        11: 0.35,
+        12: 0.35,
+    }
+    spotting: True  # whether this fuel can generate embers (default: False, optional)
+    prob_ign_by_embers: 0.4  # probability of ignition by emb
+  12:
+    name: "conifers - high susceptibility"
+    v0: 200
+    d0: 1
+    hhv: 21000
+    d1: 4  
+    humidity: 55
+    spread_probability: {
+        0: 0.005,
+        1: 0.275,
+        2: 0.475,
+        3: 0.475,
+        4: 0.275,
+        5: 0.275,
+        6: 0.275,
+        7: 0.275,
+        8: 0.4,
+        9: 0.4,
+        10: 0.275,
+        11: 0.35,
+        12: 0.35,
+    }
+    spotting: True  # whether this fuel can generate embers (default: False, optional)
+    prob_ign_by_embers: 0.4  # probability of ignition by emb
