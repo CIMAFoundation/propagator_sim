@@ -27,7 +27,7 @@ from propagator.core.models import (
     UpdateBatchWithTime,
 )
 from propagator.core.numba import (
-    FUEL_SYSTEM_LEGACY,
+    FUEL_SYSTEM_12CLASSES,
     FuelSystem,
     get_p_moisture_fn,
     get_p_time_fn,
@@ -91,7 +91,7 @@ class Propagator:
     dem: npt.NDArray[np.floating]
 
     # set fuels
-    fuels: FuelSystem = field(default_factory=lambda: FUEL_SYSTEM_LEGACY)
+    fuels: FuelSystem = field(default_factory=lambda: FUEL_SYSTEM_12CLASSES)
 
     # simulation settings
     cellsize: float = field(default=CELLSIZE)

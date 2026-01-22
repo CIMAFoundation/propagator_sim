@@ -8,7 +8,10 @@ from numba import types
 from numba.experimental import jitclass
 from numba.typed import Dict
 
-from propagator.core.constants import FUEL_SYSTEM_LEGACY_DICT
+from propagator.core.constants import (
+    FUEL_SYSTEM_LEGACY_DICT,
+    FUEL_SYSTEM_12CLASSES_DICT
+)
 from propagator.core.models import PropagatorError
 
 spec = [
@@ -247,3 +250,4 @@ def fuelsystem_from_dict(fuels: dict[int, dict]) -> FuelSystem:
 
 
 FUEL_SYSTEM_LEGACY = fuelsystem_from_dict(FUEL_SYSTEM_LEGACY_DICT)
+FUEL_SYSTEM_12CLASSES = fuelsystem_from_dict(FUEL_SYSTEM_12CLASSES_DICT)

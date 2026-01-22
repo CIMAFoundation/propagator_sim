@@ -6,6 +6,7 @@ from .models import (
 )
 from .numba import (
     FUEL_SYSTEM_LEGACY,
+    FUEL_SYSTEM_12CLASSES,
     fuelsystem_from_dict,
     get_p_moisture_fn,
     get_p_time_fn,
@@ -26,6 +27,7 @@ __all__ = [
     "PropagatorOutOfBoundsError",
     "PropagatorStats",
     "FUEL_SYSTEM_LEGACY",
+    "FUEL_SYSTEM_12CLASSES",
     "fuelsystem_from_dict",
     "get_p_moisture_fn",
     "get_p_time_fn",

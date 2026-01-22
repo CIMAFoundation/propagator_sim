@@ -19,7 +19,10 @@ from propagator.cli.console import (
     status_propagator_msg,
 )
 from propagator.core import Propagator, PropagatorOutOfBoundsError
-from propagator.core.numba import FUEL_SYSTEM_LEGACY, fuelsystem_from_dict
+from propagator.core.numba import (
+    FUEL_SYSTEM_12CLASSES,
+    fuelsystem_from_dict
+)
 from propagator.core.numba.models import FuelSystem
 from propagator.io.configuration import PropagatorConfigurationLegacy
 from propagator.io.loader.geotiff import PropagatorDataFromGeotiffs
@@ -214,9 +217,9 @@ def main() -> None:
         if cli.verbose:
             info_msg(f"Fuel system loaded from {cli.fuel_config}")
     else:
-        fuel_system = FUEL_SYSTEM_LEGACY
+        fuel_system = FUEL_SYSTEM_12CLASSES
         if cli.verbose:
-            info_msg("Using legacy fuel system")
+            info_msg("Using 12-classes fuel system")
 
     loader: PropagatorInputDataProtocol | None = None
 
