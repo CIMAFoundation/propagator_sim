@@ -18,8 +18,25 @@ D4 = 2.0
 D5 = 50.0
 A = 1 - ((D1 * (D2 * np.tanh((0 / D3) - D4))) + (0 / D5))
 
-# Fire-spotting distance coefficient
+# Fire-spotting distance coefficient (Alexandridis)
 FIRE_SPOTTING_DISTANCE_COEFFICIENT = 0.191
+
+# Spotting model parameters
+# Alexandridis et al. (2009, 2011)
+ALEXANDRIDIS_RN_MEAN = 100.0
+ALEXANDRIDIS_RN_STD = 25.0
+
+# Trucchia et al. (2020)
+TRUCCHIA_ALPHA = 0.5
+TRUCCHIA_BETA = 1.8
+
+# Pereira et al. (2015) - Portuguese model
+PEREIRA_K1 = 0.15
+PEREIRA_K2 = 0.8
+
+# Koo et al. (2010) - Physics-based
+KOO_EMBER_HEIGHT = 15.0  # meters
+KOO_TERMINAL_VELOCITY = 2.0  # m/s
 
 # Rothermel parameters
 ROTHERMEL_ALPHA1 = 0.0693
@@ -49,6 +66,7 @@ MOISTURE_OF_EXTINCTION = 0.3
 
 RateOfSpreadModel = Literal["wang", "rothermel"]
 MoistureModel = Literal["trucchia", "baghino"]
+SpottingModel = Literal["alexandridis", "trucchia", "pereira", "koo"]
 
 
 @jit(cache=False)
@@ -494,6 +512,230 @@ def fireline_intensity(
     """
     intensity = (ros / 60) * (lhv_dead_fuel * d0 + lhv_canopy * d1)
     return intensity
+
+
+# ---- Spotting Distance Models ----
+
+
+@jit(cache=False)
+def spotting_distance_alexandridis(
+    angle: float,
+    w_dir: float,
+    w_speed: float,
+    rn_mean: float = ALEXANDRIDIS_RN_MEAN,
+    rn_std: float = ALEXANDRIDIS_RN_STD,
+) -> tuple[float, float]:
+    """Calculate spotting distance using Alexandridis formulation.
+    
+    Alexandridis et al. (2008, 2011) - Exponential model with wind effect.
+    
+    Parameters
+    ----------
+    angle : float
+        The angle of the ember's trajectory (clockwise radians, 0 is north -> south)
+    w_dir : float
+        The wind direction (clockwise radians, 0 is north -> south)
+    w_speed : float
+        The wind speed (km/h)
+    rn_mean : float, optional
+        Mean of the Gaussian distribution for ember thrust (default: 100.0)
+    rn_std : float, optional
+        Standard deviation of the Gaussian distribution (default: 25.0)
+        
+    Returns
+    -------
+    tuple[float, float]
+        The spotting distance (meters) and the landing time (seconds)
+    """
+    from numpy.random import normal
+    
+    r_n = normal(rn_mean, rn_std)
+    w_speed_ms = w_speed / 3.6  # wind speed [m/s]
+    if w_speed_ms <= 0:
+        return 0.0, 1.0
+    
+    ember_distance = r_n * np.exp(
+        w_speed_ms
+        * FIRE_SPOTTING_DISTANCE_COEFFICIENT
+        * (np.cos(w_dir - angle) - 1)
+    )
+    ember_landing_time_sec = ember_distance / w_speed_ms
+    return ember_distance, ember_landing_time_sec
+
+
+@jit(cache=False)
+def spotting_distance_trucchia(
+    angle: float,
+    w_dir: float,
+    w_speed: float,
+    alpha: float = TRUCCHIA_ALPHA,
+    beta: float = TRUCCHIA_BETA,
+) -> tuple[float, float]:
+    """Calculate spotting distance using Trucchia formulation.
+    
+    Trucchia et al. (2020) - Power-law based model.
+    
+    Parameters
+    ----------
+    angle : float
+        The angle of the ember's trajectory (clockwise radians, 0 is north -> south)
+    w_dir : float
+        The wind direction (clockwise radians, 0 is north -> south)
+    w_speed : float
+        The wind speed (km/h)
+    alpha : float, optional
+        Scaling coefficient (default: 0.5)
+    beta : float, optional
+        Wind power exponent (default: 1.8)
+        
+    Returns
+    -------
+    tuple[float, float]
+        The spotting distance (meters) and the landing time (seconds)
+    """
+    from numpy.random import exponential, uniform
+    
+    w_speed_ms = w_speed / 3.6  # wind speed [m/s]
+    if w_speed_ms <= 0:
+        return 0.0, 1.0
+    
+    # Base distance from exponential distribution
+    base_distance = exponential(100.0)
+    
+    # Wind effect with power-law
+    wind_factor = alpha * (w_speed_ms ** beta)
+    
+    # Angular correction
+    angular_correction = 1.0 + 0.5 * np.cos(w_dir - angle)
+    
+    ember_distance = base_distance * wind_factor * angular_correction
+    ember_landing_time_sec = ember_distance / w_speed_ms
+    return ember_distance, ember_landing_time_sec
+
+
+@jit(cache=False)
+def spotting_distance_pereira(
+    angle: float,
+    w_dir: float,
+    w_speed: float,
+    k1: float = PEREIRA_K1,
+    k2: float = PEREIRA_K2,
+) -> tuple[float, float]:
+    """Calculate spotting distance using Pereira formulation.
+    
+    Pereira et al. (2015) - Portuguese model with simplified physics.
+    
+    Parameters
+    ----------
+    angle : float
+        The angle of the ember's trajectory (clockwise radians, 0 is north -> south)
+    w_dir : float
+        The wind direction (clockwise radians, 0 is north -> south)
+    w_speed : float
+        The wind speed (km/h)
+    k1 : float, optional
+        Distance coefficient (default: 0.15)
+    k2 : float, optional
+        Wind adjustment factor (default: 0.8)
+        
+    Returns
+    -------
+    tuple[float, float]
+        The spotting distance (meters) and the landing time (seconds)
+    """
+    from numpy.random import lognormal
+    
+    w_speed_ms = w_speed / 3.6  # wind speed [m/s]
+    if w_speed_ms <= 0:
+        return 0.0, 1.0
+    
+    # Log-normal distribution for ember distance
+    log_distance = lognormal(4.5, 0.6)
+    
+    # Wind-dependent scaling
+    wind_scaling = k1 * w_speed_ms * (1 + k2 * np.cos(w_dir - angle))
+    
+    ember_distance = log_distance * wind_scaling
+    ember_landing_time_sec = ember_distance / w_speed_ms
+    return ember_distance, ember_landing_time_sec
+
+
+@jit(cache=False)
+def spotting_distance_koo(
+    angle: float,
+    w_dir: float,
+    w_speed: float,
+    ember_height: float = KOO_EMBER_HEIGHT,
+    terminal_velocity: float = KOO_TERMINAL_VELOCITY,
+) -> tuple[float, float]:
+    """Calculate spotting distance using Koo formulation.
+    
+    Koo et al. (2010) - Physics-based model with ember flight time.
+    
+    Parameters
+    ----------
+    angle : float
+        The angle of the ember's trajectory (clockwise radians, 0 is north -> south)
+    w_dir : float
+        The wind direction (clockwise radians, 0 is north -> south)
+    w_speed : float
+        The wind speed (km/h)
+    ember_height : float, optional
+        Initial ember height (meters, default: 15.0)
+    terminal_velocity : float, optional
+        Ember terminal velocity (m/s, default: 2.0)
+        
+    Returns
+    -------
+    tuple[float, float]
+        The spotting distance (meters) and the landing time (seconds)
+    """
+    from numpy.random import uniform
+    
+    w_speed_ms = w_speed / 3.6  # wind speed [m/s]
+    if w_speed_ms <= 0:
+        return 0.0, 1.0
+    
+    # Flight time based on falling from height
+    flight_time = ember_height / terminal_velocity
+    
+    # Horizontal distance with wind drift and directional component
+    horizontal_wind = w_speed_ms * np.cos(w_dir - angle)
+    
+    # Add some randomness to account for turbulence
+    turbulence_factor = uniform(0.7, 1.3)
+    
+    ember_distance = horizontal_wind * flight_time * turbulence_factor
+    ember_distance = max(ember_distance, 0.0)  # Prevent negative distances
+    
+    return ember_distance, flight_time
+
+
+def get_spotting_fn(spotting_model_code: SpottingModel) -> Any:
+    """Select a spotting distance model by code.
+    
+    Parameters
+    ----------
+    spotting_model_code : SpottingModel
+        The code of the spotting model to select.
+        
+    Returns
+    -------
+    function
+        Function with signature
+        `(angle, w_dir, w_speed) -> (distance_m, time_s)`.
+    """
+    match spotting_model_code:
+        case "alexandridis":
+            return spotting_distance_alexandridis
+        case "trucchia":
+            return spotting_distance_trucchia
+        case "pereira":
+            return spotting_distance_pereira
+        case "koo":
+            return spotting_distance_koo
+    
+    raise ValueError(f"Unknown spotting_model_code: {spotting_model_code!r}")
 
 
 @jit(cache=False, nopython=True, fastmath=True)

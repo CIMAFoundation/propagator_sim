@@ -125,6 +125,7 @@ def advance_front_until(
     fuels,
     p_time_fn,
     p_moist_fn,
+    spotting_fn,
     out_of_bounds: npt.NDArray[np.int8],
     track_spotting: bool,
 ) -> None:
@@ -181,6 +182,7 @@ def advance_front_until(
                 fuels,
                 p_time_fn,
                 p_moist_fn,
+                spotting_fn,
             )
 
             for update in updates:

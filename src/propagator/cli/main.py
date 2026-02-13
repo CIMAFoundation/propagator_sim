@@ -306,6 +306,7 @@ def main() -> None:
         out_of_bounds_mode="ignore" if cli.ignore_out_of_bounds else "raise",
         p_time_fn=cfg.p_time_fn if cfg.p_time_fn is not None else None,
         p_moist_fn=cfg.p_moist_fn if cfg.p_moist_fn is not None else None,
+        spotting_fn=cfg.spotting_fn if cfg.spotting_fn is not None else None,
     )
 
     non_vegetated = fuel_system.get_non_vegetated()

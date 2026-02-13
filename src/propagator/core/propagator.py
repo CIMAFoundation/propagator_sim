@@ -18,6 +18,7 @@ from propagator.core.constants import (
     MOISTURE_MODEL_DEFAULT,
     REALIZATIONS,
     ROS_DEFAULT,
+    SPOTTING_MODEL_DEFAULT,
 )
 from propagator.core.models import (
     BoundaryConditions,
@@ -31,6 +32,7 @@ from propagator.core.numba import (
     advance_front_until,
     get_p_moisture_fn,
     get_p_time_fn,
+    get_spotting_fn,
 )
 from propagator.core.scheduler import Scheduler, SchedulerEvent
 
@@ -100,6 +102,7 @@ class Propagator:
     # selected simulation functions
     p_time_fn: Any = field(default=get_p_time_fn(ROS_DEFAULT))
     p_moist_fn: Any = field(default=get_p_moisture_fn(MOISTURE_MODEL_DEFAULT))
+    spotting_fn: Any = field(default=get_spotting_fn(SPOTTING_MODEL_DEFAULT))
 
     # scheduler object
     scheduler: Scheduler = field(init=False)
@@ -805,6 +808,7 @@ class Propagator:
             self.fuels,
             self.p_time_fn,
             self.p_moist_fn,
+            self.spotting_fn,
             out_of_bounds,
             self.do_spotting,
         )

@@ -103,6 +103,7 @@ def compute_spotting(
     wind_dir: float,
     wind_speed: float,
     fuels: FuelSystem,
+    spotting_fn: Any,
 ) -> list[tuple[int, int, int, float, float, bool]]:
     """
     Compute ember spotting updates for a given cell.
@@ -125,6 +126,9 @@ def compute_spotting(
         The wind speed (km/h)
     fuels : FuelSystem
         The fuel system object
+    spotting_fn : Any
+        The function to compute the spotting distance (must be jit-compiled).
+            signature: (angle: float, w_dir: float, w_speed: float) -> tuple[float, float]
 
     Returns
     -------
@@ -149,7 +153,7 @@ def compute_spotting(
         # calculate distance > depends on wind speed and direction
         # NOTE: it is computed considering wind speed and direction
         # of the cell of origin of the ember
-        ember_distance, ember_landing_time = fire_spotting(
+        ember_distance, ember_landing_time = spotting_fn(
             ember_angle,
             wind_dir,
             wind_speed,
@@ -291,6 +295,7 @@ def single_cell_updates(
     fuels: FuelSystem,
     p_time_fn: Any,
     p_moist_fn: Any,
+    spotting_fn: Any,
 ) -> list[tuple[int, int, int, float, float, bool]]:
     """
     Apply fire spread to a single cell and get the next spread updates.
@@ -323,6 +328,9 @@ def single_cell_updates(
     p_moist_fn: Any
         The function to compute the moisture probability (must be jit-compiled). Units are compliant with other functions.
             signature: (moist: float) -> float
+    spotting_fn: Any
+        The function to compute the spotting distance (must be jit-compiled). Units are compliant with other functions.
+            signature: (angle: float, w_dir: float, w_speed: float) -> tuple[float, float]
 
     Returns
     -------
@@ -413,6 +421,7 @@ def single_cell_updates(
             wind_dir[row, col],
             wind_speed[row, col],
             fuels,
+            spotting_fn,
         )
         fire_spread_updates.extend(spotting_updates)
 
@@ -435,6 +444,7 @@ def next_updates_fn(
     fuels: FuelSystem,
     p_time_fn: Any,
     p_moist_fn: Any,
+    spotting_fn: Any,
 ) -> UpdateBatchTuple:
     """
     Compute the next updates for the fire spread simulation.
@@ -471,6 +481,9 @@ def next_updates_fn(
     p_moist_fn: Any
         The function to compute the moisture probability (must be jit-compiled). Units are compliant with other functions.
             signature: (moist: float) -> float
+    spotting_fn: Any
+        The function to compute the spotting distance (must be jit-compiled). Units are compliant with other functions.
+            signature: (angle: float, w_dir: float, w_speed: float) -> tuple[float, float]
 
     Returns
     -------
@@ -503,6 +516,7 @@ def next_updates_fn(
             fuels,
             p_time_fn,
             p_moist_fn,
+            spotting_fn,
         )
 
         for fire_spread in fire_spread_update:

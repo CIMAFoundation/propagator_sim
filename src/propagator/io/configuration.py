@@ -19,6 +19,7 @@ from propagator.core.constants import (
     MOISTURE_MODEL_DEFAULT,
     REALIZATIONS,
     ROS_DEFAULT,
+    SPOTTING_MODEL_DEFAULT,
 )
 from propagator.core.models import BoundaryConditions
 
@@ -26,8 +27,10 @@ from propagator.core.models import BoundaryConditions
 from propagator.core.numba import (
     MoistureModel,
     RateOfSpreadModel,
+    SpottingModel,
     get_p_moisture_fn,
     get_p_time_fn,
+    get_spotting_fn,
 )
 from propagator.io.boundary_conditions import TimedInput
 from propagator.io.geo import GeographicInfo
@@ -71,6 +74,9 @@ class PropagatorConfigurationLegacy(BaseModel):
         CELLSIZE, gt=0.0, description="Cell size in meters"
     )
     do_spotting: bool = Field(False, description="Spotting option")
+    spotting_model: SpottingModel = Field(
+        SPOTTING_MODEL_DEFAULT, description="Spotting model name"
+    )
     ros_model: RateOfSpreadModel = Field(
         ROS_DEFAULT, description="ROS model name"
     )
@@ -84,6 +90,7 @@ class PropagatorConfigurationLegacy(BaseModel):
     # --- models ---
     p_time_fn: Optional[object] = Field(default=None, exclude=True)
     p_moist_fn: Optional[object] = Field(default=None, exclude=True)
+    spotting_fn: Optional[object] = Field(default=None, exclude=True)
 
     # --- boundary conditions ---
     boundary_conditions: List[TimedInput] = Field(
@@ -147,6 +154,7 @@ class PropagatorConfigurationLegacy(BaseModel):
         # set the functions
         self.p_time_fn = get_p_time_fn(self.ros_model)
         self.p_moist_fn = get_p_moisture_fn(self.prob_moist_model)
+        self.spotting_fn = get_spotting_fn(self.spotting_model)
         if self.p_time_fn is None:
             raise ValueError(f"Unknown ROS model: {self.ros_model}")
         if self.p_moist_fn is None:
@@ -154,6 +162,8 @@ class PropagatorConfigurationLegacy(BaseModel):
                 f"Unknown moisture model: \
                 {self.prob_moist_model}"
             )
+        if self.spotting_fn is None:
+            raise ValueError(f"Unknown spotting model: {self.spotting_model}")
 
         # checks on boundary conditions
         # check if boundary condition is empty

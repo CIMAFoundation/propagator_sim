@@ -7,6 +7,7 @@ REALIZATIONS = 100
 # --- DEFAULT MODELS ---
 ROS_DEFAULT: Literal["wang", "rothermel"] = "wang"
 MOISTURE_MODEL_DEFAULT: Literal["trucchia", "baghino"] = "trucchia"
+SPOTTING_MODEL_DEFAULT: Literal["alexandridis", "trucchia", "pereira", "koo"] = "alexandridis"
 
 
 # --- FUEL SYSTEM LEGACY ---
