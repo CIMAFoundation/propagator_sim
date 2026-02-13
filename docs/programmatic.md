@@ -59,6 +59,7 @@ sim = Propagator(
     out_of_bounds_mode="ignore",
     p_time_fn=cfg.p_time_fn,
     p_moist_fn=cfg.p_moist_fn,
+    spotting_fn=cfg.spotting_fn,  # Uses spotting model from config
 )
 
 writers = OutputWriter(
@@ -119,6 +120,44 @@ print(f"Final simulated time: {final_output.time} seconds")
 - **Simulation loop**: keep calling `next_time()` until it returns `None` or you
   exceed `time_limit`, then advance with `step()`. Every reporting interval,
   `get_output()` captures derived stats and raw fields ready for persistence.
+
+### Spotting Models
+
+The simulator supports multiple ember spotting models to choose from:
+
+- **`alexandridis`** (default): Alexandridis et al. (2008, 2011) - Exponential model with wind effect
+- **`trucchia`**: Trucchia et al. (2020) - Power-law based model
+- **`pereira`**: Pereira et al. (2015) - Portuguese model with simplified physics
+- **`koo`**: Koo et al. (2010) - Physics-based model with ember flight time
+
+To use a specific spotting model, either configure it in your JSON config:
+
+```json
+{
+  "do_spotting": true,
+  "spotting_model": "trucchia"
+}
+```
+
+Or set it programmatically:
+
+```python
+from propagator.core.numba import get_spotting_fn
+
+spotting_fn = get_spotting_fn("trucchia")  # or "alexandridis", "pereira", "koo"
+
+sim = Propagator(
+    dem=dem,
+    veg=veg,
+    do_spotting=True,
+    spotting_fn=spotting_fn,
+    # ... other parameters
+)
+```
+
+Each model implements different physics and stochastic behavior for ember
+transport, allowing you to compare predictions or select the most appropriate
+model for your region and fuel types.
 
 ### Going Further
 
