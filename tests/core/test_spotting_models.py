@@ -22,7 +22,7 @@ def test_get_spotting_fn_returns_correct_function():
 
 def test_get_spotting_fn_raises_for_unknown_model():
     """Test that factory raises ValueError for unknown model."""
-    with pytest.raises(ValueError, match="Unknown spotting_model_code"):
+    with pytest.raises(ValueError, match="Unknown spotting model"):
         get_spotting_fn("unknown_model")
 
 

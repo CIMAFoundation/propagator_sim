@@ -728,7 +728,7 @@ def get_spotting_fn(spotting_model_code: SpottingModel) -> Any:
         case "koo":
             return spotting_distance_koo
 
-    raise ValueError(f"Unknown spotting_model_code: {spotting_model_code!r}")
+    raise ValueError(f"Unknown spotting model: {spotting_model_code!r}")
 
 
 @jit(cache=False, nopython=True, fastmath=True)
