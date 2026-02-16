@@ -9,13 +9,10 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 from numba import jit  # type: ignore
-from numpy.random import normal, poisson, random, uniform
+from numpy.random import poisson, random, uniform
 
 from propagator.core.constants import NO_FUEL
 from propagator.core.models import UpdateBatchTuple
-from propagator.core.numba.functions import (
-    ALEXANDRIDIS_FIRE_SPOTTING_DISTANCE_COEFFICIENT,
-)
 
 from .functions import (
     fireline_intensity,
@@ -54,45 +51,6 @@ NEIGHBOURS_DISTANCE = np.sqrt(NEIGHBOURS[:, 0] ** 2 + NEIGHBOURS[:, 1] ** 2)
 NEIGHBOURS_ANGLE = (
     np.arctan2(NEIGHBOURS[:, 1], -NEIGHBOURS[:, 0]) + np.pi
 ) % (2 * np.pi)
-
-
-@jit(cache=False)
-def fire_spotting(
-    angle: float,
-    w_dir: float,
-    w_speed: float,
-) -> tuple[float, float]:
-    """Evaluate spotting distance using Alexandridis' formulation.
-
-    Parameters
-    ----------
-    angle : float
-        The angle of the ember's trajectory (clockwise radians, 0 is north -> south)
-    w_dir : float
-        The wind direction (clockwise radians, 0 is north -> south)
-    w_speed : float
-        The wind speed (km/h)
-
-    Returns
-    -------
-    tuple[float, float]
-        The spotting distance (meters) and the landing time (seconds)
-    """
-    r_n = normal(
-        SPOTTING_RN_MEAN, SPOTTING_RN_STD
-    )  # main thrust of the ember: sampled from a
-    # Gaussian Distribution (Alexandridis et al, 2008 and 2011)
-    w_speed_ms = w_speed / 3.6  # wind speed [m/s]
-    if w_speed_ms <= 0:
-        return 0.0, 1.0
-    # Alexandridis' formulation for spotting distance
-    ember_distance = r_n * np.exp(
-        w_speed_ms
-        * ALEXANDRIDIS_FIRE_SPOTTING_DISTANCE_COEFFICIENT
-        * (np.cos(w_dir - angle) - 1)
-    )
-    ember_landing_time_sec = ember_distance / w_speed_ms
-    return ember_distance, ember_landing_time_sec
 
 
 @jit(cache=False, nopython=True, fastmath=True)
