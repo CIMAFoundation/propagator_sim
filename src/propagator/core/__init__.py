@@ -9,6 +9,7 @@ from .numba import (
     fuelsystem_from_dict,
     get_p_moisture_fn,
     get_p_time_fn,
+    get_spotting_fn,
 )
 from .propagator import (
     Propagator,
@@ -29,5 +30,6 @@ __all__ = [
     "fuelsystem_from_dict",
     "get_p_moisture_fn",
     "get_p_time_fn",
+    "get_spotting_fn",
     "__version__",
 ]

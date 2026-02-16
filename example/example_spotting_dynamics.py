@@ -12,6 +12,7 @@ from propagator.core import (  # type: ignore
     Propagator,
     PropagatorOutOfBoundsError,
     fuelsystem_from_dict,
+    get_spotting_fn,
 )
 
 FUEL_SYSTEM_LEGACY_DICT = {
@@ -188,7 +189,7 @@ def main() -> None:
     # Available spotting models: "alexandridis" (default), "trucchia", "pereira", "koo"
     # To use a different model, import and pass spotting_fn:
     # from propagator.core.numba import get_spotting_fn
-    # spotting_fn = get_spotting_fn("trucchia")  # or "pereira", "koo"
+    spotting_fn = get_spotting_fn("trucchia")  # or "pereira", "koo"
 
     sim = Propagator(
         dem=dem,
@@ -198,7 +199,7 @@ def main() -> None:
         cellsize=20.0,
         do_spotting=True,
         out_of_bounds_mode="ignore",
-        # spotting_fn=spotting_fn,  # Optional: uncomment to use a different model
+        spotting_fn=spotting_fn,  # Optional: uncomment to use a different model
     )
 
     # Strong, uniform wind to amplify long-range spotting transport.
