@@ -13,7 +13,9 @@ from numpy.random import normal, poisson, random, uniform
 
 from propagator.core.constants import NO_FUEL
 from propagator.core.models import UpdateBatchTuple
-from propagator.core.numba.functions import FIRE_SPOTTING_DISTANCE_COEFFICIENT
+from propagator.core.numba.functions import (
+    ALEXANDRIDIS_FIRE_SPOTTING_DISTANCE_COEFFICIENT,
+)
 
 from .functions import (
     fireline_intensity,
@@ -86,7 +88,7 @@ def fire_spotting(
     # Alexandridis' formulation for spotting distance
     ember_distance = r_n * np.exp(
         w_speed_ms
-        * FIRE_SPOTTING_DISTANCE_COEFFICIENT
+        * ALEXANDRIDIS_FIRE_SPOTTING_DISTANCE_COEFFICIENT
         * (np.cos(w_dir - angle) - 1)
     )
     ember_landing_time_sec = ember_distance / w_speed_ms

@@ -19,11 +19,9 @@ D4 = 2.0
 D5 = 50.0
 A = 1 - ((D1 * (D2 * np.tanh((0 / D3) - D4))) + (0 / D5))
 
-# Fire-spotting distance coefficient (Alexandridis)
-FIRE_SPOTTING_DISTANCE_COEFFICIENT = 0.191
-
 # Spotting model parameters
 # Alexandridis et al. (2009, 2011)
+ALEXANDRIDIS_FIRE_SPOTTING_DISTANCE_COEFFICIENT = 0.191
 ALEXANDRIDIS_RN_MEAN = 100.0
 ALEXANDRIDIS_RN_STD = 25.0
 
@@ -555,7 +553,7 @@ def spotting_distance_alexandridis(
 
     ember_distance = r_n * np.exp(
         w_speed_ms
-        * FIRE_SPOTTING_DISTANCE_COEFFICIENT
+        * ALEXANDRIDIS_FIRE_SPOTTING_DISTANCE_COEFFICIENT
         * (np.cos(w_dir - angle) - 1)
     )
     ember_landing_time_sec = ember_distance / w_speed_ms
@@ -600,7 +598,7 @@ def spotting_distance_trucchia(
     base_distance = exponential(100.0)
 
     # Wind effect with power-law
-    wind_factor = alpha * (w_speed_ms ** beta)
+    wind_factor = alpha * (w_speed_ms**beta)
 
     # Angular correction
     angular_correction = 1.0 + 0.5 * np.cos(w_dir - angle)
