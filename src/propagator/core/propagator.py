@@ -79,8 +79,8 @@ class Propagator:
         Units are compliant with other functions.
             signature: (moist: float) -> float
 
-    cbh : numpy.ndarray, optional
-        2D array of canopy base height values (meters).
+    fsg : numpy.ndarray, optional
+        2D array of fuel strata gap values (meters).
     cbd : numpy.ndarray, optional
         2D array of canopy bulk density values (kg/m^3).
 
@@ -124,7 +124,7 @@ class Propagator:
     # (ideally it should decay over time)
 
     # canopy parameters (optional)
-    cbh: npt.NDArray[np.floating] | None = None  # canopy base height [meters]
+    fsg: npt.NDArray[np.floating] | None = None  # fuel strata gap [meters]
     cbd: npt.NDArray[np.floating] | None = None  # canopy bulk density [kg/m3]
 
     out_of_bounds_mode: Literal["ignore", "raise"] = "raise"
@@ -139,9 +139,9 @@ class Propagator:
         self.fireline_int = np.zeros(
             shape + (self.realizations,), dtype=np.float32
         )
-        # if no cbh/cbd provided, set to zeros
-        if self.cbh is None:
-            self.cbh = np.zeros(shape, dtype=np.float32)
+        # if no fsg/cbd provided, set to zeros
+        if self.fsg is None:
+            self.fsg = np.full(shape, np.nan, dtype=np.float32)
         if self.cbd is None:
             self.cbd = np.zeros(shape, dtype=np.float32)
         if not self.do_spotting:
@@ -461,7 +461,7 @@ class Propagator:
             self.time,
             self.veg,
             self.dem,
-            self.cbh,  # type: ignore[arg-type]
+            self.fsg,  # type: ignore[arg-type]
             self.cbd,  # type: ignore[arg-type]
             self.fire,
             moisture,

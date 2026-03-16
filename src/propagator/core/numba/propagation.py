@@ -208,7 +208,7 @@ def compute_spotting(
 def calculate_fire_behavior(
     fuel_from: Fuel,
     fuel_to: Fuel,
-    cbh_to: float,  # canopy base height of target cell
+    fsg_to: float,  # fuel strata gap of target cell
     cbd_to: float,  # canopy bulk density of target cell
     dh: float,
     dist: float,
@@ -226,8 +226,8 @@ def calculate_fire_behavior(
         The fuel object for the source cell.
     fuel_to : Fuel
         The fuel object for the target cell.
-    cbh_to : float
-        The canopy base height of the target cell (m).
+    fsg_to : float
+        The fuel strata gap of the target cell (m).
     cbd_to : float
         The canopy bulk density of the target cell (kg/m3).
     dh : float
@@ -282,13 +282,17 @@ def calculate_fire_behavior(
     status = 1  # surface fire
 
     # CROWNING
-    do_crowning = fuel_to.crowning and (cbh_to > 0.0) and (cbd_to > 0.0)
+    do_crowning = (
+        fuel_to.crowning
+        and (cbd_to > 0.0)
+        and not np.isnan(fsg_to)
+    )
     if not do_crowning:  # skip crowning module
         return transition_time, status, ros_value, fireline_intensity_value
     # check for crownfire initiation
     p_crown = probability_crowning(
         w_speed,
-        cbh_to,
+        fsg_to,
         fuel_to.d0,
         moisture
     )
@@ -313,7 +317,7 @@ def single_cell_updates(
     cellsize: float,
     veg: npt.NDArray[np.integer],
     dem: npt.NDArray[np.floating],
-    cbh: npt.NDArray[np.floating],
+    fsg: npt.NDArray[np.floating],
     cbd: npt.NDArray[np.floating],
     fire: npt.NDArray[np.int8],
     moisture: npt.NDArray[np.floating],
@@ -338,8 +342,8 @@ def single_cell_updates(
         The 2D vegetation array
     dem : npt.NDArray[np.floating]
         The 2D digital elevation model array
-    cbh : npt.NDArray[np.floating]
-        The 2D canopy base height array (units: meters)
+    fsg : npt.NDArray[np.floating]
+        The 2D fuel strata gap array (units: meters)
     cbd : npt.NDArray[np.floating]
         The 2D canopy bulk density array (units: kg/m3)
     fire: npt.NDArray[np.int8]
@@ -395,7 +399,7 @@ def single_cell_updates(
         dist_to = dist_to_lattice * cellsize
 
         # crowning
-        cbh_to = cbh[row_to, col_to]
+        fsg_to = fsg[row_to, col_to]
         cbd_to = cbd[row_to, col_to]
 
         # keep only pixels where fire can spread
@@ -429,7 +433,7 @@ def single_cell_updates(
         transition_time, status, ros, fireline_intensity = calculate_fire_behavior(
             fuel_from,
             fuel_to,
-            cbh_to,  # type: ignore
+            fsg_to,  # type: ignore
             cbd_to,  # type: ignore
             dh,
             dist_to,
@@ -468,7 +472,7 @@ def next_updates_fn(
     time: int,
     veg: npt.NDArray[np.integer],
     dem: npt.NDArray[np.floating],
-    cbh: npt.NDArray[np.floating],
+    fsg: npt.NDArray[np.floating],
     cbd: npt.NDArray[np.floating],
     fire: npt.NDArray[np.int8],
     moisture: npt.NDArray[np.floating],
@@ -497,8 +501,8 @@ def next_updates_fn(
         The 2D vegetation array
     dem : npt.NDArray[np.floating]
         The 2D digital elevation model array
-    cbh : npt.NDArray[np.floating]
-        The 2D canopy base height array (units: meters)
+    fsg : npt.NDArray[np.floating]
+        The 2D fuel strata gap array (units: meters)
     cbd : npt.NDArray[np.floating]
         The 2D canopy bulk density array (units: kg/m^3)
     fire: npt.NDArray[np.int8]
@@ -543,7 +547,7 @@ def next_updates_fn(
             cellsize,
             veg,
             dem,
-            cbh,
+            fsg,
             cbd,
             fire[:, :, realization],
             moisture,

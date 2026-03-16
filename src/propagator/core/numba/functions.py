@@ -548,10 +548,10 @@ def get_probability_to_neighbour(
 
 @jit(cache=True, nopython=True, fastmath=True)
 def probability_crowning(
-    wind_speed: float,  # km/h - at 10m
-    canopy_base_height: float,  # Fuel Strata Gap (FSG) in original publication
-    surface_fuel_consumption: float,  # surface fuel for combustion (kg/m2)
-    ffmc: float,  # fine fuel moisture content (fraction)
+    wind_speed: float,
+    fuel_strata_gap: float,
+    surface_fuel_consumption: float,
+    ffmc: float,
 ) -> float:
     """
     Determine if crown fire initiation occurs
@@ -562,8 +562,8 @@ def probability_crowning(
     ----------
     wind_speed : float
         Wind speed at 10 meters (km/h).
-    canopy_base_height : float
-        Canopy base height (m).
+    fuel_strata_gap : float
+        Fuel strata gap (m) - distance between understory and canopy.
     surface_fuel_consumption : float
         Available surface fuel for combustion (kg/m2).
     ffmc : float
@@ -575,6 +575,7 @@ def probability_crowning(
         porbability of crowning.
     """
     ffmc_perc = ffmc * 100  # convert to percentage
+    # surface fuel consumption is used as categories
     if surface_fuel_consumption <= 1.0:
         d_1 = 1.0
         d_2 = 0.0
@@ -592,7 +593,7 @@ def probability_crowning(
     b32 = -1.856
     b5 = -0.331
     # function
-    g_x = b0 + b1*wind_speed + b2*canopy_base_height + \
+    g_x = b0 + b1*wind_speed + b2*fuel_strata_gap + \
         b31 * d_1 + b32 * d_2 + b5*ffmc_perc
     # probability of crowning
     p_crown = np.exp(g_x) / (1 + np.exp(g_x))
