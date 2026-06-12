@@ -29,6 +29,7 @@ from propagator.core.numba import (
     FUEL_SYSTEM_LEGACY,
     FuelSystem,
     advance_front_until,
+    build_fuel_index_grid,
     get_p_moisture_fn,
     get_p_time_fn,
 )
@@ -111,6 +112,7 @@ class Propagator:
     _front_sizes: npt.NDArray[np.int32] = field(init=False)
     _front_overflow: npt.NDArray[np.int8] = field(init=False)
     _front_capacity: int = field(init=False, default=0)
+    _fuel_idx: npt.NDArray[np.int64] = field(init=False)
 
     # simulation state
     time: int = field(init=False, default=0)
@@ -153,26 +155,29 @@ class Propagator:
         )
         self._front_sizes = np.zeros((self.realizations,), dtype=np.int32)
         self._front_overflow = np.zeros((self.realizations,), dtype=np.int8)
-        self.fire = np.zeros(shape + (self.realizations,), dtype=np.int8)
+        # state arrays use (realizations, rows, cols) layout so that each
+        # realization's grid is contiguous in memory for the JIT kernels
+        self.fire = np.zeros((self.realizations,) + shape, dtype=np.int8)
         if self.do_spotting:
             self.spotting_generation = np.zeros(
-                shape + (self.realizations,), dtype=np.uint32
+                (self.realizations,) + shape, dtype=np.uint32
             )
             self.spotting_receiving = np.zeros(
-                shape + (self.realizations,), dtype=np.uint32
+                (self.realizations,) + shape, dtype=np.uint32
             )
         else:
             self.spotting_generation = None
             self.spotting_receiving = None
         self.arrival_time = np.zeros(
-            shape + (self.realizations,), dtype=np.int32
+            (self.realizations,) + shape, dtype=np.int32
         )
-        self.ros = np.zeros(shape + (self.realizations,), dtype=np.float32)
+        self.ros = np.zeros((self.realizations,) + shape, dtype=np.float32)
         self.fireline_int = np.zeros(
-            shape + (self.realizations,), dtype=np.float32
+            (self.realizations,) + shape, dtype=np.float32
         )
         if not self.do_spotting:
             self.fuels.disable_spotting()
+        self._fuel_idx = build_fuel_index_grid(self.fuels, self.veg)
 
     def compute_fire_probability(self) -> npt.NDArray[np.floating]:
         """Return mean burn probability across realizations for each cell.
@@ -182,7 +187,7 @@ class Propagator:
         numpy.ndarray
             2D array with values in [0, 1].
         """
-        values = np.mean(self.fire, axis=2).astype(np.float32)
+        values = np.mean(self.fire, axis=0).astype(np.float32)
         return values
 
     def compute_spotting_generation_probability(
@@ -192,7 +197,7 @@ class Propagator:
         if self.spotting_generation is None:
             return np.zeros(self.veg.shape, dtype=np.float32)
         values = (
-            np.sum(self.spotting_generation, axis=2, dtype=np.float64).astype(
+            np.sum(self.spotting_generation, axis=0, dtype=np.float64).astype(
                 np.float32
             )
             / self.realizations
@@ -206,7 +211,7 @@ class Propagator:
         if self.spotting_receiving is None:
             return np.zeros(self.veg.shape, dtype=np.float32)
         values = (
-            np.sum(self.spotting_receiving, axis=2, dtype=np.float64).astype(
+            np.sum(self.spotting_receiving, axis=0, dtype=np.float64).astype(
                 np.float32
             )
             / self.realizations
@@ -226,11 +231,11 @@ class Propagator:
 
     def compute_arrival_time_min(self) -> npt.NDArray[np.floating]:
         """Return per-cell minimum arrival time across realizations."""
-        mask = np.sum(self.fire, axis=2) > 0
+        mask = np.sum(self.fire, axis=0) > 0
         masked = np.where(
             self.fire > 0, self.arrival_time, np.iinfo(np.int32).max
         )
-        min_values = np.min(masked, axis=2).astype(np.float32)
+        min_values = np.min(masked, axis=0).astype(np.float32)
         min_values[~mask] = 0
         return min_values
 
@@ -282,7 +287,7 @@ class Propagator:
         Parameters
         ----------
         the_var : numpy.ndarray
-            3D array with shape (rows, cols, realizations).
+            3D array with shape (realizations, rows, cols).
             Variable for which to compute the mean.
 
         Returns
@@ -294,8 +299,8 @@ class Propagator:
         mask = self.fire > 0
 
         # accumulate in float64 to reduce precision loss
-        s = np.nansum(np.where(mask, the_var, 0.0), axis=2, dtype=np.float64)
-        c = np.sum(mask, axis=2)
+        s = np.nansum(np.where(mask, the_var, 0.0), axis=0, dtype=np.float64)
+        c = np.sum(mask, axis=0)
 
         # mean where count>0; NaN otherwise
         out = np.full(self.veg.shape, np.nan, dtype=np.float32)
@@ -305,10 +310,10 @@ class Propagator:
     def _compute_variable_max(
         self, the_var: npt.NDArray[np.floating]
     ) -> npt.NDArray[np.floating]:
-        mask = np.sum(self.fire, axis=2) > 0
+        mask = np.sum(self.fire, axis=0) > 0
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
-            max_values = np.nanmax(the_var, axis=2).astype(np.float32)
+            max_values = np.nanmax(the_var, axis=0).astype(np.float32)
 
         max_values[~mask] = 0
         return max_values
@@ -473,10 +478,10 @@ class Propagator:
         ros = updates.rates_of_spread
         fireline_intensity = updates.fireline_intensities
 
-        self.fire[rows, cols, realizations] = True
-        self.arrival_time[rows, cols, realizations] = int(self.time)
-        self.ros[rows, cols, realizations] = ros
-        self.fireline_int[rows, cols, realizations] = fireline_intensity
+        self.fire[realizations, rows, cols] = True
+        self.arrival_time[realizations, rows, cols] = int(self.time)
+        self.ros[realizations, rows, cols] = ros
+        self.fireline_int[realizations, rows, cols] = fireline_intensity
 
     def _calculate_next_updates(self, updates: UpdateBatch, time: int) -> None:
         """Calculate and schedule the next updates based on the current state.
@@ -628,7 +633,7 @@ class Propagator:
         """
 
         must_be_updated = (
-            self.fire[updates.rows, updates.cols, updates.realizations] == 0
+            self.fire[updates.realizations, updates.rows, updates.cols] == 0
         )
 
         rows = updates.rows[must_be_updated]
@@ -692,6 +697,7 @@ class Propagator:
             # mutate vegetation where needed
             mask = ~np.isnan(scheduler_event.vegetation_changes)
             self.veg[mask] = scheduler_event.vegetation_changes[mask]
+            self._fuel_idx = build_fuel_index_grid(self.fuels, self.veg)
 
     def step(
         self,
@@ -792,6 +798,7 @@ class Propagator:
             self._front_overflow,
             self.cellsize,
             self.veg,
+            self._fuel_idx,
             self.dem,
             self.fire,
             spotting_generation,

@@ -58,48 +58,50 @@ def test_spotting_state_allocated_only_when_enabled():
 def test_compute_fire_probability_and_means():
     propagator = make_propagator(realizations=2)
 
+    # literals are written as (rows, cols, realizations) and transposed to
+    # the (realizations, rows, cols) state layout
     propagator.fire = np.array(
         [
             [[1, 0], [0, 1]],
             [[1, 1], [0, 0]],
         ],
         dtype=np.int8,
-    )
+    ).transpose(2, 0, 1)
     propagator.ros = np.array(
         [
             [[0.8, 0.0], [0.0, 1.2]],
             [[0.4, 0.6], [0.0, 0.0]],
         ],
         dtype=np.float32,
-    )
+    ).transpose(2, 0, 1)
     propagator.fireline_int = np.array(
         [
             [[10.0, 0.0], [0.0, 20.0]],
             [[5.0, 15.0], [0.0, 0.0]],
         ],
         dtype=np.float32,
-    )
+    ).transpose(2, 0, 1)
     propagator.arrival_time = np.array(
         [
             [[10, 0], [0, 20]],
             [[15, 25], [0, 0]],
         ],
         dtype=np.int32,
-    )
+    ).transpose(2, 0, 1)
     propagator.spotting_generation = np.array(
         [
             [[1, 0], [0, 0]],
             [[1, 1], [0, 0]],
         ],
         dtype=np.uint32,
-    )
+    ).transpose(2, 0, 1)
     propagator.spotting_receiving = np.array(
         [
             [[0, 0], [1, 1]],
             [[0, 1], [0, 0]],
         ],
         dtype=np.uint32,
-    )
+    ).transpose(2, 0, 1)
 
     prob = propagator.compute_fire_probability()
     np.testing.assert_allclose(
@@ -216,18 +218,20 @@ def test_compute_fire_probability_and_means():
 def test_get_output_includes_spotting_probabilities():
     propagator = make_propagator(realizations=2)
     propagator.time = 60
+    # literals are written as (rows, cols, realizations) and transposed to
+    # the (realizations, rows, cols) state layout
     propagator.fire = np.array(
         [[[1, 0], [0, 0]], [[0, 1], [0, 0]]], dtype=np.int8
-    )
+    ).transpose(2, 0, 1)
     propagator.spotting_generation = np.array(
         [[[1, 0], [0, 1]], [[0, 0], [0, 0]]], dtype=np.uint32
-    )
+    ).transpose(2, 0, 1)
     propagator.spotting_receiving = np.array(
         [[[0, 1], [0, 0]], [[1, 0], [0, 0]]], dtype=np.uint32
-    )
+    ).transpose(2, 0, 1)
     propagator.arrival_time = np.array(
         [[[5, 0], [0, 0]], [[0, 9], [0, 0]]], dtype=np.int32
-    )
+    ).transpose(2, 0, 1)
 
     output = propagator.get_output()
 
@@ -385,10 +389,10 @@ def test_apply_updates_updates_state():
     future_time = 5
     propagator._apply_updates(updates, new_time=future_time)
 
-    assert propagator.fire[0, 1, 0] == 1
-    assert propagator.arrival_time[0, 1, 0] == future_time
-    assert propagator.ros[0, 1, 0] == pytest.approx(2.5)
-    assert propagator.fireline_int[0, 1, 0] == pytest.approx(7.5)
+    assert propagator.fire[0, 0, 1] == 1
+    assert propagator.arrival_time[0, 0, 1] == future_time
+    assert propagator.ros[0, 0, 1] == pytest.approx(2.5)
+    assert propagator.fireline_int[0, 0, 1] == pytest.approx(7.5)
 
     time = propagator.time
     assert time == future_time

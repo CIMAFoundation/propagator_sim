@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- Propagation kernel performance (~1.6x event throughput): fuel properties
+  are read directly from `FuelSystem` arrays through a precomputed
+  vegetation-to-fuel index grid instead of per-cell `Fuel` jitclass
+  allocations and typed-Dict lookups; spread updates are pushed directly
+  onto the event heap instead of building intermediate per-cell lists.
+- **Breaking:** simulation state arrays (`fire`, `arrival_time`, `ros`,
+  `fireline_int`, `spotting_generation`, `spotting_receiving`) now use
+  `(realizations, rows, cols)` layout so each realization's grid is
+  contiguous in memory. `PropagatorOutput` 2D maps are unaffected.
+- **Breaking:** `next_updates_fn` and the lower-level kernel functions take
+  an additional `fuel_idx` argument (see
+  `propagator.core.numba.build_fuel_index_grid`).
+
 ## [0.1.0] - 2026-06-12
 
 ### Added

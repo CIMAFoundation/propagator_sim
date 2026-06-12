@@ -6,7 +6,13 @@ import numpy as np
 import numpy.typing as npt
 from numba import njit, prange  # type: ignore
 
-from .propagation import single_cell_updates
+from propagator.core.constants import NO_FUEL
+
+from .propagation import (
+    N_NEIGHBOURS,
+    compute_spotting,
+    try_spread_to_neighbour,
+)
 
 
 @njit(cache=False)
@@ -112,6 +118,7 @@ def advance_front_until(
     overflow: npt.NDArray[np.int8],
     cellsize: float,
     veg: npt.NDArray[np.integer],
+    fuel_idx: npt.NDArray[np.int64],
     dem: npt.NDArray[np.floating],
     fire: npt.NDArray[np.int8],
     spotting_generation: npt.NDArray[np.bool_],
@@ -157,39 +164,50 @@ def advance_front_until(
             )
             sizes[realization] = new_size
 
-            if fire[row, col, realization] != 0:
+            if fire[realization, row, col] != 0:
                 continue
 
             if row <= 0 or col <= 0 or row >= n_rows - 1 or col >= n_cols - 1:
                 out_of_bounds[realization] = 1
 
-            fire[row, col, realization] = 1
-            state_arrival_time[row, col, realization] = time
-            state_ros[row, col, realization] = ros_value
-            state_fli[row, col, realization] = fli_value
+            fire[realization, row, col] = 1
+            state_arrival_time[realization, row, col] = time
+            state_ros[realization, row, col] = ros_value
+            state_fli[realization, row, col] = fli_value
 
-            updates = single_cell_updates(
-                row,
-                col,
-                cellsize,
-                veg,
-                dem,
-                fire[:, :, realization],
-                moisture,
-                wind_dir,
-                wind_speed,  # type: ignore
-                fuels,
-                p_time_fn,
-                p_moist_fn,
-            )
+            if veg[row, col] == NO_FUEL:
+                continue
 
-            for update in updates:
-                (delta_time, row_to, col_to, ros_to, fli_to, is_spotting) = (
-                    update
+            fire_slice = fire[realization]
+            w_dir_r = wind_dir[row, col]
+            w_speed_r = wind_speed[row, col]
+
+            for neighbour_index in range(N_NEIGHBOURS):
+                (
+                    ignites,
+                    row_to,
+                    col_to,
+                    delta_time,
+                    ros_to,
+                    fli_to,
+                ) = try_spread_to_neighbour(
+                    neighbour_index,
+                    row,
+                    col,
+                    cellsize,
+                    veg,
+                    fuel_idx,
+                    dem,
+                    fire_slice,
+                    moisture,
+                    w_dir_r,
+                    w_speed_r,  # type: ignore
+                    fuels,
+                    p_time_fn,
+                    p_moist_fn,
                 )
-                if track_spotting and is_spotting:
-                    spotting_generation[row, col, realization] = True
-                    spotting_receiving[row_to, col_to, realization] = True
+                if not ignites:
+                    continue
                 if sizes[realization] >= max_events:
                     overflow[realization] = 1
                     break
@@ -206,3 +224,44 @@ def advance_front_until(
                     ros_to,
                     fli_to,
                 )
+
+            if fuels.spotting[fuel_idx[row, col]]:
+                spotting_updates = compute_spotting(
+                    row,
+                    col,
+                    cellsize,
+                    veg,
+                    fuel_idx,
+                    fire_slice,
+                    w_dir_r,
+                    w_speed_r,  # type: ignore
+                    fuels,
+                )
+                for update in spotting_updates:
+                    (
+                        delta_time,
+                        row_to,
+                        col_to,
+                        ros_to,
+                        fli_to,
+                        _is_spotting,
+                    ) = update
+                    if track_spotting:
+                        spotting_generation[realization, row, col] = True
+                        spotting_receiving[realization, row_to, col_to] = True
+                    if sizes[realization] >= max_events:
+                        overflow[realization] = 1
+                        break
+                    sizes[realization] = _heap_push(
+                        event_times[realization],
+                        event_rows[realization],
+                        event_cols[realization],
+                        event_ros[realization],
+                        event_fli[realization],
+                        sizes[realization],
+                        time + int(delta_time),
+                        row_to,
+                        col_to,
+                        ros_to,
+                        fli_to,
+                    )

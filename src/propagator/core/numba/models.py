@@ -3,8 +3,6 @@
 This file defines the data structures used in the Numba JIT-compiled wildfire propagation engine.
 """
 
-from logging import warning
-
 import numpy as np
 from numba import types
 from numba.experimental import jitclass
@@ -213,6 +211,41 @@ class FuelSystem:
         for i in range(len(self.spotting)):
             self.spotting[i] = False
             self.prob_ign_by_embers[i] = 0.0
+
+
+def build_fuel_index_grid(fuels: FuelSystem, veg) -> np.ndarray:
+    """Map vegetation codes to dense FuelSystem indices.
+
+    Precomputing this grid lets the JIT kernels index the FuelSystem arrays
+    directly instead of doing typed-Dict lookups per neighbour in the hot
+    loop. Unknown vegetation codes fall back to the non-vegetated fuel,
+    mirroring `FuelSystem.get_fuel` / `get_transition_probability`.
+
+    Parameters
+    ----------
+    fuels : FuelSystem
+        The fuel system object.
+    veg : numpy.ndarray
+        The 2D vegetation codes array.
+
+    Returns
+    -------
+    numpy.ndarray
+        int64 array with the same shape as `veg`, holding for each cell the
+        dense index of its fuel in the FuelSystem arrays.
+    """
+    mapping = dict(fuels.fuels_id)
+    non_vegetated_id = fuels.get_non_vegetated()
+    default_index = mapping.get(non_vegetated_id, -1)
+    fuel_idx = np.full(veg.shape, default_index, dtype=np.int64)
+    for fuel_id, index in mapping.items():
+        fuel_idx[veg == fuel_id] = index
+    if default_index == -1 and np.any(fuel_idx == -1):
+        raise PropagatorError(
+            "Vegetation map contains codes not present in the fuel system "
+            "and no non-vegetated (burn=False) fallback fuel is defined."
+        )
+    return fuel_idx
 
 
 def fuelsystem_from_dict(fuels: dict[int, dict]) -> FuelSystem:
