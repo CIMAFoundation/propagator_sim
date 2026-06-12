@@ -1,4 +1,4 @@
-from .front_tracking import advance_front_until
+from .front_tracking import FRONT_RESERVE, advance_front_until
 from .functions import (
     MoistureModel,
     RateOfSpreadModel,
@@ -12,6 +12,13 @@ from .models import (
     fuelsystem_from_dict,
 )
 from .propagation import next_updates_fn
+from .tiles import (
+    TILE_MASK,
+    TILE_SHIFT,
+    TILE_SIZE,
+    fold_state_tiles,
+    materialize_tiles,
+)
 
 __all__ = [
     "FUEL_SYSTEM_LEGACY",
@@ -24,4 +31,10 @@ __all__ = [
     "advance_front_until",
     "next_updates_fn",
     "FuelSystem",
+    "FRONT_RESERVE",
+    "TILE_MASK",
+    "TILE_SHIFT",
+    "TILE_SIZE",
+    "fold_state_tiles",
+    "materialize_tiles",
 ]

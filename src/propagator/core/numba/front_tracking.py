@@ -14,6 +14,7 @@ from .propagation import (
     compute_spotting,
     try_spread_to_neighbour,
 )
+from .tiles import TILE_MASK, TILE_SHIFT
 
 # Worst-case number of events a single pop can push (all neighbours plus a
 # capped ember burst). The kernel only pops when this headroom is available,
@@ -130,9 +131,12 @@ def advance_front_until(
     fire: npt.NDArray[np.int8],
     spotting_generation: npt.NDArray[np.bool_],
     spotting_receiving: npt.NDArray[np.bool_],
-    state_arrival_time: npt.NDArray[np.int32],
-    state_ros: npt.NDArray[np.float32],
-    state_fli: npt.NDArray[np.float32],
+    tile_idx: npt.NDArray[np.int32],
+    tile_counts: npt.NDArray[np.int32],
+    tile_capacity: int,
+    tile_arrival: npt.NDArray[np.int32],
+    tile_ros: npt.NDArray[np.float32],
+    tile_fli: npt.NDArray[np.float32],
     moisture: npt.NDArray[np.floating],
     wind_dir: npt.NDArray[np.floating],
     wind_speed: npt.NDArray[np.floating],
@@ -145,6 +149,7 @@ def advance_front_until(
     n_realizations = sizes.shape[0]
     n_rows = veg.shape[0]
     n_cols = veg.shape[1]
+    total_tiles = tile_idx.shape[1] * tile_idx.shape[2]
 
     for realization in prange(n_realizations):
         if overflow[realization] != 0:
@@ -154,7 +159,13 @@ def advance_front_until(
             if event_times[realization, 0] > end_time:
                 break
 
-            if sizes[realization] + FRONT_RESERVE > max_events:
+            # suspend (heap intact) if the next pop cannot be guaranteed to
+            # fit: worst-case heap pushes, or a tile allocation while the
+            # pool is full and not every tile is allocated yet
+            if sizes[realization] + FRONT_RESERVE > max_events or (
+                tile_counts[realization] >= tile_capacity
+                and tile_counts[realization] < total_tiles
+            ):
                 overflow[realization] = 1
                 break
 
@@ -182,9 +193,18 @@ def advance_front_until(
                 out_of_bounds[realization] = 1
 
             fire[realization, row, col] = 1
-            state_arrival_time[realization, row, col] = time
-            state_ros[realization, row, col] = ros_value
-            state_fli[realization, row, col] = fli_value
+            tile_row = row >> TILE_SHIFT
+            tile_col = col >> TILE_SHIFT
+            tile = tile_idx[realization, tile_row, tile_col]
+            if tile < 0:
+                tile = tile_counts[realization]
+                tile_counts[realization] = tile + 1
+                tile_idx[realization, tile_row, tile_col] = tile
+            local_row = row & TILE_MASK
+            local_col = col & TILE_MASK
+            tile_arrival[realization, tile, local_row, local_col] = time
+            tile_ros[realization, tile, local_row, local_col] = ros_value
+            tile_fli[realization, tile, local_row, local_col] = fli_value
 
             if veg[row, col] == NO_FUEL:
                 continue
