@@ -11,10 +11,10 @@
       
       
       
-        <link rel="prev" href="../programmatic/">
+        <link rel="prev" href="../cli/">
       
       
-        <link rel="next" href="../outputs/">
+        <link rel="next" href="../spotting/">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>CLI Usage - PROPAGATOR Sim</title>
+        <title>Simulation Outputs - PROPAGATOR Sim</title>
       
     
     
@@ -70,7 +70,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#cli-usage" class="md-skip">
+        <a href="#simulation-outputs" class="md-skip">
           Skip to content
         </a>
       
@@ -109,7 +109,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              CLI Usage
+              Simulation Outputs
             
           </span>
         </div>
@@ -282,6 +282,33 @@
       
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
     
   
   
@@ -301,7 +328,7 @@
   <span class="md-ellipsis">
     
   
-    CLI Usage
+    Simulation Outputs
   
 
     
@@ -319,7 +346,7 @@
   <span class="md-ellipsis">
     
   
-    CLI Usage
+    Simulation Outputs
   
 
     
@@ -345,10 +372,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#basic-invocation" class="md-nav__link">
+  <a href="#fields" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Basic Invocation
+        Fields
       
     </span>
   </a>
@@ -356,10 +383,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#operating-modes" class="md-nav__link">
+  <a href="#arrival-times" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Operating Modes
+        Arrival Times
       
     </span>
   </a>
@@ -367,32 +394,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#argument-reference" class="md-nav__link">
+  <a href="#cli-raster-products" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Argument Reference
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#output-products" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Output Products
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
+        CLI Raster Products
       
     </span>
   </a>
@@ -403,33 +408,6 @@
   
 </nav>
       
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../outputs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Simulation Outputs
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -679,10 +657,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#basic-invocation" class="md-nav__link">
+  <a href="#fields" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Basic Invocation
+        Fields
       
     </span>
   </a>
@@ -690,10 +668,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#operating-modes" class="md-nav__link">
+  <a href="#arrival-times" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Operating Modes
+        Arrival Times
       
     </span>
   </a>
@@ -701,32 +679,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#argument-reference" class="md-nav__link">
+  <a href="#cli-raster-products" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Argument Reference
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#output-products" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Output Products
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
+        CLI Raster Products
       
     </span>
   </a>
@@ -750,129 +706,103 @@
 
 
 
-<h1 id="cli-usage">CLI Usage</h1>
-<p>The <code>propagator</code> command drives simulations from the terminal. It validates
-input files, prepares rasters, runs the propagation loop, and writes outputs on
-every reporting interval.</p>
-<pre><code class="language-bash">uv run propagator --help
-</code></pre>
-<h2 id="basic-invocation">Basic Invocation</h2>
-<pre><code class="language-bash">uv run propagator \
-  --config example/config.json \
-  --mode geotiff \
-  --dem example/dem.tif \
-  --fuel example/fuel.tif \
-  --output results/run-2025-02-19
-</code></pre>
-<p>CLI arguments are powered by <code>pydantic-settings</code>; required inputs raise clear
-validation errors before the simulation starts.</p>
-<h2 id="operating-modes">Operating Modes</h2>
-<ul>
-<li><strong>GeoTIFF mode</strong> (<code>--mode geotiff</code>): supply explicit DEM (<code>--dem</code>) and fuel
-  (<code>--fuel</code>) GeoTIFF rasters. Use this for bespoke datasets or the bundled
-  quickstart sample.</li>
-<li><strong>Tiles mode</strong> (<code>--mode tiles</code>, default): point to a directory of tiled DEM
-  and vegetation rasters with <code>--tilespath</code> and choose a tileset via
-  <code>--tileset</code>. The simulator infers the geographic window from ignition
-  coordinates defined in the configuration.</li>
-</ul>
-<p>Switching between modes controls which arguments are required; passing both
-<code>--dem</code> and <code>--fuel</code> automatically activates GeoTIFF mode even if <code>--mode</code> is
-left at the default.</p>
-<h2 id="argument-reference">Argument Reference</h2>
+<h1 id="simulation-outputs">Simulation Outputs</h1>
+<p>Every reporting interval the simulator exposes a <code>PropagatorOutput</code> snapshot
+via <code>Propagator.get_output()</code>. The CLI persists these snapshots as GeoTIFF
+rasters, GeoJSON isochrones, and metadata JSON; programmatic users can consume
+them directly (see the <a href="../programmatic/">Programmatic Workflow</a>).</p>
+<p>All per-cell fields are 2D arrays with the same shape as the input rasters,
+aggregated across the stochastic realizations of the run.</p>
+<h2 id="fields">Fields</h2>
 <table>
 <thead>
 <tr>
-<th>Flag</th>
-<th>Type / Default</th>
+<th>Field</th>
+<th>Units</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>--config PATH</code></td>
-<td>required</td>
-<td>JSON configuration file parsed into <code>PropagatorConfigurationLegacy</code>.</td>
+<td><code>time</code></td>
+<td>seconds</td>
+<td>Simulation time of the snapshot, from simulation start.</td>
 </tr>
 <tr>
-<td><code>--fuel-config PATH</code></td>
-<td>optional</td>
-<td>YAML file defining a custom fuel system (<code>fuels</code> mapping).</td>
+<td><code>fire_probability</code></td>
+<td>[0, 1]</td>
+<td>Fraction of realizations in which the cell has burned.</td>
 </tr>
 <tr>
-<td><code>--mode {tiles,geotiff}</code></td>
-<td><code>tiles</code></td>
-<td>Select how static rasters are loaded (see above).</td>
+<td><code>min_arrival_time</code></td>
+<td>seconds</td>
+<td>Earliest time the fire reached the cell across all realizations in which it burned. Cells never reached hold <code>0</code>.</td>
 </tr>
 <tr>
-<td><code>--dem PATH</code></td>
-<td>required in geotiff mode</td>
-<td>DEM GeoTIFF when running in geotiff mode.</td>
+<td><code>mean_arrival_time</code></td>
+<td>seconds</td>
+<td>Mean arrival time over the realizations in which the cell burned.</td>
 </tr>
 <tr>
-<td><code>--fuel PATH</code></td>
-<td>required in geotiff mode</td>
-<td>Fuel/vegetation GeoTIFF when running in geotiff mode.</td>
+<td><code>ros_mean</code></td>
+<td>m/min</td>
+<td>Mean rate of spread over realizations where the cell burned.</td>
 </tr>
 <tr>
-<td><code>--tilespath PATH</code></td>
-<td>required in tiles mode</td>
-<td>Base directory containing tiled rasters.</td>
+<td><code>ros_max</code></td>
+<td>m/min</td>
+<td>Maximum rate of spread across realizations.</td>
 </tr>
 <tr>
-<td><code>--tileset NAME</code></td>
-<td>optional</td>
-<td>Tileset to use within <code>tilespath</code> (defaults to <code>default</code>).</td>
+<td><code>fli_mean</code></td>
+<td>kW/m</td>
+<td>Mean fireline intensity over realizations where the cell burned.</td>
 </tr>
 <tr>
-<td><code>--output PATH</code></td>
-<td>required</td>
-<td>Destination directory; created if missing. Stores GeoTIFF, GeoJSON, and JSON outputs.</td>
+<td><code>fli_max</code></td>
+<td>kW/m</td>
+<td>Maximum fireline intensity across realizations.</td>
 </tr>
 <tr>
-<td><code>--isochrones FLOAT …</code></td>
-<td><code>0.5 0.75 0.9</code></td>
-<td>Probability thresholds for GeoJSON isochrone export. Repeat the flag to set multiple values.</td>
+<td><code>spotting_generation_probability</code></td>
+<td>[0, 1]</td>
+<td>Fraction of realizations in which the cell launched at least one ember (all zeros when spotting is disabled). See <a href="../spotting/">Fire Spotting</a>.</td>
 </tr>
 <tr>
-<td><code>--record</code></td>
-<td>flag, default off</td>
-<td>When enabled, saves a Rich console log in the output directory.</td>
+<td><code>spotting_receiving_probability</code></td>
+<td>[0, 1]</td>
+<td>Fraction of realizations in which the cell was hit by an ember (all zeros when spotting is disabled).</td>
 </tr>
 <tr>
-<td><code>--ignore-out-of-bounds</code></td>
-<td>flag, default off</td>
-<td>Continue the simulation when the fire reaches the DEM boundary.</td>
-</tr>
-<tr>
-<td><code>--verbose</code></td>
-<td>flag, default off</td>
-<td>Print status tables, boundary conditions, and timing information.</td>
+<td><code>stats</code></td>
+<td>—</td>
+<td>Aggregate statistics: number of active cells and burned-area mean and 50/75/90th percentiles.</td>
 </tr>
 </tbody>
 </table>
-<p>Boolean switches use implicit flags: including <code>--verbose</code>, <code>--record</code>, or
-<code>--ignore-out-of-bounds</code> turns each behaviour on.</p>
-<h2 id="output-products">Output Products</h2>
-<p>During the run, the CLI periodically writes:
-- GeoTIFF rasters for fire probability, arrival time (min/mean), fireline
-  intensity (mean/max), and rate of spread (mean/max). When <code>do_spotting</code> is
-  enabled in the configuration, spotting generation and receiving probability
-  rasters are written as well (see <a href="../spotting/">Fire Spotting</a>).
-- GeoJSON isochrones for configured probability thresholds.
-- Metadata JSON capturing CLI arguments, execution time, and summary statistics.</p>
-<p>Set <code>--record</code> to capture the Rich console log alongside these artefacts, which
-is useful for post-run audits.</p>
-<h2 id="troubleshooting">Troubleshooting</h2>
-<ul>
-<li>Missing GeoTIFFs or tiles raise validation errors before the simulation
-  boots; check path spelling if you hit them.</li>
-<li>If dependency wheels complain about PROJ/GDAL, ensure the native libraries
-  are installed (see <a href="../getting-started/#prerequisites">Getting Started</a>).</li>
-<li>For reproducible runs across multiple ignitions or meteorological scenarios,
-  adjust <code>realizations</code>, <code>time_limit</code>, and <code>boundary_conditions</code> inside the
-  JSON configuration file.</li>
-</ul>
+<h2 id="arrival-times">Arrival Times</h2>
+<p>Arrival times record, per realization, the simulation time at which each cell
+ignited. They are useful to derive isochrone maps from a single realization
+ensemble, or to quantify the spread of arrival uncertainty:</p>
+<pre><code class="language-python">output = sim.get_output()
+
+# Earliest possible arrival (best-case warning time)
+earliest = output.min_arrival_time
+
+# Expected arrival where the fire is likely to reach
+expected = output.mean_arrival_time
+</code></pre>
+<p>Both arrays are expressed in seconds from simulation start. <code>min_arrival_time</code>
+is the minimum over the realizations in which the cell burned, so cells with a
+low <code>fire_probability</code> can still carry a meaningful (if unlikely) early
+arrival time — combine it with <code>fire_probability</code> when communicating risk.</p>
+<h2 id="cli-raster-products">CLI Raster Products</h2>
+<p>When running through the CLI, each reporting interval writes one GeoTIFF per
+variable: <code>fire_probability</code>, <code>min_arrival_time</code>, <code>mean_arrival_time</code>,
+<code>ros_mean</code>, <code>ros_max</code>, <code>fireline_intensity_mean</code>, <code>fireline_intensity_max</code>,
+and — when spotting is enabled in the configuration —
+<code>spotting_generation_probability</code> and <code>spotting_receiving_probability</code>.
+See <a href="../cli/">CLI Usage</a> for invocation details.</p>
 
 
 

@@ -11,10 +11,6 @@
       
       
       
-        <link rel="prev" href="../programmatic/">
-      
-      
-        <link rel="next" href="../outputs/">
       
       
         
@@ -25,7 +21,7 @@
     
     
       
-        <title>CLI Usage - PROPAGATOR Sim</title>
+        <title>Propagation Scheduler Refactor Notes - PROPAGATOR Sim</title>
       
     
     
@@ -70,7 +66,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#cli-usage" class="md-skip">
+        <a href="#propagation-scheduler-refactor-notes" class="md-skip">
           Skip to content
         </a>
       
@@ -109,7 +105,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              CLI Usage
+              Propagation Scheduler Refactor Notes
             
           </span>
         </div>
@@ -282,37 +278,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    CLI Usage
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
         
   
   
@@ -328,81 +297,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#basic-invocation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Basic Invocation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#operating-modes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Operating Modes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#argument-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Argument Reference
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#output-products" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Output Products
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -672,69 +566,6 @@
     
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#basic-invocation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Basic Invocation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#operating-modes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Operating Modes
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#argument-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Argument Reference
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#output-products" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Output Products
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -750,129 +581,64 @@
 
 
 
-<h1 id="cli-usage">CLI Usage</h1>
-<p>The <code>propagator</code> command drives simulations from the terminal. It validates
-input files, prepares rasters, runs the propagation loop, and writes outputs on
-every reporting interval.</p>
-<pre><code class="language-bash">uv run propagator --help
-</code></pre>
-<h2 id="basic-invocation">Basic Invocation</h2>
-<pre><code class="language-bash">uv run propagator \
-  --config example/config.json \
-  --mode geotiff \
-  --dem example/dem.tif \
-  --fuel example/fuel.tif \
-  --output results/run-2025-02-19
-</code></pre>
-<p>CLI arguments are powered by <code>pydantic-settings</code>; required inputs raise clear
-validation errors before the simulation starts.</p>
-<h2 id="operating-modes">Operating Modes</h2>
-<ul>
-<li><strong>GeoTIFF mode</strong> (<code>--mode geotiff</code>): supply explicit DEM (<code>--dem</code>) and fuel
-  (<code>--fuel</code>) GeoTIFF rasters. Use this for bespoke datasets or the bundled
-  quickstart sample.</li>
-<li><strong>Tiles mode</strong> (<code>--mode tiles</code>, default): point to a directory of tiled DEM
-  and vegetation rasters with <code>--tilespath</code> and choose a tileset via
-  <code>--tileset</code>. The simulator infers the geographic window from ignition
-  coordinates defined in the configuration.</li>
-</ul>
-<p>Switching between modes controls which arguments are required; passing both
-<code>--dem</code> and <code>--fuel</code> automatically activates GeoTIFF mode even if <code>--mode</code> is
-left at the default.</p>
-<h2 id="argument-reference">Argument Reference</h2>
-<table>
-<thead>
-<tr>
-<th>Flag</th>
-<th>Type / Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>--config PATH</code></td>
-<td>required</td>
-<td>JSON configuration file parsed into <code>PropagatorConfigurationLegacy</code>.</td>
-</tr>
-<tr>
-<td><code>--fuel-config PATH</code></td>
-<td>optional</td>
-<td>YAML file defining a custom fuel system (<code>fuels</code> mapping).</td>
-</tr>
-<tr>
-<td><code>--mode {tiles,geotiff}</code></td>
-<td><code>tiles</code></td>
-<td>Select how static rasters are loaded (see above).</td>
-</tr>
-<tr>
-<td><code>--dem PATH</code></td>
-<td>required in geotiff mode</td>
-<td>DEM GeoTIFF when running in geotiff mode.</td>
-</tr>
-<tr>
-<td><code>--fuel PATH</code></td>
-<td>required in geotiff mode</td>
-<td>Fuel/vegetation GeoTIFF when running in geotiff mode.</td>
-</tr>
-<tr>
-<td><code>--tilespath PATH</code></td>
-<td>required in tiles mode</td>
-<td>Base directory containing tiled rasters.</td>
-</tr>
-<tr>
-<td><code>--tileset NAME</code></td>
-<td>optional</td>
-<td>Tileset to use within <code>tilespath</code> (defaults to <code>default</code>).</td>
-</tr>
-<tr>
-<td><code>--output PATH</code></td>
-<td>required</td>
-<td>Destination directory; created if missing. Stores GeoTIFF, GeoJSON, and JSON outputs.</td>
-</tr>
-<tr>
-<td><code>--isochrones FLOAT …</code></td>
-<td><code>0.5 0.75 0.9</code></td>
-<td>Probability thresholds for GeoJSON isochrone export. Repeat the flag to set multiple values.</td>
-</tr>
-<tr>
-<td><code>--record</code></td>
-<td>flag, default off</td>
-<td>When enabled, saves a Rich console log in the output directory.</td>
-</tr>
-<tr>
-<td><code>--ignore-out-of-bounds</code></td>
-<td>flag, default off</td>
-<td>Continue the simulation when the fire reaches the DEM boundary.</td>
-</tr>
-<tr>
-<td><code>--verbose</code></td>
-<td>flag, default off</td>
-<td>Print status tables, boundary conditions, and timing information.</td>
-</tr>
-</tbody>
-</table>
-<p>Boolean switches use implicit flags: including <code>--verbose</code>, <code>--record</code>, or
-<code>--ignore-out-of-bounds</code> turns each behaviour on.</p>
-<h2 id="output-products">Output Products</h2>
-<p>During the run, the CLI periodically writes:
-- GeoTIFF rasters for fire probability, arrival time (min/mean), fireline
-  intensity (mean/max), and rate of spread (mean/max). When <code>do_spotting</code> is
-  enabled in the configuration, spotting generation and receiving probability
-  rasters are written as well (see <a href="../spotting/">Fire Spotting</a>).
-- GeoJSON isochrones for configured probability thresholds.
-- Metadata JSON capturing CLI arguments, execution time, and summary statistics.</p>
-<p>Set <code>--record</code> to capture the Rich console log alongside these artefacts, which
-is useful for post-run audits.</p>
-<h2 id="troubleshooting">Troubleshooting</h2>
-<ul>
-<li>Missing GeoTIFFs or tiles raise validation errors before the simulation
-  boots; check path spelling if you hit them.</li>
-<li>If dependency wheels complain about PROJ/GDAL, ensure the native libraries
-  are installed (see <a href="../getting-started/#prerequisites">Getting Started</a>).</li>
-<li>For reproducible runs across multiple ignitions or meteorological scenarios,
-  adjust <code>realizations</code>, <code>time_limit</code>, and <code>boundary_conditions</code> inside the
-  JSON configuration file.</li>
-</ul>
+<h1 id="propagation-scheduler-refactor-notes">Propagation Scheduler Refactor Notes</h1>
+<p>Goal: redesign propagation scheduling to be numba-friendly and parallel across
+realizations, while keeping the current public API and event-driven behavior.</p>
+<p>Idea recap
+- Keep boundary conditions on the existing Python <code>Scheduler</code>.
+- Add a dedicated propagation-only scheduler that stores events in arrays and
+  supports numba-friendly insertion/pop.
+- Add <code>seconds</code> (or similar) to <code>Propagator.step</code>, so each call advances all
+  realizations in parallel for a time window, avoiding per-event step overhead.
+- Track time-dependent moisture per realization when running windowed steps.</p>
+<p>Context and lessons
+- The dominant cost for large grids + many realizations is step granularity,
+  not the scheduler itself. Processing a single event time per call leads to
+  heavy orchestration overhead.
+- Any propagation-only scheduler should be paired with a multi-second step
+  window so numba can process a large batch per call.</p>
+<p>Proposal to explore next
+- Add <code>seconds: int | None = None</code> to <code>Propagator.step</code>.
+  - If <code>seconds is None</code>, keep legacy behavior (one event time).
+  - If set, process all propagation events in <code>[time, time + seconds]</code> in a
+    single call, allowing <code>prange</code> across realizations.
+- Keep boundary conditions event-driven; apply any BC events at or before
+  the end of the window.
+- Maintain integer seconds only, earliest time per realization, inf allowed.</p>
+<p>Potential data structures
+- Propagation scheduler:
+  - Hash table (time -&gt; head index), heap for next time, event arrays.
+  - Per-realization pending counts for <code>compute_stats</code>.
+  - Optional 2D tiling for memory locality if needed later, but avoid if it
+    harms parallelization.
+- Status matrices:
+  - Can change 3D layout; external API must not rely on shape or ordering.</p>
+<p>Time-dependent moisture considerations
+- Current behavior (baseline):
+  - <code>moisture</code> is a 2D field (fractional), set by boundary conditions.
+  - <code>actions_moisture</code> is a 2D field (fractional), added on top of <code>moisture</code>.
+  - <code>actions_moisture</code> decays by <code>(1 - k) ** (delta_minutes)</code> every step.
+  - <code>_get_moisture()</code> returns <code>clip(moisture + actions_moisture)</code>.
+- With windowed steps and per-realization time:
+  - If realizations advance different amounts in one call, <code>actions_moisture</code>
+    decay must be per-realization (and possibly <code>moisture</code> updates too).
+  - A lazy strategy can keep one scalar <code>last_update_time</code> plus a scalar
+    decay factor:
+    - store <code>actions_moisture</code> at reference time <code>t0</code>
+    - current value when working on a cell/realization is <code>actions_moisture * decay_factor**(t_now - t0)</code>
+    - when adding moisture at <code>t_now</code>, add <code>delta / scale</code> to the stored array</p>
+<p>Session notes and implementation direction
+- Current hot path: <code>Propagator.step()</code> pops a single event time, applies BC, and calls <code>next_updates_fn</code> to generate new updates.
+- The existing <code>Scheduler</code> is Python-side and groups <code>UpdateBatchWithTime</code> by time; this adds overhead at high event counts.
+- <code>next_updates_fn</code> is numba-jitted but works on batches; it returns arrays that then get split/queued in Python.
+- For performance, the propagation loop should avoid <code>UpdateBatch*</code> in the core loop and run as a numba front-tracking kernel.
+- Proposed kernel structure:
+  - Per-realization min-heap (arrays of times/rows/cols/ros/fli, plus size).
+  - <code>advance_front_until(end_time)</code> runs in <code>prange</code> across realizations.
+  - Each realization pops earliest events, applies fire state, and pushes new events in numba.
+- Boundary conditions remain event-driven in Python; propagation runs in windowed slices between BC events.
+- In the initial front-tracking implementation, capacity is capped per realization (default <code>veg.size</code>); overflow should raise to avoid silent truncation.
+- Moisture and wind are currently treated as constant within a window; BC updates happen at window boundaries.</p>
 
 
 
