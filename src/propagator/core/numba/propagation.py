@@ -32,6 +32,9 @@ P_C0 = 0.6
 LAMBDA_SPOTTING = 2.0
 SPOTTING_RN_MEAN = 100
 SPOTTING_RN_STD = 25
+# Hard cap on embers per emission so the per-cell number of front events is
+# bounded (P[Poisson(2) > 32] ~ 1e-27, so the cap never binds in practice).
+MAX_SPOTTING_EMBERS = 32
 
 NEIGHBOURS = np.array(
     [
@@ -142,7 +145,7 @@ def compute_spotting(
     # let numba assign the type
     spotting_updates = []  # type: ignore
 
-    num_embers = poisson(LAMBDA_SPOTTING)
+    num_embers = min(poisson(LAMBDA_SPOTTING), MAX_SPOTTING_EMBERS)
 
     if num_embers == 0:
         return spotting_updates

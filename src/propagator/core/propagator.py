@@ -44,6 +44,12 @@ class PropagatorOutOfBoundsError(Exception):
     pass
 
 
+# Initial per-realization capacity of the front event heap. The heap only
+# holds the active front (a small fraction of the grid), so it starts small
+# and doubles whenever the kernel reports it ran out of headroom.
+FRONT_INITIAL_CAPACITY = 4096
+
+
 @dataclass
 class Propagator:
     """Stochastic cellular wildfire spread simulator.
@@ -137,7 +143,7 @@ class Propagator:
         on the vegetation grid shape."""
         shape = self.veg.shape
         self.scheduler = Scheduler(realizations=self.realizations)
-        self._front_capacity = int(self.veg.size)
+        self._front_capacity = FRONT_INITIAL_CAPACITY
         self._front_times = np.zeros(
             (self.realizations, self._front_capacity), dtype=np.int32
         )
@@ -159,11 +165,13 @@ class Propagator:
         # realization's grid is contiguous in memory for the JIT kernels
         self.fire = np.zeros((self.realizations,) + shape, dtype=np.int8)
         if self.do_spotting:
+            # binary masks: uint8 keeps them 4x smaller than the previous
+            # uint32 allocation
             self.spotting_generation = np.zeros(
-                (self.realizations,) + shape, dtype=np.uint32
+                (self.realizations,) + shape, dtype=np.uint8
             )
             self.spotting_receiving = np.zeros(
-                (self.realizations,) + shape, dtype=np.uint32
+                (self.realizations,) + shape, dtype=np.uint8
             )
         else:
             self.spotting_generation = None
@@ -527,8 +535,7 @@ class Propagator:
     ) -> None:
         size = int(self._front_sizes[realization])
         if size >= self._front_capacity:
-            self._front_overflow[realization] = 1
-            return
+            self._grow_front()
         self._front_times[realization, size] = time
         self._front_rows[realization, size] = row
         self._front_cols[realization, size] = col
@@ -556,6 +563,22 @@ class Propagator:
                 )
             idx = parent
         self._front_sizes[realization] = size + 1
+
+    def _grow_front(self) -> None:
+        """Double the capacity of the front event heap, preserving content."""
+        new_capacity = self._front_capacity * 2
+        for name in (
+            "_front_times",
+            "_front_rows",
+            "_front_cols",
+            "_front_ros",
+            "_front_fli",
+        ):
+            old = getattr(self, name)
+            new = np.zeros((self.realizations, new_capacity), dtype=old.dtype)
+            new[:, : self._front_capacity] = old
+            setattr(self, name, new)
+        self._front_capacity = new_capacity
 
     def _decay_actions_moisture(
         self, time_delta: int, decay_factor: float = 0.01
@@ -774,7 +797,7 @@ class Propagator:
 
         moisture = self._get_moisture()
         out_of_bounds = np.zeros((self.realizations,), dtype=np.int8)
-        dummy_spotting = np.zeros((1, 1, 1), dtype=np.uint32)
+        dummy_spotting = np.zeros((1, 1, 1), dtype=np.uint8)
         spotting_generation = (
             self.spotting_generation
             if self.spotting_generation is not None
@@ -786,40 +809,43 @@ class Propagator:
             else dummy_spotting
         )
 
-        advance_front_until(
-            int(end_time),
-            int(self._front_capacity),
-            self._front_times,
-            self._front_rows,
-            self._front_cols,
-            self._front_ros,
-            self._front_fli,
-            self._front_sizes,
-            self._front_overflow,
-            self.cellsize,
-            self.veg,
-            self._fuel_idx,
-            self.dem,
-            self.fire,
-            spotting_generation,
-            spotting_receiving,
-            self.arrival_time,
-            self.ros,
-            self.fireline_int,
-            moisture,
-            self.wind_dir,
-            self.wind_speed,
-            self.fuels,
-            self.p_time_fn,
-            self.p_moist_fn,
-            out_of_bounds,
-            self.do_spotting,
-        )
-
-        if int(np.sum(self._front_overflow)) > 0:
-            raise RuntimeError(
-                "Propagation front queue overflowed capacity; increase capacity."
+        while True:
+            advance_front_until(
+                int(end_time),
+                int(self._front_capacity),
+                self._front_times,
+                self._front_rows,
+                self._front_cols,
+                self._front_ros,
+                self._front_fli,
+                self._front_sizes,
+                self._front_overflow,
+                self.cellsize,
+                self.veg,
+                self._fuel_idx,
+                self.dem,
+                self.fire,
+                spotting_generation,
+                spotting_receiving,
+                self.arrival_time,
+                self.ros,
+                self.fireline_int,
+                moisture,
+                self.wind_dir,
+                self.wind_speed,
+                self.fuels,
+                self.p_time_fn,
+                self.p_moist_fn,
+                out_of_bounds,
+                self.do_spotting,
             )
+
+            if int(np.sum(self._front_overflow)) == 0:
+                break
+            # the kernel suspends a realization (heap intact) when it cannot
+            # guarantee headroom for the next pop: grow and resume
+            self._grow_front()
+            self._front_overflow[:] = 0
 
         if (
             self.out_of_bounds_mode == "raise"

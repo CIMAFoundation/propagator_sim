@@ -9,10 +9,17 @@ from numba import njit, prange  # type: ignore
 from propagator.core.constants import NO_FUEL
 
 from .propagation import (
+    MAX_SPOTTING_EMBERS,
     N_NEIGHBOURS,
     compute_spotting,
     try_spread_to_neighbour,
 )
+
+# Worst-case number of events a single pop can push (all neighbours plus a
+# capped ember burst). The kernel only pops when this headroom is available,
+# so an overflow always suspends with the heap intact and the caller can
+# regrow the buffers and resume.
+FRONT_RESERVE = N_NEIGHBOURS + MAX_SPOTTING_EMBERS
 
 
 @njit(cache=False)
@@ -147,6 +154,10 @@ def advance_front_until(
             if event_times[realization, 0] > end_time:
                 break
 
+            if sizes[realization] + FRONT_RESERVE > max_events:
+                overflow[realization] = 1
+                break
+
             (
                 time,
                 row,
@@ -208,9 +219,6 @@ def advance_front_until(
                 )
                 if not ignites:
                     continue
-                if sizes[realization] >= max_events:
-                    overflow[realization] = 1
-                    break
                 sizes[realization] = _heap_push(
                     event_times[realization],
                     event_rows[realization],
@@ -249,9 +257,6 @@ def advance_front_until(
                     if track_spotting:
                         spotting_generation[realization, row, col] = True
                         spotting_receiving[realization, row_to, col_to] = True
-                    if sizes[realization] >= max_events:
-                        overflow[realization] = 1
-                        break
                     sizes[realization] = _heap_push(
                         event_times[realization],
                         event_rows[realization],
