@@ -845,6 +845,9 @@ extras from the install command.</p>
 <p>The command will create the <code>results/quickstart</code> directory if it does not
 already exist. Time-related settings in the configuration file (for example
 <code>time_limit</code> and <code>time_resolution</code>) are expressed in seconds.</p>
+<p>The configuration must include boundary conditions with an entry at time <code>0</code>
+and at least one ignition in that initial state. If ignitions are provided at
+the top level, the CLI merges them into the first boundary-condition block.</p>
 <h3 id="optional-inputs">Optional inputs</h3>
 <ul>
 <li>Provide a custom fuel model with <code>--fuel-config example/fuel_config.yaml</code>.</li>
@@ -852,12 +855,18 @@ already exist. Time-related settings in the configuration file (for example
   [--tileset &lt;name&gt;]</code> when using staged tiled rasters instead of GeoTIFFs.</li>
 <li>Add <code>--verbose</code> to print progress tables and boundary-condition details.</li>
 <li>Add <code>--record</code> to save terminal logs alongside the simulation outputs.</li>
+<li>Add <code>--ignore-out-of-bounds</code> to keep running after the fire reaches the
+  domain edge.</li>
 </ul>
 <h2 id="inspect-the-outputs">Inspect the Outputs</h2>
 <p>After the run completes, the output directory contains GeoTIFF rasters
 (<code>fire_probability</code>, <code>fireline_intensity_*</code>, <code>ros_*</code>), GeoJSON isochrones, and
 metadata JSON summarising the run. Visualise the rasters with any GIS tool or
 load them back into Python using <code>rasterio</code> or <code>geopandas</code>.</p>
+<p>Each artefact name includes the simulation time, for example
+<code>fire_probability_3600.tiff</code> or <code>metadata_3600.json</code>. When <code>--record</code> is
+enabled, the terminal export is written as <code>run.html</code> and <code>run.log</code> in the
+output directory.</p>
 <h2 id="programmatic-usage">Programmatic Usage</h2>
 <p>You can embed PROPAGATOR directly in your Python workflows when you need custom
 post-processing or bespoke integration logic. The snippet below mirrors

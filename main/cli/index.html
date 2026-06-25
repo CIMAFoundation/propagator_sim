@@ -375,6 +375,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Argument Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configuration-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#boundary-conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Boundary Conditions
+      
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
@@ -382,6 +410,17 @@
     <span class="md-ellipsis">
       
         Output Products
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime Behavior
       
     </span>
   </a>
@@ -709,6 +748,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Argument Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configuration-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#boundary-conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Boundary Conditions
+      
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
@@ -716,6 +783,17 @@
     <span class="md-ellipsis">
       
         Output Products
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime Behavior
       
     </span>
   </a>
@@ -754,6 +832,8 @@
 <p>The <code>propagator</code> command drives simulations from the terminal. It validates
 input files, prepares rasters, runs the propagation loop, and writes outputs on
 every reporting interval.</p>
+<p>The CLI has a single entrypoint and no subcommands. All behavior is controlled
+through flags plus the JSON configuration file passed via <code>--config</code>.</p>
 <pre><code class="language-bash">uv run propagator --help
 </code></pre>
 <h2 id="basic-invocation">Basic Invocation</h2>
@@ -766,6 +846,10 @@ every reporting interval.</p>
 </code></pre>
 <p>CLI arguments are powered by <code>pydantic-settings</code>; required inputs raise clear
 validation errors before the simulation starts.</p>
+<p>The JSON config must define at least one boundary-condition block with time
+<code>0</code>, and that initial state must include ignitions either at the top level or
+inside the first boundary condition. The CLI merges top-level ignitions into the
+first boundary-condition entry before validation continues.</p>
 <h2 id="operating-modes">Operating Modes</h2>
 <ul>
 <li><strong>GeoTIFF mode</strong> (<code>--mode geotiff</code>): supply explicit DEM (<code>--dem</code>) and fuel
@@ -779,6 +863,9 @@ validation errors before the simulation starts.</p>
 <p>Switching between modes controls which arguments are required; passing both
 <code>--dem</code> and <code>--fuel</code> automatically activates GeoTIFF mode even if <code>--mode</code> is
 left at the default.</p>
+<p>In GeoTIFF mode, <code>--tilespath</code> and <code>--tileset</code> are ignored. In tiles mode,
+<code>--dem</code> and <code>--fuel</code> must be omitted and the loader expects the tile metadata
+files and raster tiles under the selected directory layout.</p>
 <h2 id="argument-reference">Argument Reference</h2>
 <table>
 <thead>
@@ -853,6 +940,111 @@ left at the default.</p>
 </table>
 <p>Boolean switches use implicit flags: including <code>--verbose</code>, <code>--record</code>, or
 <code>--ignore-out-of-bounds</code> turns each behaviour on.</p>
+<h3 id="configuration-rules">Configuration Rules</h3>
+<p>These rules come from the runtime validation layer and are worth keeping in
+mind when preparing a scenario file:</p>
+<ul>
+<li><code>--config</code> must point to an existing JSON file.</li>
+<li><code>--output</code> is created automatically if it does not already exist.</li>
+<li><code>time_limit</code> and <code>time_resolution</code> are expressed in seconds.</li>
+<li><code>init_date</code> accepts <code>YYYYMMDDHHMM</code>, <code>YYYY-MM-DDTHH:MM:SS</code>, or
+  <code>YYYY-MM-DD HH:MM:SS</code>.</li>
+<li><code>ignitions</code> may be supplied either at the top level or inside the first
+  boundary-condition block.</li>
+<li><code>boundary_conditions</code> cannot be empty and cannot contain duplicate times.</li>
+<li><code>--fuel-config</code> must be a YAML file with a top-level <code>fuels</code> mapping.</li>
+</ul>
+<p>The default fuel system is used when <code>--fuel-config</code> is omitted.</p>
+<h2 id="boundary-conditions">Boundary Conditions</h2>
+<p>Boundary conditions live under <code>boundary_conditions</code> in the JSON config. Each
+entry describes what changes at a given simulation time and is interpreted as a
+single <code>TimedInput</code> block.</p>
+<p>Supported fields are:</p>
+<ul>
+<li><code>time</code> required, non-negative integer seconds from simulation start</li>
+<li><code>w_dir</code> optional wind direction in degrees clockwise from north</li>
+<li><code>w_speed</code> optional wind speed in km/h</li>
+<li><code>moisture</code> optional fuel moisture in percent, from <code>0</code> to <code>100</code></li>
+<li><code>ignitions</code> optional list of geometries, usually <code>POINT</code>, <code>LINE</code>, or
+  <code>POLYGON</code></li>
+<li><code>actions</code> optional list of suppression or fuel-change actions</li>
+</ul>
+<p>Action types are:</p>
+<ul>
+<li><code>waterline_action</code> for waterline drops, using <code>LINE</code> geometries</li>
+<li><code>canadair</code> for fixed-wing drops, using <code>LINE</code> geometries</li>
+<li><code>helicopter</code> for helicopter drops, using <code>LINE</code> geometries</li>
+<li><code>heavy_action</code> for fuel-removal or heavy suppression actions, using <code>LINE</code>
+  geometries</li>
+</ul>
+<p>Each action entry is a list of geometries. The geometry type is validated by
+the action class, so a waterline or aircraft action must use line geometries.
+The current implementation rasterizes these actions into per-cell moisture or
+fuel updates:</p>
+<ul>
+<li><code>waterline_action</code> raises moisture in the action buffer area</li>
+<li><code>canadair</code> raises moisture on the line and in a one-cell buffer</li>
+<li><code>helicopter</code> creates jittered ignition-adjacent moisture cells around the
+  line</li>
+<li><code>heavy_action</code> replaces the buffered cells with the non-vegetated fuel class</li>
+</ul>
+<p>Example action block:</p>
+<pre><code class="language-json">{
+  &quot;time&quot;: 6000,
+  &quot;actions&quot;: [
+    {
+      &quot;action_type&quot;: &quot;waterline_action&quot;,
+      &quot;geometries&quot;: [
+        &quot;LINE:[52.556601726325894 52.546600601885977];[-6.89301682922232 -6.851764124705658]&quot;
+      ]
+    }
+  ]
+}
+</code></pre>
+<p>Example:</p>
+<pre><code class="language-json">{
+  &quot;time&quot;: 0,
+  &quot;w_dir&quot;: 270,
+  &quot;w_speed&quot;: 30,
+  &quot;moisture&quot;: 12,
+  &quot;ignitions&quot;: [
+    &quot;POINT:[52.51751;-6.82354]&quot;
+  ]
+}
+</code></pre>
+<p>For a multi-step run:</p>
+<pre><code class="language-json">{
+  &quot;boundary_conditions&quot;: [
+    {
+      &quot;time&quot;: 0,
+      &quot;w_dir&quot;: 0,
+      &quot;w_speed&quot;: 30,
+      &quot;moisture&quot;: 0,
+      &quot;ignitions&quot;: [
+        &quot;POINT:[52.51751;-6.82354]&quot;
+      ]
+    },
+    {
+      &quot;time&quot;: 7200,
+      &quot;w_dir&quot;: 90,
+      &quot;w_speed&quot;: 30,
+      &quot;moisture&quot;: 0
+    }
+  ]
+}
+</code></pre>
+<p>Key behavior:</p>
+<ul>
+<li>If <code>ignitions</code> are present at the top level, the CLI appends them to the
+  first <code>time = 0</code> block.</li>
+<li>If a <code>time = 0</code> block is missing, the config is rejected.</li>
+<li>If the <code>time = 0</code> block does not contain any ignitions after merging, the
+  config is rejected.</li>
+<li>Duplicate <code>time</code> values are rejected.</li>
+<li><code>w_dir</code> is normalized into the <code>[0, 360)</code> range.</li>
+<li><code>moisture</code> values are interpreted as percentages in the config and converted
+  to fractions internally.</li>
+</ul>
 <h2 id="output-products">Output Products</h2>
 <p>During the run, the CLI periodically writes:
 - GeoTIFF rasters for fire probability, arrival time (min/mean), fireline
@@ -863,6 +1055,27 @@ left at the default.</p>
 - Metadata JSON capturing CLI arguments, execution time, and summary statistics.</p>
 <p>Set <code>--record</code> to capture the Rich console log alongside these artefacts, which
 is useful for post-run audits.</p>
+<p>Files are written with the simulation time appended to the basename. For
+example, at <code>t=3600</code> the default outputs look like:</p>
+<ul>
+<li><code>fire_probability_3600.tiff</code></li>
+<li><code>mean_arrival_time_3600.tiff</code></li>
+<li><code>metadata_3600.json</code></li>
+<li><code>isochrones_3600.json</code></li>
+</ul>
+<p>When <code>--record</code> is enabled, the console export uses <code>run.html</code> and <code>run.log</code>
+inside the output directory.</p>
+<h2 id="runtime-behavior">Runtime Behavior</h2>
+<ul>
+<li>Each loop iteration advances the propagation model by <code>time_resolution</code>
+  seconds.</li>
+<li>If the model reaches the domain boundary and <code>--ignore-out-of-bounds</code> is not
+  set, the run stops after reporting the error.</li>
+<li><code>--verbose</code> adds the simulation date and area percentiles to the status line
+  and prints the parsed configuration and boundary-condition table at startup.</li>
+<li><code>--record</code> captures terminal output from the point it is enabled until process
+  exit; it does not retroactively record earlier output.</li>
+</ul>
 <h2 id="troubleshooting">Troubleshooting</h2>
 <ul>
 <li>Missing GeoTIFFs or tiles raise validation errors before the simulation
@@ -872,6 +1085,8 @@ is useful for post-run audits.</p>
 <li>For reproducible runs across multiple ignitions or meteorological scenarios,
   adjust <code>realizations</code>, <code>time_limit</code>, and <code>boundary_conditions</code> inside the
   JSON configuration file.</li>
+<li>If the CLI fails with a boundary-condition error, check that time <code>0</code> is
+  present and that the first block contains at least one ignition.</li>
 </ul>
 
 
