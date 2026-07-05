@@ -5,6 +5,7 @@ import pytest
 
 from propagator.core import BoundaryConditions, Propagator  # type: ignore
 from propagator.core.models import PropagatorStats, UpdateBatch  # type: ignore
+from propagator.core.numba import FLAG_SPOT_GEN, FLAG_SPOT_RECV  # type: ignore
 from propagator.core.scheduler import SchedulerEvent  # type: ignore
 
 
@@ -24,35 +25,29 @@ def make_propagator(realizations: int = 2) -> Propagator:
     return propagator
 
 
-def test_spotting_state_allocated_only_when_enabled():
+def test_spotting_probabilities_default_to_zero():
     base_veg = np.array([[1, 2], [3, 4]], dtype=np.int32)
     base_dem = np.zeros_like(base_veg, dtype=np.float32)
 
-    no_spotting = Propagator(
-        veg=base_veg,
-        dem=base_dem,
-        realizations=2,
-        do_spotting=False,
-    )
-    assert no_spotting.spotting_generation is None
-    assert no_spotting.spotting_receiving is None
-    np.testing.assert_allclose(
-        no_spotting.compute_spotting_generation_probability(),
-        np.zeros(base_veg.shape, dtype=np.float32),
-    )
-    np.testing.assert_allclose(
-        no_spotting.compute_spotting_receiving_probability(),
-        np.zeros(base_veg.shape, dtype=np.float32),
-    )
-
-    with_spotting = Propagator(
-        veg=base_veg,
-        dem=base_dem,
-        realizations=2,
-        do_spotting=True,
-    )
-    assert with_spotting.spotting_generation is not None
-    assert with_spotting.spotting_receiving is not None
+    for do_spotting in (False, True):
+        propagator = Propagator(
+            veg=base_veg,
+            dem=base_dem,
+            realizations=2,
+            do_spotting=do_spotting,
+        )
+        np.testing.assert_allclose(
+            propagator.compute_spotting_generation_probability(),
+            np.zeros(base_veg.shape, dtype=np.float32),
+        )
+        np.testing.assert_allclose(
+            propagator.compute_spotting_receiving_probability(),
+            np.zeros(base_veg.shape, dtype=np.float32),
+        )
+        assert (
+            propagator.get_spotting_generation().shape == (2,) + base_veg.shape
+        )
+        assert not propagator.get_spotting_receiving().any()
 
 
 def ignite_cell(
@@ -75,6 +70,29 @@ def ignite_cell(
     propagator._apply_updates(updates, new_time=time)
 
 
+def mark_spotting(
+    propagator: Propagator,
+    realization: int,
+    row: int,
+    col: int,
+    *,
+    gen: bool = False,
+    recv: bool = False,
+) -> None:
+    """Set spotting flags on a cell's tile slot (test seam)."""
+    tile, local_row, local_col = propagator._state_tile_slot(
+        realization, row, col
+    )
+    if gen:
+        propagator._tile_flags[realization, tile, local_row, local_col] |= (
+            FLAG_SPOT_GEN
+        )
+    if recv:
+        propagator._tile_flags[realization, tile, local_row, local_col] |= (
+            FLAG_SPOT_RECV
+        )
+
+
 def test_compute_fire_probability_and_means():
     propagator = make_propagator(realizations=2)
 
@@ -86,20 +104,15 @@ def test_compute_fire_probability_and_means():
     ignite_cell(propagator, 1, 0, 1, time=20, ros=1.2, fli=20.0)
     ignite_cell(propagator, 1, 1, 0, time=25, ros=0.6, fli=15.0)
 
-    propagator.spotting_generation = np.array(
-        [
-            [[1, 0], [0, 0]],
-            [[1, 1], [0, 0]],
-        ],
-        dtype=np.uint32,
-    ).transpose(2, 0, 1)
-    propagator.spotting_receiving = np.array(
-        [
-            [[0, 0], [1, 1]],
-            [[0, 1], [0, 0]],
-        ],
-        dtype=np.uint32,
-    ).transpose(2, 0, 1)
+    # spotting flags:
+    # gen: r0 at (0,0) and (1,0); r1 at (1,0)
+    # recv: r0 and r1 at (0,1); r1 at (1,0)
+    mark_spotting(propagator, 0, 0, 0, gen=True)
+    mark_spotting(propagator, 0, 1, 0, gen=True)
+    mark_spotting(propagator, 1, 1, 0, gen=True)
+    mark_spotting(propagator, 0, 0, 1, recv=True)
+    mark_spotting(propagator, 1, 0, 1, recv=True)
+    mark_spotting(propagator, 1, 1, 0, recv=True)
 
     prob = propagator.compute_fire_probability()
     np.testing.assert_allclose(
@@ -219,14 +232,11 @@ def test_get_output_includes_spotting_probabilities():
     ignite_cell(propagator, 0, 0, 0, time=5, ros=0.0, fli=0.0)
     ignite_cell(propagator, 1, 1, 0, time=9, ros=0.0, fli=0.0)
     propagator.time = 60
-    # literals are written as (rows, cols, realizations) and transposed to
-    # the (realizations, rows, cols) state layout
-    propagator.spotting_generation = np.array(
-        [[[1, 0], [0, 1]], [[0, 0], [0, 0]]], dtype=np.uint32
-    ).transpose(2, 0, 1)
-    propagator.spotting_receiving = np.array(
-        [[[0, 1], [0, 0]], [[1, 0], [0, 0]]], dtype=np.uint32
-    ).transpose(2, 0, 1)
+    # gen: r0 at (0,0), r1 at (0,1); recv: r1 at (0,0), r0 at (1,0)
+    mark_spotting(propagator, 0, 0, 0, gen=True)
+    mark_spotting(propagator, 1, 0, 1, gen=True)
+    mark_spotting(propagator, 1, 0, 0, recv=True)
+    mark_spotting(propagator, 0, 1, 0, recv=True)
 
     output = propagator.get_output()
 
@@ -384,7 +394,7 @@ def test_apply_updates_updates_state():
     future_time = 5
     propagator._apply_updates(updates, new_time=future_time)
 
-    assert propagator.fire[0, 0, 1] == 1
+    assert propagator.get_fire()[0, 0, 1] == 1
     assert propagator.get_arrival_time()[0, 0, 1] == future_time
     assert propagator.get_ros()[0, 0, 1] == pytest.approx(2.5)
     assert propagator.get_fireline_int()[0, 0, 1] == pytest.approx(7.5)

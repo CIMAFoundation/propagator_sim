@@ -14,13 +14,24 @@ from .propagation import (
     compute_spotting,
     try_spread_to_neighbour,
 )
-from .tiles import TILE_MASK, TILE_SHIFT
+from .tiles import (
+    FLAG_FIRE,
+    FLAG_SPOT_GEN,
+    FLAG_SPOT_RECV,
+    TILE_MASK,
+    TILE_SHIFT,
+    read_flags,
+)
 
 # Worst-case number of events a single pop can push (all neighbours plus a
 # capped ember burst). The kernel only pops when this headroom is available,
 # so an overflow always suspends with the heap intact and the caller can
 # regrow the buffers and resume.
 FRONT_RESERVE = N_NEIGHBOURS + MAX_SPOTTING_EMBERS
+
+# Worst-case number of tiles a single pop can allocate: the popped cell's
+# tile plus one tile per ember landing cell.
+TILE_RESERVE = 1 + MAX_SPOTTING_EMBERS
 
 
 @njit(cache=False)
@@ -128,12 +139,10 @@ def advance_front_until(
     veg: npt.NDArray[np.integer],
     fuel_idx: npt.NDArray[np.int64],
     dem: npt.NDArray[np.floating],
-    fire: npt.NDArray[np.int8],
-    spotting_generation: npt.NDArray[np.bool_],
-    spotting_receiving: npt.NDArray[np.bool_],
     tile_idx: npt.NDArray[np.int32],
     tile_counts: npt.NDArray[np.int32],
     tile_capacity: int,
+    tile_flags: npt.NDArray[np.uint8],
     tile_arrival: npt.NDArray[np.int32],
     tile_ros: npt.NDArray[np.float32],
     tile_fli: npt.NDArray[np.float32],
@@ -160,10 +169,10 @@ def advance_front_until(
                 break
 
             # suspend (heap intact) if the next pop cannot be guaranteed to
-            # fit: worst-case heap pushes, or a tile allocation while the
-            # pool is full and not every tile is allocated yet
+            # fit: worst-case heap pushes, or worst-case tile allocations
+            # while not every tile is allocated yet
             if sizes[realization] + FRONT_RESERVE > max_events or (
-                tile_counts[realization] >= tile_capacity
+                tile_counts[realization] + TILE_RESERVE > tile_capacity
                 and tile_counts[realization] < total_tiles
             ):
                 overflow[realization] = 1
@@ -186,22 +195,25 @@ def advance_front_until(
             )
             sizes[realization] = new_size
 
-            if fire[realization, row, col] != 0:
+            tile_idx_r = tile_idx[realization]
+            tile_flags_r = tile_flags[realization]
+
+            if read_flags(tile_idx_r, tile_flags_r, row, col) & FLAG_FIRE:
                 continue
 
             if row <= 0 or col <= 0 or row >= n_rows - 1 or col >= n_cols - 1:
                 out_of_bounds[realization] = 1
 
-            fire[realization, row, col] = 1
             tile_row = row >> TILE_SHIFT
             tile_col = col >> TILE_SHIFT
-            tile = tile_idx[realization, tile_row, tile_col]
+            tile = tile_idx_r[tile_row, tile_col]
             if tile < 0:
                 tile = tile_counts[realization]
                 tile_counts[realization] = tile + 1
-                tile_idx[realization, tile_row, tile_col] = tile
+                tile_idx_r[tile_row, tile_col] = tile
             local_row = row & TILE_MASK
             local_col = col & TILE_MASK
+            tile_flags_r[tile, local_row, local_col] |= FLAG_FIRE
             tile_arrival[realization, tile, local_row, local_col] = time
             tile_ros[realization, tile, local_row, local_col] = ros_value
             tile_fli[realization, tile, local_row, local_col] = fli_value
@@ -209,7 +221,6 @@ def advance_front_until(
             if veg[row, col] == NO_FUEL:
                 continue
 
-            fire_slice = fire[realization]
             w_dir_r = wind_dir[row, col]
             w_speed_r = wind_speed[row, col]
 
@@ -229,7 +240,8 @@ def advance_front_until(
                     veg,
                     fuel_idx,
                     dem,
-                    fire_slice,
+                    tile_idx_r,
+                    tile_flags_r,
                     moisture,
                     w_dir_r,
                     w_speed_r,  # type: ignore
@@ -260,7 +272,8 @@ def advance_front_until(
                     cellsize,
                     veg,
                     fuel_idx,
-                    fire_slice,
+                    tile_idx_r,
+                    tile_flags_r,
                     w_dir_r,
                     w_speed_r,  # type: ignore
                     fuels,
@@ -275,8 +288,21 @@ def advance_front_until(
                         _is_spotting,
                     ) = update
                     if track_spotting:
-                        spotting_generation[realization, row, col] = True
-                        spotting_receiving[realization, row_to, col_to] = True
+                        tile_flags_r[tile, local_row, local_col] |= (
+                            FLAG_SPOT_GEN
+                        )
+                        recv_tile_row = row_to >> TILE_SHIFT
+                        recv_tile_col = col_to >> TILE_SHIFT
+                        recv_tile = tile_idx_r[recv_tile_row, recv_tile_col]
+                        if recv_tile < 0:
+                            recv_tile = tile_counts[realization]
+                            tile_counts[realization] = recv_tile + 1
+                            tile_idx_r[recv_tile_row, recv_tile_col] = (
+                                recv_tile
+                            )
+                        tile_flags_r[
+                            recv_tile, row_to & TILE_MASK, col_to & TILE_MASK
+                        ] |= FLAG_SPOT_RECV
                     sizes[realization] = _heap_push(
                         event_times[realization],
                         event_rows[realization],

@@ -19,15 +19,36 @@ TILE_SHIFT = 5
 TILE_SIZE = 1 << TILE_SHIFT
 TILE_MASK = TILE_SIZE - 1
 
+# Bitfield flags stored in the per-cell uint8 tile pool.
+FLAG_FIRE = np.uint8(1)
+FLAG_SPOT_GEN = np.uint8(2)
+FLAG_SPOT_RECV = np.uint8(4)
+
+
+@njit(cache=False, inline="always")
+def read_flags(
+    tile_idx_r: npt.NDArray[np.int32],
+    tile_flags_r: npt.NDArray[np.uint8],
+    row: int,
+    col: int,
+) -> np.uint8:
+    """Read the flags byte for a cell in one realization (0 if unallocated)."""
+    tile = tile_idx_r[row >> TILE_SHIFT, col >> TILE_SHIFT]
+    if tile < 0:
+        return np.uint8(0)
+    return tile_flags_r[tile, row & TILE_MASK, col & TILE_MASK]
+
 
 @njit(cache=False, parallel=True)
 def fold_state_tiles(
     tile_idx: npt.NDArray[np.int32],
+    tile_flags: npt.NDArray[np.uint8],
     tile_arrival: npt.NDArray[np.int32],
     tile_ros: npt.NDArray[np.float32],
     tile_fli: npt.NDArray[np.float32],
-    fire: npt.NDArray[np.int8],
     count: npt.NDArray[np.int32],
+    spot_gen_count: npt.NDArray[np.int32],
+    spot_recv_count: npt.NDArray[np.int32],
     arrival_min: npt.NDArray[np.int32],
     arrival_sum: npt.NDArray[np.float64],
     ros_sum: npt.NDArray[np.float64],
@@ -37,15 +58,16 @@ def fold_state_tiles(
 ) -> None:
     """Aggregate tiled state across realizations into per-cell 2D maps.
 
-    Only burned cells (fire != 0) contribute. Callers must pass `count`,
-    sums and maxes zero-initialized and `arrival_min` initialized to
-    int32 max. NaN ros/fli values contribute to `count` but are skipped
-    in sums and maxes, matching the previous dense nansum/nanmax
-    behaviour.
+    Spotting flags are counted for every flagged cell; arrival/ros/fli only
+    contribute for burned cells (FLAG_FIRE set). Callers must pass `count`,
+    spot counts, sums and maxes zero-initialized and `arrival_min`
+    initialized to int32 max. NaN ros/fli values contribute to `count` but
+    are skipped in sums and maxes, matching the previous dense
+    nansum/nanmax behaviour.
     """
     n_realizations, tiles_h, tiles_w = tile_idx.shape
-    n_rows = fire.shape[1]
-    n_cols = fire.shape[2]
+    n_rows = count.shape[0]
+    n_cols = count.shape[1]
 
     # parallel over spatial tiles: each output cell is owned by exactly one
     # thread, so the in-place accumulation is race-free
@@ -66,7 +88,14 @@ def fold_state_tiles(
                     col = col0 + local_col
                     if col >= n_cols:
                         break
-                    if fire[realization, row, col] == 0:
+                    flags = tile_flags[realization, tile, local_row, local_col]
+                    if flags == 0:
+                        continue
+                    if flags & FLAG_SPOT_GEN:
+                        spot_gen_count[row, col] += 1
+                    if flags & FLAG_SPOT_RECV:
+                        spot_recv_count[row, col] += 1
+                    if not flags & FLAG_FIRE:
                         continue
                     count[row, col] += 1
                     arrival = tile_arrival[

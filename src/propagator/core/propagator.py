@@ -25,9 +25,13 @@ from propagator.core.models import (
     UpdateBatch,
 )
 from propagator.core.numba import (
+    FLAG_FIRE,
+    FLAG_SPOT_GEN,
+    FLAG_SPOT_RECV,
     FRONT_RESERVE,
     FUEL_SYSTEM_LEGACY,
     TILE_MASK,
+    TILE_RESERVE,
     TILE_SHIFT,
     TILE_SIZE,
     FuelSystem,
@@ -64,6 +68,8 @@ class StateFold:
     """Per-cell aggregates of the tiled state across realizations."""
 
     count: npt.NDArray[np.int32]
+    spot_gen_count: npt.NDArray[np.int32]
+    spot_recv_count: npt.NDArray[np.int32]
     arrival_min: npt.NDArray[np.int32]
     arrival_sum: npt.NDArray[np.float64]
     ros_sum: npt.NDArray[np.float64]
@@ -142,21 +148,20 @@ class Propagator:
     _front_capacity: int = field(init=False, default=0)
     _fuel_idx: npt.NDArray[np.int64] = field(init=False)
 
-    # block-sparse per-realization state: arrival time, rate of spread and
-    # fireline intensity live in on-demand 32x32 tiles (see core.numba.tiles);
-    # use get_arrival_time()/get_ros()/get_fireline_int() for dense views
+    # block-sparse per-realization state: burn/spotting flags, arrival time,
+    # rate of spread and fireline intensity live in on-demand 32x32 tiles
+    # (see core.numba.tiles); use get_fire()/get_arrival_time()/get_ros()/
+    # get_fireline_int() and the spotting getters for dense views
     _tile_idx: npt.NDArray[np.int32] = field(init=False)
     _tile_counts: npt.NDArray[np.int32] = field(init=False)
     _tile_capacity: int = field(init=False, default=0)
+    _tile_flags: npt.NDArray[np.uint8] = field(init=False)
     _tile_arrival: npt.NDArray[np.int32] = field(init=False)
     _tile_ros: npt.NDArray[np.float32] = field(init=False)
     _tile_fli: npt.NDArray[np.float32] = field(init=False)
 
     # simulation state
     time: int = field(init=False, default=0)
-    fire: npt.NDArray[np.int8] = field(init=False)
-    spotting_generation: npt.NDArray[np.bool_] | None = field(init=False)
-    spotting_receiving: npt.NDArray[np.bool_] | None = field(init=False)
     moisture: npt.NDArray[np.floating] = field(init=False)
     wind_dir: npt.NDArray[np.floating] = field(init=False)
     wind_speed: npt.NDArray[np.floating] = field(init=False)
@@ -197,6 +202,10 @@ class Propagator:
         )
         self._tile_counts = np.zeros((self.realizations,), dtype=np.int32)
         self._tile_capacity = min(TILE_INITIAL_CAPACITY, tiles_h * tiles_w)
+        self._tile_flags = np.zeros(
+            (self.realizations, self._tile_capacity, TILE_SIZE, TILE_SIZE),
+            dtype=np.uint8,
+        )
         self._tile_arrival = np.zeros(
             (self.realizations, self._tile_capacity, TILE_SIZE, TILE_SIZE),
             dtype=np.int32,
@@ -209,21 +218,6 @@ class Propagator:
             (self.realizations, self._tile_capacity, TILE_SIZE, TILE_SIZE),
             dtype=np.float32,
         )
-        # state arrays use (realizations, rows, cols) layout so that each
-        # realization's grid is contiguous in memory for the JIT kernels
-        self.fire = np.zeros((self.realizations,) + shape, dtype=np.int8)
-        if self.do_spotting:
-            # binary masks: uint8 keeps them 4x smaller than the previous
-            # uint32 allocation
-            self.spotting_generation = np.zeros(
-                (self.realizations,) + shape, dtype=np.uint8
-            )
-            self.spotting_receiving = np.zeros(
-                (self.realizations,) + shape, dtype=np.uint8
-            )
-        else:
-            self.spotting_generation = None
-            self.spotting_receiving = None
         if not self.do_spotting:
             self.fuels.disable_spotting()
         self._fuel_idx = build_fuel_index_grid(self.fuels, self.veg)
@@ -236,36 +230,24 @@ class Propagator:
         numpy.ndarray
             2D array with values in [0, 1].
         """
-        values = np.mean(self.fire, axis=0).astype(np.float32)
-        return values
+        return self._probability(self._fold_state().count)
 
     def compute_spotting_generation_probability(
         self,
     ) -> npt.NDArray[np.floating]:
         """Return per-cell spotting generation probability."""
-        if self.spotting_generation is None:
-            return np.zeros(self.veg.shape, dtype=np.float32)
-        values = (
-            np.sum(self.spotting_generation, axis=0, dtype=np.float64).astype(
-                np.float32
-            )
-            / self.realizations
-        )
-        return values
+        return self._probability(self._fold_state().spot_gen_count)
 
     def compute_spotting_receiving_probability(
         self,
     ) -> npt.NDArray[np.floating]:
         """Return per-cell spotting receiving probability."""
-        if self.spotting_receiving is None:
-            return np.zeros(self.veg.shape, dtype=np.float32)
-        values = (
-            np.sum(self.spotting_receiving, axis=0, dtype=np.float64).astype(
-                np.float32
-            )
-            / self.realizations
-        )
-        return values
+        return self._probability(self._fold_state().spot_recv_count)
+
+    def _probability(
+        self, count: npt.NDArray[np.int32]
+    ) -> npt.NDArray[np.floating]:
+        return (count / self.realizations).astype(np.float32)
 
     def compute_ros_max(self) -> npt.NDArray[np.floating]:
         """Return per-cell maximum Rate of Spread across realizations.
@@ -324,6 +306,8 @@ class Propagator:
         shape = self.veg.shape
         fold = StateFold(
             count=np.zeros(shape, dtype=np.int32),
+            spot_gen_count=np.zeros(shape, dtype=np.int32),
+            spot_recv_count=np.zeros(shape, dtype=np.int32),
             arrival_min=np.full(shape, np.iinfo(np.int32).max, dtype=np.int32),
             arrival_sum=np.zeros(shape, dtype=np.float64),
             ros_sum=np.zeros(shape, dtype=np.float64),
@@ -333,11 +317,13 @@ class Propagator:
         )
         fold_state_tiles(
             self._tile_idx,
+            self._tile_flags,
             self._tile_arrival,
             self._tile_ros,
             self._tile_fli,
-            self.fire,
             fold.count,
+            fold.spot_gen_count,
+            fold.spot_recv_count,
             fold.arrival_min,
             fold.arrival_sum,
             fold.ros_sum,
@@ -360,6 +346,31 @@ class Propagator:
         out = np.full(self.veg.shape, np.nan, dtype=np.float32)
         np.divide(the_sum, count, out=out, where=count > 0)
         return out
+
+    def _materialize_flags(self) -> npt.NDArray[np.uint8]:
+        out = np.zeros((self.realizations,) + self.veg.shape, dtype=np.uint8)
+        materialize_tiles(self._tile_idx, self._tile_flags, out)
+        return out
+
+    def get_fire(self) -> npt.NDArray[np.uint8]:
+        """Materialize the dense (realizations, rows, cols) burn state (0/1).
+
+        This allocates the full dense array; intended for analysis and
+        tests, not for the hot path.
+        """
+        return ((self._materialize_flags() & FLAG_FIRE) != 0).astype(np.uint8)
+
+    def get_spotting_generation(self) -> npt.NDArray[np.uint8]:
+        """Materialize the dense per-realization spotting generation mask."""
+        return ((self._materialize_flags() & FLAG_SPOT_GEN) != 0).astype(
+            np.uint8
+        )
+
+    def get_spotting_receiving(self) -> npt.NDArray[np.uint8]:
+        """Materialize the dense per-realization spotting receiving mask."""
+        return ((self._materialize_flags() & FLAG_SPOT_RECV) != 0).astype(
+            np.uint8
+        )
 
     def get_arrival_time(self) -> npt.NDArray[np.int32]:
         """Materialize the dense (realizations, rows, cols) arrival times.
@@ -551,11 +562,13 @@ class Propagator:
         ros = updates.rates_of_spread
         fireline_intensity = updates.fireline_intensities
 
-        self.fire[realizations, rows, cols] = True
         for index in range(len(rows)):
             realization = int(realizations[index])
             tile, local_row, local_col = self._state_tile_slot(
                 realization, int(rows[index]), int(cols[index])
+            )
+            self._tile_flags[realization, tile, local_row, local_col] |= (
+                FLAG_FIRE
             )
             self._tile_arrival[realization, tile, local_row, local_col] = int(
                 self.time
@@ -566,23 +579,6 @@ class Propagator:
             self._tile_fli[realization, tile, local_row, local_col] = (
                 fireline_intensity[index]
             )
-
-    def _calculate_next_updates(self, updates: UpdateBatch, time: int) -> None:
-        """Calculate and schedule the next updates based on the current state.
-        Parameters
-        ----------
-        updates : UpdateBatch
-            Batch of updates that were just applied.
-        time : int
-            The simulation time of the updates.
-        Returns
-        -------
-        None
-        """
-
-        raise RuntimeError(
-            "UpdateBatch scheduling is not used in front tracking"
-        )
 
     def _schedule_ignitions(
         self, time: int, updates: UpdateBatch | None
@@ -660,7 +656,7 @@ class Propagator:
         """Double the capacity of the state tile pools, preserving content."""
         tiles_h, tiles_w = self._tile_idx.shape[1:]
         new_capacity = min(self._tile_capacity * 2, tiles_h * tiles_w)
-        for name in ("_tile_arrival", "_tile_ros", "_tile_fli"):
+        for name in ("_tile_flags", "_tile_arrival", "_tile_ros", "_tile_fli"):
             old = getattr(self, name)
             new = np.zeros(
                 (self.realizations, new_capacity, TILE_SIZE, TILE_SIZE),
@@ -747,37 +743,6 @@ class Propagator:
         ):
             raise PropagatorOutOfBoundsError("""Simulation reached the edge of the grid.
                              To ignore this error, set out_of_bounds_mode to 'ignore'.""")
-
-    def _filter_valid_updates(self, updates: UpdateBatch) -> UpdateBatch:
-        """Filter out updates that are not valid, e.g. cells that have already
-        burned.
-        Parameters
-        ----------
-        updates : UpdateBatch
-            Batch of updates to filter.
-        Returns
-        -------
-        UpdateBatch
-            Filtered batch of updates.
-        """
-
-        must_be_updated = (
-            self.fire[updates.realizations, updates.rows, updates.cols] == 0
-        )
-
-        rows = updates.rows[must_be_updated]
-        cols = updates.cols[must_be_updated]
-        realizations = updates.realizations[must_be_updated]
-        ros = updates.rates_of_spread[must_be_updated]
-        fireline_intensity = updates.fireline_intensities[must_be_updated]
-
-        return UpdateBatch(
-            rows=rows,
-            cols=cols,
-            realizations=realizations,
-            rates_of_spread=ros,
-            fireline_intensities=fireline_intensity,
-        )
 
     def _update_boundary_conditions(
         self, time_delta: int, scheduler_event: SchedulerEvent
@@ -903,17 +868,6 @@ class Propagator:
 
         moisture = self._get_moisture()
         out_of_bounds = np.zeros((self.realizations,), dtype=np.int8)
-        dummy_spotting = np.zeros((1, 1, 1), dtype=np.uint8)
-        spotting_generation = (
-            self.spotting_generation
-            if self.spotting_generation is not None
-            else dummy_spotting
-        )
-        spotting_receiving = (
-            self.spotting_receiving
-            if self.spotting_receiving is not None
-            else dummy_spotting
-        )
 
         while True:
             advance_front_until(
@@ -930,12 +884,10 @@ class Propagator:
                 self.veg,
                 self._fuel_idx,
                 self.dem,
-                self.fire,
-                spotting_generation,
-                spotting_receiving,
                 self._tile_idx,
                 self._tile_counts,
                 int(self._tile_capacity),
+                self._tile_flags,
                 self._tile_arrival,
                 self._tile_ros,
                 self._tile_fli,
@@ -962,7 +914,9 @@ class Propagator:
             ):
                 self._grow_front()
                 grew = True
-            if np.any(self._tile_counts[flagged] >= self._tile_capacity):
+            if np.any(
+                self._tile_counts[flagged] + TILE_RESERVE > self._tile_capacity
+            ):
                 self._grow_tiles()
                 grew = True
             if not grew:
@@ -999,19 +953,22 @@ class Propagator:
             PropagatorOutput: Snapshot of fire probability,
                 RoS, intensity, stats.
         """
-        fire_probability = self.compute_fire_probability()
-        spotting_generation_probability = (
-            self.compute_spotting_generation_probability()
+        # single fold pass shared by every derived map: get_output is called
+        # frequently in production, so avoid re-folding per quantity
+        fold = self._fold_state()
+        fire_probability = self._probability(fold.count)
+        spotting_generation_probability = self._probability(
+            fold.spot_gen_count
         )
-        spotting_receiving_probability = (
-            self.compute_spotting_receiving_probability()
+        spotting_receiving_probability = self._probability(
+            fold.spot_recv_count
         )
-        min_arrival_time = self.compute_arrival_time_min()
-        mean_arrival_time = self.compute_arrival_time_mean()
-        ros_max = self.compute_ros_max()
-        ros_mean = self.compute_ros_mean()
-        fireline_intensity_max = self.compute_fireline_int_max()
-        fireline_intensity_mean = self.compute_fireline_int_mean()
+        min_arrival_time = self._arrival_time_min(fold)
+        mean_arrival_time = self._masked_mean(fold.arrival_sum, fold.count)
+        ros_max = fold.ros_max
+        ros_mean = self._masked_mean(fold.ros_sum, fold.count)
+        fireline_intensity_max = fold.fli_max
+        fireline_intensity_mean = self._masked_mean(fold.fli_sum, fold.count)
         stats = self.compute_stats(fire_probability)
 
         return PropagatorOutput(
