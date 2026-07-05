@@ -1,5 +1,6 @@
 """Package init for the wildfire propagator core."""
 
+from .checkpoint import PropagatorCheckpoint
 from .models import (
     BoundaryConditions,
     PropagatorStats,
@@ -23,6 +24,7 @@ except Exception:
 __all__ = [
     "BoundaryConditions",
     "Propagator",
+    "PropagatorCheckpoint",
     "PropagatorOutOfBoundsError",
     "PropagatorStats",
     "FUEL_SYSTEM_LEGACY",

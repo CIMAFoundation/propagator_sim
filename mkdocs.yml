@@ -24,6 +24,7 @@ nav:
   - CLI Usage: cli.md
   - Simulation Outputs: outputs.md
   - Fire Spotting: spotting.md
+  - Checkpoints & Domain Growth: checkpoints.md
   - API Reference:
       - Overview: reference/index.md
       - Core: reference/propagator.md

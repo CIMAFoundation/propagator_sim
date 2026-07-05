@@ -154,6 +154,7 @@ def advance_front_until(
     p_moist_fn,
     out_of_bounds: npt.NDArray[np.int8],
     track_spotting: bool,
+    halt_on_boundary: bool,
 ) -> None:
     n_realizations = sizes.shape[0]
     n_rows = veg.shape[0]
@@ -170,13 +171,39 @@ def advance_front_until(
 
             # suspend (heap intact) if the next pop cannot be guaranteed to
             # fit: worst-case heap pushes, or worst-case tile allocations
-            # while not every tile is allocated yet
-            if sizes[realization] + FRONT_RESERVE > max_events or (
-                tile_counts[realization] + TILE_RESERVE > tile_capacity
-                and tile_counts[realization] < total_tiles
+            # (bounded by the tiles that can still be allocated at all)
+            tile_demand = total_tiles - tile_counts[realization]
+            if tile_demand > TILE_RESERVE:
+                tile_demand = TILE_RESERVE
+            if (
+                sizes[realization] + FRONT_RESERVE > max_events
+                or tile_counts[realization] + tile_demand > tile_capacity
             ):
                 overflow[realization] = 1
                 break
+
+            # suspend (heap intact, event not popped) if the next event
+            # ignites a boundary-ring cell: the caller can checkpoint,
+            # expand the domain and resume without losing any spread
+            if halt_on_boundary:
+                peek_row = event_rows[realization, 0]
+                peek_col = event_cols[realization, 0]
+                if (
+                    peek_row <= 0
+                    or peek_col <= 0
+                    or peek_row >= n_rows - 1
+                    or peek_col >= n_cols - 1
+                ) and not (
+                    read_flags(
+                        tile_idx[realization],
+                        tile_flags[realization],
+                        peek_row,
+                        peek_col,
+                    )
+                    & FLAG_FIRE
+                ):
+                    out_of_bounds[realization] = 1
+                    break
 
             (
                 time,

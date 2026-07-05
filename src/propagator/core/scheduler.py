@@ -7,6 +7,7 @@ events, pop the earliest batch, and inspect active realizations.
 from __future__ import annotations
 
 import bisect
+import copy
 from dataclasses import dataclass, field
 from typing import Dict, Iterator, List, Optional, Tuple
 
@@ -247,6 +248,12 @@ class Scheduler:
 
     def clear(self) -> None:
         self._queue.clear()
+
+    def snapshot(self) -> List[Tuple[int, SchedulerEvent]]:
+        """Deep-copied (time, event) pairs of the pending queue, in order."""
+        return [
+            (time, copy.deepcopy(event)) for time, event in self._queue.items()
+        ]
 
     def next_time(self) -> Optional[int]:
         if not self:

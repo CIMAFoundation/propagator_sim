@@ -6,12 +6,18 @@ moisture inputs. Public dataclasses capture boundary conditions, actions,
 summary statistics, and output snapshots suitable for CLI and IO layers.
 """
 
+import copy
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
 import numpy as np
 import numpy.typing as npt
 
+from propagator.core.checkpoint import (
+    CHECKPOINT_VERSION,
+    PropagatorCheckpoint,
+    reanchor_event,
+)
 from propagator.core.constants import (
     CELLSIZE,
     MOISTURE_MODEL_DEFAULT,
@@ -131,6 +137,11 @@ class Propagator:
     cellsize: float = field(default=CELLSIZE)
     do_spotting: bool = field(default=False)
     realizations: int = field(default=REALIZATIONS)
+
+    # world (row, col) of local cell (0, 0): anchors the grid in an absolute
+    # cell coordinate system so checkpoints can be restored onto larger,
+    # shifted grids (see from_checkpoint)
+    origin: tuple[int, int] = (0, 0)
 
     # selected simulation functions
     p_time_fn: Any = field(default=get_p_time_fn(ROS_DEFAULT))
@@ -868,6 +879,10 @@ class Propagator:
 
         moisture = self._get_moisture()
         out_of_bounds = np.zeros((self.realizations,), dtype=np.int8)
+        # in "raise" mode the kernel suspends BEFORE igniting a boundary
+        # cell (heap intact), so the caller can checkpoint, expand the
+        # domain via from_checkpoint and resume without losing spread
+        halt_on_boundary = self.out_of_bounds_mode == "raise"
 
         while True:
             advance_front_until(
@@ -899,6 +914,7 @@ class Propagator:
                 self.p_moist_fn,
                 out_of_bounds,
                 self.do_spotting,
+                halt_on_boundary,
             )
 
             if int(np.sum(self._front_overflow)) == 0:
@@ -914,9 +930,11 @@ class Propagator:
             ):
                 self._grow_front()
                 grew = True
-            if np.any(
-                self._tile_counts[flagged] + TILE_RESERVE > self._tile_capacity
-            ):
+            tiles_h, tiles_w = self._tile_idx.shape[1:]
+            tile_demand = np.minimum(
+                self._tile_counts[flagged] + TILE_RESERVE, tiles_h * tiles_w
+            )
+            if np.any(tile_demand > self._tile_capacity):
                 self._grow_tiles()
                 grew = True
             if not grew:
@@ -930,8 +948,12 @@ class Propagator:
             self.out_of_bounds_mode == "raise"
             and int(np.sum(out_of_bounds)) > 0
         ):
-            raise PropagatorOutOfBoundsError("""Simulation reached the edge of the grid.
-                             To ignore this error, set out_of_bounds_mode to 'ignore'.""")
+            raise PropagatorOutOfBoundsError(
+                "Simulation reached the edge of the grid. The state is "
+                "intact: checkpoint() and resume on a larger grid with "
+                "Propagator.from_checkpoint(), or set out_of_bounds_mode "
+                "to 'ignore' to let the fire stop at the boundary."
+            )
 
     def _next_front_time(self) -> int | None:
         if int(np.sum(self._front_sizes)) == 0:
@@ -1003,3 +1025,292 @@ class Propagator:
         if next_prop_time is None:
             return next_bc_time
         return min(next_bc_time, next_prop_time)
+
+    # --- Checkpointing and domain growth ---------------------------------
+
+    def world_bounds(self) -> tuple[int, int, int, int]:
+        """Inclusive world-cell bounds (row0, col0, row1, col1) of the grid."""
+        rows, cols = self.veg.shape
+        return (
+            self.origin[0],
+            self.origin[1],
+            self.origin[0] + rows - 1,
+            self.origin[1] + cols - 1,
+        )
+
+    def checkpoint(self) -> PropagatorCheckpoint:
+        """Snapshot the full dynamic state as an immutable checkpoint.
+
+        The checkpoint is independent of this instance (deep copies) and
+        can be used for in-place rollback (`restore`), persisted to disk
+        (`PropagatorCheckpoint.save`/`load`), or resumed on a larger grid
+        (`Propagator.from_checkpoint`).
+
+        Note: the stochastic RNG state is not captured, so runs resumed
+        from a checkpoint are statistically equivalent but not bitwise
+        reproductions of the original continuation.
+        """
+
+        def _optional(name: str) -> npt.NDArray | None:
+            value = getattr(self, name, None)
+            return None if value is None else np.array(value, copy=True)
+
+        front_size = int(self._front_sizes.max())
+        tile_count = int(self._tile_counts.max())
+        return PropagatorCheckpoint(
+            version=CHECKPOINT_VERSION,
+            time=int(self.time),
+            origin=(int(self.origin[0]), int(self.origin[1])),
+            cellsize=float(self.cellsize),
+            realizations=int(self.realizations),
+            do_spotting=bool(self.do_spotting),
+            veg=self.veg.copy(),
+            dem=self.dem.copy(),
+            moisture=_optional("moisture"),
+            wind_dir=_optional("wind_dir"),
+            wind_speed=_optional("wind_speed"),
+            actions_moisture=_optional("actions_moisture"),
+            front_times=self._front_times[:, :front_size].copy(),
+            front_rows=self._front_rows[:, :front_size].copy(),
+            front_cols=self._front_cols[:, :front_size].copy(),
+            front_ros=self._front_ros[:, :front_size].copy(),
+            front_fli=self._front_fli[:, :front_size].copy(),
+            front_sizes=self._front_sizes.copy(),
+            tile_idx=self._tile_idx.copy(),
+            tile_counts=self._tile_counts.copy(),
+            tile_flags=self._tile_flags[:, :tile_count].copy(),
+            tile_arrival=self._tile_arrival[:, :tile_count].copy(),
+            tile_ros=self._tile_ros[:, :tile_count].copy(),
+            tile_fli=self._tile_fli[:, :tile_count].copy(),
+            scheduler_events=self.scheduler.snapshot(),
+        )
+
+    def restore(self, checkpoint: PropagatorCheckpoint) -> None:
+        """Roll this propagator back to a checkpoint taken on the same grid.
+
+        Restores simulation time, front heaps, tiled state, weather
+        fields, vegetation (including past `vegetation_changes`) and the
+        pending boundary-condition queue. The checkpoint stays valid and
+        can be restored again.
+        """
+        if checkpoint.shape != self.veg.shape:
+            raise ValueError(
+                f"Checkpoint grid {checkpoint.shape} does not match this "
+                f"propagator's grid {self.veg.shape}; use "
+                "Propagator.from_checkpoint() to change the domain."
+            )
+        if tuple(checkpoint.origin) != tuple(self.origin):
+            raise ValueError(
+                f"Checkpoint origin {checkpoint.origin} does not match "
+                f"this propagator's origin {tuple(self.origin)}."
+            )
+        self.veg = checkpoint.veg.copy()
+        self._fuel_idx = build_fuel_index_grid(self.fuels, self.veg)
+        self._load_state(checkpoint, 0, 0)
+
+    @classmethod
+    def from_checkpoint(
+        cls,
+        checkpoint: PropagatorCheckpoint,
+        *,
+        veg: npt.NDArray[np.integer] | None = None,
+        dem: npt.NDArray[np.floating] | None = None,
+        origin: tuple[int, int] | None = None,
+        fuels: FuelSystem | None = None,
+        p_time_fn: Any = None,
+        p_moist_fn: Any = None,
+        out_of_bounds_mode: Literal["ignore", "raise"] = "raise",
+    ) -> "Propagator":
+        """Build a propagator resuming from a checkpoint.
+
+        Without `veg`/`dem` the checkpointed domain is reconstructed
+        as-is. Passing `veg`, `dem` and a world `origin` resumes on a new
+        (typically larger) grid: it must fully contain the checkpointed
+        grid, and any north/west growth (`checkpoint.origin - origin`)
+        must be a multiple of TILE_SIZE cells so the block-sparse tiles
+        transfer without being rewritten. Vegetation in the overlap is
+        taken from the checkpoint, preserving past `vegetation_changes`.
+
+        `fuels`, `p_time_fn` and `p_moist_fn` are not serialized; pass
+        the same objects used originally (defaults apply when omitted).
+        """
+        if veg is None:
+            if dem is not None or origin is not None:
+                raise ValueError(
+                    "veg, dem and origin must be provided together"
+                )
+            veg = checkpoint.veg.copy()
+            dem = checkpoint.dem.copy()
+            origin = checkpoint.origin
+            row_shift = 0
+            col_shift = 0
+        else:
+            if dem is None:
+                raise ValueError("dem is required when providing veg")
+            if veg.shape != dem.shape:
+                raise ValueError("veg and dem must have the same shape")
+            if origin is None:
+                origin = checkpoint.origin
+            row_shift = checkpoint.origin[0] - origin[0]
+            col_shift = checkpoint.origin[1] - origin[1]
+            old_rows, old_cols = checkpoint.shape
+            if row_shift < 0 or col_shift < 0:
+                raise ValueError(
+                    "New origin must not be south/east of the checkpoint "
+                    "origin: the new grid must contain the old one."
+                )
+            if row_shift % TILE_SIZE or col_shift % TILE_SIZE:
+                raise ValueError(
+                    "North/west growth must be a multiple of "
+                    f"TILE_SIZE ({TILE_SIZE}) cells; got shift "
+                    f"({row_shift}, {col_shift})."
+                )
+            if (
+                row_shift + old_rows > veg.shape[0]
+                or col_shift + old_cols > veg.shape[1]
+            ):
+                raise ValueError(
+                    "New grid does not fully contain the checkpoint grid."
+                )
+            veg = np.array(veg, copy=True)
+            veg[
+                row_shift : row_shift + old_rows,
+                col_shift : col_shift + old_cols,
+            ] = checkpoint.veg
+
+        extra: dict[str, Any] = {}
+        if fuels is not None:
+            extra["fuels"] = fuels
+        if p_time_fn is not None:
+            extra["p_time_fn"] = p_time_fn
+        if p_moist_fn is not None:
+            extra["p_moist_fn"] = p_moist_fn
+
+        propagator = cls(
+            veg=veg,
+            dem=dem,
+            cellsize=checkpoint.cellsize,
+            do_spotting=checkpoint.do_spotting,
+            realizations=checkpoint.realizations,
+            origin=(int(origin[0]), int(origin[1])),
+            out_of_bounds_mode=out_of_bounds_mode,
+            **extra,
+        )
+        propagator._load_state(checkpoint, row_shift, col_shift)
+        return propagator
+
+    def _load_state(
+        self,
+        checkpoint: PropagatorCheckpoint,
+        row_shift: int,
+        col_shift: int,
+    ) -> None:
+        """Replace all dynamic state with the checkpoint's, re-anchored by
+        (row_shift, col_shift) into this propagator's grid."""
+        if checkpoint.version > CHECKPOINT_VERSION:
+            raise ValueError(
+                f"Checkpoint version {checkpoint.version} is newer than "
+                f"supported version {CHECKPOINT_VERSION}"
+            )
+        if checkpoint.realizations != self.realizations:
+            raise ValueError("Checkpoint realizations mismatch")
+        if checkpoint.do_spotting != self.do_spotting:
+            raise ValueError("Checkpoint do_spotting mismatch")
+        if checkpoint.cellsize != self.cellsize:
+            raise ValueError("Checkpoint cellsize mismatch")
+
+        old_shape = checkpoint.shape
+        new_shape = self.veg.shape
+        grew = old_shape != new_shape or row_shift != 0 or col_shift != 0
+        self.time = int(checkpoint.time)
+
+        # front event heaps (stored trimmed to the largest heap)
+        stored_events = checkpoint.front_times.shape[1]
+        capacity = FRONT_INITIAL_CAPACITY
+        while capacity < stored_events + FRONT_RESERVE + 1:
+            capacity *= 2
+        self._front_capacity = capacity
+        for name, source, shift in (
+            ("_front_times", checkpoint.front_times, 0),
+            ("_front_rows", checkpoint.front_rows, row_shift),
+            ("_front_cols", checkpoint.front_cols, col_shift),
+            ("_front_ros", checkpoint.front_ros, 0),
+            ("_front_fli", checkpoint.front_fli, 0),
+        ):
+            array = np.zeros((self.realizations, capacity), source.dtype)
+            array[:, :stored_events] = source + shift if shift else source
+            setattr(self, name, array)
+        self._front_sizes = checkpoint.front_sizes.astype(np.int32).copy()
+        self._front_overflow = np.zeros((self.realizations,), dtype=np.int8)
+
+        # block-sparse tile state: the tile-index grid is re-anchored by
+        # whole tiles; pool contents transfer untouched
+        tiles_h = -(-new_shape[0] // TILE_SIZE)
+        tiles_w = -(-new_shape[1] // TILE_SIZE)
+        tile_row0 = row_shift >> TILE_SHIFT
+        tile_col0 = col_shift >> TILE_SHIFT
+        old_tiles_h, old_tiles_w = checkpoint.tile_idx.shape[1:]
+        self._tile_idx = np.full(
+            (self.realizations, tiles_h, tiles_w), -1, dtype=np.int32
+        )
+        self._tile_idx[
+            :,
+            tile_row0 : tile_row0 + old_tiles_h,
+            tile_col0 : tile_col0 + old_tiles_w,
+        ] = checkpoint.tile_idx
+        self._tile_counts = checkpoint.tile_counts.astype(np.int32).copy()
+
+        stored_tiles = checkpoint.tile_flags.shape[1]
+        tile_capacity = max(TILE_INITIAL_CAPACITY, stored_tiles + TILE_RESERVE)
+        tile_capacity = max(
+            min(tile_capacity, tiles_h * tiles_w), stored_tiles
+        )
+        self._tile_capacity = tile_capacity
+        for name, source in (
+            ("_tile_flags", checkpoint.tile_flags),
+            ("_tile_arrival", checkpoint.tile_arrival),
+            ("_tile_ros", checkpoint.tile_ros),
+            ("_tile_fli", checkpoint.tile_fli),
+        ):
+            array = np.zeros(
+                (self.realizations, tile_capacity, TILE_SIZE, TILE_SIZE),
+                source.dtype,
+            )
+            array[:, :stored_tiles] = source
+            setattr(self, name, array)
+
+        # environmental fields: weather grows by edge replication, action
+        # moisture with zeros (no suppression outside the old domain)
+        pad = (
+            (row_shift, new_shape[0] - old_shape[0] - row_shift),
+            (col_shift, new_shape[1] - old_shape[1] - col_shift),
+        )
+        for name in ("moisture", "wind_dir", "wind_speed"):
+            value = getattr(checkpoint, name)
+            if value is None:
+                if hasattr(self, name):
+                    delattr(self, name)
+                continue
+            setattr(
+                self,
+                name,
+                np.pad(value, pad, mode="edge") if grew else value.copy(),
+            )
+        if checkpoint.actions_moisture is None:
+            self.actions_moisture = None
+        elif grew:
+            self.actions_moisture = np.pad(
+                checkpoint.actions_moisture,
+                pad,
+                mode="constant",
+                constant_values=0,
+            )
+        else:
+            self.actions_moisture = checkpoint.actions_moisture.copy()
+
+        # pending boundary-condition queue
+        self.scheduler = Scheduler(realizations=self.realizations)
+        for event_time, event in checkpoint.scheduler_events:
+            event = copy.deepcopy(event)
+            reanchor_event(event, row_shift, col_shift, old_shape, new_shape)
+            self.scheduler.add_event(int(event_time), event)
