@@ -1,5 +1,9 @@
 # Checkpoints, Rollback & Domain Growth
 
+This page covers the machinery for long and large simulations: state
+snapshots, rollback, growing the domain at runtime, deterministic
+seeding, and freezing burned-out interior tiles to disk.
+
 The simulator can snapshot its complete dynamic state into an immutable
 `PropagatorCheckpoint`. A checkpoint supports three workflows:
 
@@ -173,6 +177,52 @@ During growth:
   replication until fresh boundary conditions are set; action moisture is
   padded with zeros; pending scheduler events are shifted and padded
   automatically.
+
+## Freezing inactive tiles to disk
+
+On long runs the burned interior keeps growing while the fire only ever
+works at the front. With a `freeze_dir`, burned-out tiles can be paged
+to disk so the in-memory working set stays proportional to the active
+front — without discarding the per-cell tracking of the interior:
+
+```python
+sim = Propagator(veg=veg, dem=dem, realizations=100,
+                 freeze_dir="/fast-ssd/run-042")
+
+while simulating:
+    sim.step(seconds=3600)
+    output = sim.get_output()        # frozen tiles are merged in
+    sim.freeze_inactive_tiles()      # e.g. once per output interval
+```
+
+A tile is frozen (per realization) only when propagation can provably
+never touch it again:
+
+- every in-domain cell is burnt or fuel-free, or
+- (spotting disabled) the only remaining unburnt fuel cells are *dead
+  holes* — cells whose entire neighbourhood is burnt or fuel-free — and
+  no pending front event targets the tile.
+
+Under this criterion freezing is exact: the kernels treat frozen tiles
+as fully burnt, which is indistinguishable from reading the real data,
+so the dynamics and the RNG stream are unchanged — a seeded run
+produces bitwise-identical results with or without freezing.
+
+Everything stays transparent:
+
+- `get_output()` and the dense getters (`get_fire()`,
+  `get_arrival_time()`, ...) merge frozen tiles back in automatically.
+- Igniting inside a frozen area (via boundary conditions) thaws the
+  affected tile; vegetation changes thaw everything, since new fuel can
+  invalidate the freeze criterion.
+- `checkpoint()` thaws all tiles first so snapshots are self-contained;
+  `restore()` clears the store.
+- `expand()` keeps frozen tiles valid — store keys are world-anchored.
+
+Frozen tiles are 13 KB each in a fixed-record file
+(`frozen_tiles.bin`), with slots reused on refreeze so the file never
+fragments. The store is session-scoped: it does not need to survive a
+process restart because checkpoints are always complete.
 
 ## Checkpoint format
 

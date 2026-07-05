@@ -24,6 +24,11 @@ FLAG_FIRE = np.uint8(1)
 FLAG_SPOT_GEN = np.uint8(2)
 FLAG_SPOT_RECV = np.uint8(4)
 
+# tile_idx sentinels: -1 = never allocated; -2 = frozen to disk. A tile is
+# only frozen when every in-domain cell is burnt or fuel-free, so kernels
+# may treat all its cells as burnt without reading the stored contents.
+FROZEN_TILE = np.int32(-2)
+
 
 @njit(cache=False, inline="always")
 def read_flags(
@@ -32,8 +37,14 @@ def read_flags(
     row: int,
     col: int,
 ) -> np.uint8:
-    """Read the flags byte for a cell in one realization (0 if unallocated)."""
+    """Read the flags byte for a cell in one realization.
+
+    Unallocated tiles read as 0; frozen tiles read as burnt (their cells
+    are all burnt or fuel-free by the freeze criterion).
+    """
     tile = tile_idx_r[row >> TILE_SHIFT, col >> TILE_SHIFT]
+    if tile == FROZEN_TILE:
+        return FLAG_FIRE
     if tile < 0:
         return np.uint8(0)
     return tile_flags_r[tile, row & TILE_MASK, col & TILE_MASK]
@@ -118,6 +129,51 @@ def fold_state_tiles(
                         fli_sum[row, col] += fli_value
                         if fli_value > fli_max[row, col]:
                             fli_max[row, col] = fli_value
+
+
+@njit(cache=False)
+def flood_reachable(
+    open_mask: npt.NDArray[np.bool_],
+    seed_rows: npt.NDArray[np.int32],
+    seed_cols: npt.NDArray[np.int32],
+    reachable: npt.NDArray[np.bool_],
+) -> None:
+    """Mark cells 8-connected to any seed through `open_mask` cells.
+
+    Used to decide which unburnt fuel cells can still ignite: fire only
+    ever spreads through unburnt fuel, so components that contain no
+    pending front event can never burn. `reachable` must be passed
+    zero-initialized; seeds outside `open_mask` are ignored.
+    """
+    n_rows, n_cols = open_mask.shape
+    stack_rows = np.empty(open_mask.size, dtype=np.int32)
+    stack_cols = np.empty(open_mask.size, dtype=np.int32)
+    top = 0
+    for i in range(seed_rows.size):
+        row = seed_rows[i]
+        col = seed_cols[i]
+        if open_mask[row, col] and not reachable[row, col]:
+            reachable[row, col] = True
+            stack_rows[top] = row
+            stack_cols[top] = col
+            top += 1
+    while top > 0:
+        top -= 1
+        row = stack_rows[top]
+        col = stack_cols[top]
+        for dr in range(-1, 2):
+            for dc in range(-1, 2):
+                if dr == 0 and dc == 0:
+                    continue
+                nr = row + dr
+                nc = col + dc
+                if nr < 0 or nc < 0 or nr >= n_rows or nc >= n_cols:
+                    continue
+                if open_mask[nr, nc] and not reachable[nr, nc]:
+                    reachable[nr, nc] = True
+                    stack_rows[top] = nr
+                    stack_cols[top] = nc
+                    top += 1
 
 
 @njit(cache=False, parallel=True)

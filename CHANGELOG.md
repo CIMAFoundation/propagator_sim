@@ -31,6 +31,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   JIT kernels' per-thread RNGs; runs with the same seed, machine and
   numba thread count are bitwise reproducible, and `reseed()` after
   `restore()` makes rollback continuations deterministic.
+- Tile freezing: with `freeze_dir` set, `freeze_inactive_tiles()` pages
+  burned-out interior tiles to a fixed-record file on disk and releases
+  their memory, keeping the working set proportional to the active front
+  while preserving full per-cell interior tracking. A tile freezes only
+  when propagation can provably never touch it again (reachability
+  analysis of the unburnt-fuel graph from pending front events; strict
+  all-burnt criterion when spotting is enabled), so dynamics and the RNG
+  stream are unchanged — seeded runs are bitwise identical with or
+  without freezing. Outputs and dense getters merge frozen tiles in
+  transparently; checkpoints thaw first; new ignitions thaw the reachable
+  component they seed.
 - Boundary suspension: with `out_of_bounds_mode="raise"` the kernel now
   suspends a realization *before* igniting a boundary-ring cell, leaving
   its event heap intact, so a checkpoint taken after

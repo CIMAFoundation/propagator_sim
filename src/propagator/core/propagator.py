@@ -8,6 +8,7 @@ summary statistics, and output snapshots suitable for CLI and IO layers.
 
 import copy
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
@@ -21,6 +22,7 @@ from propagator.core.checkpoint import (
 from propagator.core.constants import (
     CELLSIZE,
     MOISTURE_MODEL_DEFAULT,
+    NO_FUEL,
     REALIZATIONS,
     ROS_DEFAULT,
 )
@@ -35,6 +37,7 @@ from propagator.core.numba import (
     FLAG_SPOT_GEN,
     FLAG_SPOT_RECV,
     FRONT_RESERVE,
+    FROZEN_TILE,
     FUEL_SYSTEM_LEGACY,
     TILE_MASK,
     TILE_RESERVE,
@@ -43,6 +46,7 @@ from propagator.core.numba import (
     FuelSystem,
     advance_front_until,
     build_fuel_index_grid,
+    flood_reachable,
     fold_state_tiles,
     get_p_moisture_fn,
     get_p_time_fn,
@@ -50,6 +54,7 @@ from propagator.core.numba import (
     seed_rngs,
 )
 from propagator.core.scheduler import Scheduler, SchedulerEvent
+from propagator.core.tile_store import TileStore
 
 from .utils import upcast_to_ndarray
 
@@ -148,6 +153,10 @@ class Propagator:
     # are reproducible on the same machine and thread count (see reseed)
     seed: int | None = None
 
+    # directory for freezing burned-out interior tiles to disk (see
+    # freeze_inactive_tiles); None disables freezing
+    freeze_dir: str | Path | None = None
+
     # selected simulation functions
     p_time_fn: Any = field(default=get_p_time_fn(ROS_DEFAULT))
     p_moist_fn: Any = field(default=get_p_moisture_fn(MOISTURE_MODEL_DEFAULT))
@@ -175,6 +184,7 @@ class Propagator:
     _tile_arrival: npt.NDArray[np.int32] = field(init=False)
     _tile_ros: npt.NDArray[np.float32] = field(init=False)
     _tile_fli: npt.NDArray[np.float32] = field(init=False)
+    _tile_store: TileStore | None = field(init=False, default=None)
 
     # simulation state
     time: int = field(init=False, default=0)
@@ -237,6 +247,8 @@ class Propagator:
         if not self.do_spotting:
             self.fuels.disable_spotting()
         self._fuel_idx = build_fuel_index_grid(self.fuels, self.veg)
+        if self.freeze_dir is not None:
+            self._tile_store = TileStore(self.freeze_dir)
         if self.seed is not None:
             self.reseed(self.seed)
 
@@ -359,6 +371,7 @@ class Propagator:
             fold.fli_sum,
             fold.fli_max,
         )
+        self._fold_frozen(fold)
         return fold
 
     @staticmethod
@@ -378,6 +391,7 @@ class Propagator:
     def _materialize_flags(self) -> npt.NDArray[np.uint8]:
         out = np.zeros((self.realizations,) + self.veg.shape, dtype=np.uint8)
         materialize_tiles(self._tile_idx, self._tile_flags, out)
+        self._scatter_frozen(out, 0)
         return out
 
     def get_fire(self) -> npt.NDArray[np.uint8]:
@@ -408,6 +422,7 @@ class Propagator:
         """
         out = np.zeros((self.realizations,) + self.veg.shape, dtype=np.int32)
         materialize_tiles(self._tile_idx, self._tile_arrival, out)
+        self._scatter_frozen(out, 1)
         return out
 
     def get_ros(self) -> npt.NDArray[np.float32]:
@@ -418,6 +433,7 @@ class Propagator:
         """
         out = np.zeros((self.realizations,) + self.veg.shape, dtype=np.float32)
         materialize_tiles(self._tile_idx, self._tile_ros, out)
+        self._scatter_frozen(out, 2)
         return out
 
     def get_fireline_int(self) -> npt.NDArray[np.float32]:
@@ -428,6 +444,7 @@ class Propagator:
         """
         out = np.zeros((self.realizations,) + self.veg.shape, dtype=np.float32)
         materialize_tiles(self._tile_idx, self._tile_fli, out)
+        self._scatter_frozen(out, 3)
         return out
 
     def compute_stats(
@@ -633,6 +650,9 @@ class Propagator:
         ros: float,
         fli: float,
     ) -> None:
+        # a new ignition seeds spread through areas that may have been
+        # frozen as unreachable: bring its whole component back
+        self._thaw_for_ignition(realization, int(row), int(col))
         size = int(self._front_sizes[realization])
         if size >= self._front_capacity:
             self._grow_front()
@@ -702,7 +722,9 @@ class Propagator:
         tile_row = row >> TILE_SHIFT
         tile_col = col >> TILE_SHIFT
         tile = int(self._tile_idx[realization, tile_row, tile_col])
-        if tile < 0:
+        if tile == int(FROZEN_TILE):
+            tile = self._thaw_tile(realization, tile_row, tile_col)
+        elif tile < 0:
             if int(self._tile_counts[realization]) >= self._tile_capacity:
                 self._grow_tiles()
             tile = int(self._tile_counts[realization])
@@ -816,6 +838,9 @@ class Propagator:
 
     def _update_vegetation(self, scheduler_event: SchedulerEvent) -> None:
         if scheduler_event.vegetation_changes is not None:
+            # vegetation changes can add fuel to burned-out areas, which
+            # invalidates the freeze criterion: bring everything back
+            self.thaw_all()
             # mutate vegetation where needed
             mask = ~np.isnan(scheduler_event.vegetation_changes)
             self.veg[mask] = scheduler_event.vegetation_changes[mask]
@@ -1043,6 +1068,352 @@ class Propagator:
             return next_bc_time
         return min(next_bc_time, next_prop_time)
 
+    # --- Tile freezing ----------------------------------------------------
+
+    def _tile_world_key(
+        self, realization: int, tile_row: int, tile_col: int
+    ) -> tuple[int, int, int]:
+        """Store key of a tile: world coords of its top-left cell.
+
+        World-anchored keys survive expand(): growth shifts are TILE_SIZE
+        multiples, so a tile keeps its key across re-anchoring.
+        """
+        return (
+            int(realization),
+            int(self.origin[0]) + (int(tile_row) << TILE_SHIFT),
+            int(self.origin[1]) + (int(tile_col) << TILE_SHIFT),
+        )
+
+    def _tile_local_pos(self, key: tuple[int, int, int]) -> tuple[int, int]:
+        _, world_row, world_col = key
+        return (
+            (world_row - int(self.origin[0])) >> TILE_SHIFT,
+            (world_col - int(self.origin[1])) >> TILE_SHIFT,
+        )
+
+    def freeze_inactive_tiles(self) -> int:
+        """Freeze burned-out tiles to disk and release their memory.
+
+        A tile is frozen (per realization) when propagation can never
+        touch it again, so kernels may treat it as fully burnt without
+        reading its contents. With spotting disabled that holds for any
+        tile with no *reachable* unburnt fuel cell: fire only spreads
+        through unburnt fuel, so unburnt components that contain no
+        pending front event can never ignite. With spotting enabled
+        (embers can land anywhere) the stricter "every cell burnt or
+        fuel-free" criterion applies. Freezing therefore changes
+        neither the dynamics nor the RNG stream; seeded runs stay
+        bitwise identical.
+
+        The frozen per-cell tracking stays available — outputs and dense
+        getters merge it back in transparently, and igniting into a
+        frozen area thaws the affected tile.
+
+        Requires `freeze_dir`. Returns the number of tiles frozen. Call
+        periodically (e.g. once per output interval) to keep the working
+        set proportional to the active front.
+        """
+        if self._tile_store is None:
+            raise RuntimeError("Tile freezing requires freeze_dir to be set")
+        n_rows, n_cols = self.veg.shape
+        tiles_h, tiles_w = self._tile_idx.shape[1:]
+        grid_h = tiles_h * TILE_SIZE
+        grid_w = tiles_w * TILE_SIZE
+        # cells that could still ignite: in-domain cells with fuel
+        ignitable = np.zeros((grid_h, grid_w), dtype=bool)
+        ignitable[:n_rows, :n_cols] = self.veg != NO_FUEL
+        ignitable_blocks = ignitable.reshape(
+            tiles_h, TILE_SIZE, tiles_w, TILE_SIZE
+        ).transpose(0, 2, 1, 3)
+
+        frozen_total = 0
+        for realization in range(self.realizations):
+            idx = self._tile_idx[realization]
+            tile_rows, tile_cols = np.nonzero(idx >= 0)
+            if tile_rows.size == 0:
+                continue
+            slots = idx[tile_rows, tile_cols]
+            burnt = (self._tile_flags[realization, slots] & FLAG_FIRE).astype(
+                bool
+            )
+
+            if self.do_spotting:
+                inactive = burnt | ~ignitable_blocks[tile_rows, tile_cols]
+                freezable = inactive.all(axis=(1, 2))
+            else:
+                freezable = self._freezable_by_reachability(
+                    realization, tile_rows, tile_cols, burnt, ignitable
+                )
+
+            if not freezable.any():
+                continue
+            for tile_row, tile_col, slot in zip(
+                tile_rows[freezable],
+                tile_cols[freezable],
+                slots[freezable],
+            ):
+                self._tile_store.freeze(
+                    self._tile_world_key(realization, tile_row, tile_col),
+                    self._tile_flags[realization, slot],
+                    self._tile_arrival[realization, slot],
+                    self._tile_ros[realization, slot],
+                    self._tile_fli[realization, slot],
+                )
+                idx[tile_row, tile_col] = FROZEN_TILE
+            frozen_total += int(freezable.sum())
+            self._compact_tiles(realization)
+        if frozen_total:
+            self._shrink_tiles()
+        return frozen_total
+
+    def _freezable_by_reachability(
+        self,
+        realization: int,
+        tile_rows: npt.NDArray[np.intp],
+        tile_cols: npt.NDArray[np.intp],
+        burnt: npt.NDArray[np.bool_],
+        ignitable: npt.NDArray[np.bool_],
+    ) -> npt.NDArray[np.bool_]:
+        """Per-tile mask of tiles with no reachable unburnt fuel cell.
+
+        Fire spreads only through unburnt fuel: flood-fill the unburnt
+        fuel graph from every pending front event target; components
+        with no seed can never burn, so tiles containing only burnt,
+        fuel-free or unreachable cells are safe to freeze."""
+        grid_h, grid_w = ignitable.shape
+        tiles_h, tiles_w = self._tile_idx.shape[1:]
+
+        burnt_grid = np.zeros((grid_h, grid_w), dtype=bool)
+        for i in range(tile_rows.size):
+            row0 = int(tile_rows[i]) << TILE_SHIFT
+            col0 = int(tile_cols[i]) << TILE_SHIFT
+            burnt_grid[row0 : row0 + TILE_SIZE, col0 : col0 + TILE_SIZE] = (
+                burnt[i]
+            )
+        open_mask = ignitable & ~burnt_grid
+
+        size = int(self._front_sizes[realization])
+        reachable = np.zeros((grid_h, grid_w), dtype=bool)
+        if size:
+            event_rows = self._front_rows[realization, :size]
+            event_cols = self._front_cols[realization, :size]
+            in_grid = (
+                (event_rows >= 0)
+                & (event_rows < grid_h)
+                & (event_cols >= 0)
+                & (event_cols < grid_w)
+            )
+            flood_reachable(
+                open_mask,
+                event_rows[in_grid].astype(np.int32),
+                event_cols[in_grid].astype(np.int32),
+                reachable,
+            )
+        reachable_blocks = reachable.reshape(
+            tiles_h, TILE_SIZE, tiles_w, TILE_SIZE
+        ).transpose(0, 2, 1, 3)
+        return ~reachable_blocks[tile_rows, tile_cols].any(axis=(1, 2))
+
+    def _thaw_for_ignition(self, realization: int, row: int, col: int) -> None:
+        """Thaw every frozen tile a new ignition at (row, col) could
+        reach. Manual ignitions create a new spread seed, so their whole
+        unburnt-fuel component must be live again for the kernel to
+        propagate through it."""
+        if self._tile_store is None or len(self._tile_store) == 0:
+            return
+        frozen_keys = [
+            key for key in self._tile_store.keys() if key[0] == realization
+        ]
+        if not frozen_keys:
+            return
+
+        n_rows, n_cols = self.veg.shape
+        tiles_h, tiles_w = self._tile_idx.shape[1:]
+        grid_h = tiles_h * TILE_SIZE
+        grid_w = tiles_w * TILE_SIZE
+        ignitable = np.zeros((grid_h, grid_w), dtype=bool)
+        ignitable[:n_rows, :n_cols] = self.veg != NO_FUEL
+
+        burnt_grid = np.zeros((grid_h, grid_w), dtype=bool)
+        idx = self._tile_idx[realization]
+        tile_rows, tile_cols = np.nonzero(idx >= 0)
+        for i in range(tile_rows.size):
+            row0 = int(tile_rows[i]) << TILE_SHIFT
+            col0 = int(tile_cols[i]) << TILE_SHIFT
+            slot = idx[tile_rows[i], tile_cols[i]]
+            burnt_grid[row0 : row0 + TILE_SIZE, col0 : col0 + TILE_SIZE] = (
+                self._tile_flags[realization, slot] & FLAG_FIRE
+            ).astype(bool)
+        for key in frozen_keys:
+            tile_row, tile_col = self._tile_local_pos(key)
+            row0 = tile_row << TILE_SHIFT
+            col0 = tile_col << TILE_SHIFT
+            burnt_grid[row0 : row0 + TILE_SIZE, col0 : col0 + TILE_SIZE] = (
+                self._tile_store.read(key)[0] & FLAG_FIRE
+            ).astype(bool)
+
+        reachable = np.zeros((grid_h, grid_w), dtype=bool)
+        flood_reachable(
+            ignitable & ~burnt_grid,
+            np.array([row], dtype=np.int32),
+            np.array([col], dtype=np.int32),
+            reachable,
+        )
+        reachable_blocks = reachable.reshape(
+            tiles_h, TILE_SIZE, tiles_w, TILE_SIZE
+        ).transpose(0, 2, 1, 3)
+
+        target_tile = (row >> TILE_SHIFT, col >> TILE_SHIFT)
+        for key in frozen_keys:
+            tile_row, tile_col = self._tile_local_pos(key)
+            if (tile_row, tile_col) == target_tile or reachable_blocks[
+                tile_row, tile_col
+            ].any():
+                self._thaw_tile(realization, tile_row, tile_col)
+
+    def _compact_tiles(self, realization: int) -> None:
+        """Repack a realization's live pool slots contiguously from 0."""
+        idx = self._tile_idx[realization]
+        mask = idx >= 0
+        live = np.sort(idx[mask]).astype(np.int64)
+        count = int(live.size)
+        old_count = int(self._tile_counts[realization])
+        if count == old_count:
+            return
+        remap = np.full((old_count,), -1, dtype=np.int32)
+        remap[live] = np.arange(count, dtype=np.int32)
+        for name in ("_tile_flags", "_tile_arrival", "_tile_ros", "_tile_fli"):
+            pool = getattr(self, name)[realization]
+            pool[:count] = pool[live]
+            # vacated slots must be pristine: the kernel allocates new
+            # tiles assuming their pool contents are zeroed
+            pool[count:old_count] = 0
+        idx[mask] = remap[idx[mask]]
+        self._tile_counts[realization] = count
+
+    def _shrink_tiles(self) -> None:
+        """Shrink the tile pools when most slots are free, releasing RAM."""
+        tiles_h, tiles_w = self._tile_idx.shape[1:]
+        max_count = int(self._tile_counts.max())
+        needed = max(
+            TILE_INITIAL_CAPACITY,
+            min(max_count + TILE_RESERVE, tiles_h * tiles_w),
+            max_count,
+        )
+        if needed * 2 > self._tile_capacity:
+            return
+        for name in ("_tile_flags", "_tile_arrival", "_tile_ros", "_tile_fli"):
+            setattr(self, name, getattr(self, name)[:, :needed].copy())
+        self._tile_capacity = needed
+
+    def _thaw_tile(
+        self, realization: int, tile_row: int, tile_col: int
+    ) -> int:
+        """Load a frozen tile back into the pool; returns its slot."""
+        assert self._tile_store is not None
+        flags, arrival, ros, fli = self._tile_store.thaw(
+            self._tile_world_key(realization, tile_row, tile_col)
+        )
+        if int(self._tile_counts[realization]) >= self._tile_capacity:
+            self._grow_tiles()
+        slot = int(self._tile_counts[realization])
+        self._tile_counts[realization] = slot + 1
+        self._tile_idx[realization, tile_row, tile_col] = slot
+        self._tile_flags[realization, slot] = flags
+        self._tile_arrival[realization, slot] = arrival
+        self._tile_ros[realization, slot] = ros
+        self._tile_fli[realization, slot] = fli
+        return slot
+
+    def thaw_all(self) -> int:
+        """Load every frozen tile back into memory; returns the count."""
+        if self._tile_store is None or len(self._tile_store) == 0:
+            return 0
+        thawed = 0
+        for key in list(self._tile_store.keys()):
+            tile_row, tile_col = self._tile_local_pos(key)
+            self._thaw_tile(key[0], tile_row, tile_col)
+            thawed += 1
+        return thawed
+
+    def _frozen_entries(self):
+        """Yield (realization, tile_row, tile_col, flags, arrival, ros,
+        fli) for every frozen tile, without thawing."""
+        if self._tile_store is None:
+            return
+        for key in self._tile_store.keys():
+            tile_row, tile_col = self._tile_local_pos(key)
+            yield (key[0], tile_row, tile_col, *self._tile_store.read(key))
+
+    def _fold_frozen(self, fold: StateFold) -> None:
+        """Merge frozen tiles into a fold, mirroring fold_state_tiles."""
+        if self._tile_store is None or len(self._tile_store) == 0:
+            return
+        n_rows, n_cols = self.veg.shape
+        for (
+            _,
+            tile_row,
+            tile_col,
+            flags,
+            arrival,
+            ros,
+            fli,
+        ) in self._frozen_entries():
+            row0 = tile_row << TILE_SHIFT
+            col0 = tile_col << TILE_SHIFT
+            height = min(TILE_SIZE, n_rows - row0)
+            width = min(TILE_SIZE, n_cols - col0)
+            rows = slice(row0, row0 + height)
+            cols = slice(col0, col0 + width)
+            flags = flags[:height, :width]
+
+            fold.spot_gen_count[rows, cols] += (flags & FLAG_SPOT_GEN).astype(
+                bool
+            )
+            fold.spot_recv_count[rows, cols] += (
+                flags & FLAG_SPOT_RECV
+            ).astype(bool)
+
+            fire = (flags & FLAG_FIRE).astype(bool)
+            fold.count[rows, cols] += fire
+
+            arrival = arrival[:height, :width]
+            fold.arrival_min[rows, cols] = np.where(
+                fire,
+                np.minimum(fold.arrival_min[rows, cols], arrival),
+                fold.arrival_min[rows, cols],
+            )
+            fold.arrival_sum[rows, cols] += np.where(fire, arrival, 0)
+
+            for values, the_sum, the_max in (
+                (ros[:height, :width], fold.ros_sum, fold.ros_max),
+                (fli[:height, :width], fold.fli_sum, fold.fli_max),
+            ):
+                valid = fire & ~np.isnan(values)
+                masked = np.where(valid, values, 0)
+                the_sum[rows, cols] += masked
+                the_max[rows, cols] = np.maximum(
+                    the_max[rows, cols], masked.astype(np.float32)
+                )
+
+    def _scatter_frozen(self, out: npt.NDArray, component: int) -> None:
+        """Scatter one component of every frozen tile into a dense
+        (realizations, rows, cols) array (0 flags, 1 arrival, 2 ros,
+        3 fli)."""
+        if self._tile_store is None or len(self._tile_store) == 0:
+            return
+        n_rows, n_cols = self.veg.shape
+        for entry in self._frozen_entries():
+            realization, tile_row, tile_col = entry[:3]
+            data = entry[3 + component]
+            row0 = tile_row << TILE_SHIFT
+            col0 = tile_col << TILE_SHIFT
+            height = min(TILE_SIZE, n_rows - row0)
+            width = min(TILE_SIZE, n_cols - col0)
+            out[realization, row0 : row0 + height, col0 : col0 + width] = data[
+                :height, :width
+            ]
+
     # --- Checkpointing and domain growth ---------------------------------
 
     def world_bounds(self) -> tuple[int, int, int, int]:
@@ -1173,8 +1544,11 @@ class Propagator:
 
         Note: the stochastic RNG state is not captured, so runs resumed
         from a checkpoint are statistically equivalent but not bitwise
-        reproductions of the original continuation.
+        reproductions of the original continuation (use reseed() for
+        deterministic continuations). Frozen tiles are thawed back into
+        memory first so the checkpoint is self-contained.
         """
+        self.thaw_all()
 
         def _optional(name: str) -> npt.NDArray | None:
             value = getattr(self, name, None)
@@ -1246,6 +1620,7 @@ class Propagator:
         p_moist_fn: Any = None,
         out_of_bounds_mode: Literal["ignore", "raise"] = "raise",
         seed: int | None = None,
+        freeze_dir: str | Path | None = None,
     ) -> "Propagator":
         """Build a propagator resuming from a checkpoint.
 
@@ -1299,6 +1674,7 @@ class Propagator:
             realizations=checkpoint.realizations,
             origin=(int(origin[0]), int(origin[1])),
             seed=seed,
+            freeze_dir=freeze_dir,
             out_of_bounds_mode=out_of_bounds_mode,
             **extra,
         )
@@ -1420,3 +1796,8 @@ class Propagator:
             event = copy.deepcopy(event)
             reanchor_event(event, row_shift, col_shift, old_shape, new_shape)
             self.scheduler.add_event(int(event_time), event)
+
+        # checkpoints are self-contained (taken after thaw_all), so any
+        # frozen tiles belong to the state being replaced
+        if self._tile_store is not None:
+            self._tile_store.clear()
