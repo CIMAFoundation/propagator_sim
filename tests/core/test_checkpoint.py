@@ -178,6 +178,57 @@ def test_from_checkpoint_grows_domain():
     assert outside.sum() > 0
 
 
+def test_expand_grows_in_place():
+    size = 64
+    propagator = make_running_propagator(size=size, origin=(320, 320))
+    propagator.out_of_bounds_mode = "raise"
+
+    with pytest.raises(PropagatorOutOfBoundsError):
+        for _ in range(500):
+            propagator.step(seconds=3600)
+    before = state_summary(propagator)
+    tile_flags_before = propagator._tile_flags
+    scheduler_before = propagator.scheduler
+
+    margin = TILE_SIZE
+    new_size = size + 2 * margin
+    propagator.expand(
+        veg=np.full((new_size, new_size), 5, dtype=np.int32),
+        dem=np.zeros((new_size, new_size), dtype=np.float32),
+        origin=(320 - margin, 320 - margin),
+    )
+
+    # in-place: pools and scheduler objects are the same, nothing copied
+    assert propagator._tile_flags is tile_flags_before
+    assert propagator.scheduler is scheduler_before
+    assert propagator.time == before[0]
+    assert propagator.veg.shape == (new_size, new_size)
+    assert propagator.moisture.shape == (new_size, new_size)
+
+    overlap = slice(margin, margin + size)
+    np.testing.assert_array_equal(
+        propagator.get_fire()[:, overlap, overlap], before[2]
+    )
+    np.testing.assert_array_equal(
+        propagator.get_arrival_time()[:, overlap, overlap], before[3]
+    )
+
+    # the halted boundary events resume and cross the old bounds
+    propagator.out_of_bounds_mode = "ignore"
+    propagator.step(seconds=6 * 3600)
+    fire = propagator.get_fire()
+    outside = fire.copy()
+    outside[:, overlap, overlap] = 0
+    assert outside.sum() > 0
+
+    with pytest.raises(ValueError, match="multiple of"):
+        propagator.expand(
+            veg=np.full((new_size + 8, new_size + 8), 5, dtype=np.int32),
+            dem=np.zeros((new_size + 8, new_size + 8), dtype=np.float32),
+            origin=(320 - margin - 8, 320 - margin),
+        )
+
+
 def test_from_checkpoint_validates_alignment_and_coverage():
     propagator = make_running_propagator(size=64, origin=(320, 320))
     propagator.step(seconds=600)

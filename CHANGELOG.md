@@ -23,6 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   must be a multiple of the tile size (32 cells) so the block-sparse tiles
   transfer without being rewritten; weather fields are padded by edge
   replication and pending scheduler events are re-anchored automatically.
+- In-place domain growth: `Propagator.expand(veg, dem, origin)` grows the
+  live simulator without copying front heaps or tile pools — the cheap
+  path for wrappers that enlarge the domain as the fire approaches a
+  boundary. Same containment/alignment rules as `from_checkpoint`.
+- Deterministic seeding: `Propagator(seed=...)` and `reseed()` seed the
+  JIT kernels' per-thread RNGs; runs with the same seed, machine and
+  numba thread count are bitwise reproducible, and `reseed()` after
+  `restore()` makes rollback continuations deterministic.
 - Boundary suspension: with `out_of_bounds_mode="raise"` the kernel now
   suspends a realization *before* igniting a boundary-ring cell, leaving
   its event heap intact, so a checkpoint taken after

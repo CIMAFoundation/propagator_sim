@@ -249,6 +249,10 @@ class Scheduler:
     def clear(self) -> None:
         self._queue.clear()
 
+    def events(self) -> Iterator[Tuple[int, SchedulerEvent]]:
+        """Iterate over the pending (time, event) pairs in time order."""
+        return self._queue.items()
+
     def snapshot(self) -> List[Tuple[int, SchedulerEvent]]:
         """Deep-copied (time, event) pairs of the pending queue, in order."""
         return [

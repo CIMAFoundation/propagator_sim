@@ -11,6 +11,7 @@ from .models import (
     build_fuel_index_grid,
     fuelsystem_from_dict,
 )
+from .rng import seed_rngs
 from .tiles import (
     FLAG_FIRE,
     FLAG_SPOT_GEN,
@@ -42,4 +43,5 @@ __all__ = [
     "TILE_SIZE",
     "fold_state_tiles",
     "materialize_tiles",
+    "seed_rngs",
 ]

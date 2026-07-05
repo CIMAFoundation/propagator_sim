@@ -22,7 +22,9 @@ What a checkpoint does **not** capture:
 - `fuels`, `p_time_fn` and `p_moist_fn` — these contain JIT-compiled
   functions and must be passed again when rebuilding a simulator.
 - The random number generator state. A run resumed from a checkpoint is
-  statistically equivalent to the original but not a bitwise replay.
+  statistically equivalent to the original but not a bitwise replay —
+  unless you `reseed()` explicitly (see
+  [Reproducibility](#reproducibility)).
 
 ## Rollback
 
@@ -66,7 +68,59 @@ world coordinates coincide for the default `origin=(0, 0)`.
 The origin is what allows a checkpoint taken on one grid to be re-anchored
 onto another: state is transferred where the world coordinates overlap.
 
+## Reproducibility
+
+Pass `seed=` at construction (or call `reseed()` at any point) to seed the
+JIT kernels' per-thread random number generators deterministically:
+
+```python
+sim = Propagator(veg=veg, dem=dem, realizations=100, seed=42)
+```
+
+Two runs with the same seed produce bitwise-identical results **on the
+same machine with the same numba thread count** (`NUMBA_NUM_THREADS`);
+results are not portable across different thread counts.
+
+Combining `reseed()` with rollback makes what-if exploration
+deterministic:
+
+```python
+cp = sim.checkpoint()
+sim.reseed(7); sim.step(seconds=3600)   # evolution A
+
+sim.restore(cp)
+sim.reseed(7); sim.step(seconds=3600)   # bitwise identical to A
+
+sim.restore(cp)
+sim.reseed(8); sim.step(seconds=3600)   # an independent evolution
+```
+
 ## Growing the domain
+
+There are two growth paths:
+
+- **`expand(veg, dem, origin)`** — grows the live simulator in place.
+  This is the cheap path for a wrapper that enlarges the domain whenever
+  the fire approaches a boundary: front heaps and tile pools are not
+  copied; only the small tile-index grid is re-anchored and the 2D fields
+  are padded.
+- **`checkpoint()` + `from_checkpoint(...)`** — same re-anchoring, but
+  through a persistent snapshot. Use it when growth coincides with a
+  save/restore boundary (e.g. moving the run to another process).
+
+Both enforce the same rules (see below). A typical in-place growth loop:
+
+```python
+try:
+    sim.step(seconds=3600)
+except PropagatorOutOfBoundsError:
+    margin = 8 * TILE_SIZE          # grow generously so growth is rare
+    new_origin = (sim.origin[0] - margin, sim.origin[1] - margin)
+    new_shape = (sim.veg.shape[0] + 2 * margin, sim.veg.shape[1] + 2 * margin)
+    new_veg, new_dem = load_window(new_origin, new_shape)   # your loader
+    sim.expand(new_veg, new_dem, new_origin)
+    sim.step(seconds=3600)          # fire continues across the old boundary
+```
 
 With the default `out_of_bounds_mode="raise"`, the propagation kernel
 *suspends* a realization just before it would ignite a cell on the boundary

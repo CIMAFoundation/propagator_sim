@@ -47,6 +47,7 @@ from propagator.core.numba import (
     get_p_moisture_fn,
     get_p_time_fn,
     materialize_tiles,
+    seed_rngs,
 )
 from propagator.core.scheduler import Scheduler, SchedulerEvent
 
@@ -143,6 +144,10 @@ class Propagator:
     # shifted grids (see from_checkpoint)
     origin: tuple[int, int] = (0, 0)
 
+    # seed for the JIT kernels' per-thread RNGs; runs with the same seed
+    # are reproducible on the same machine and thread count (see reseed)
+    seed: int | None = None
+
     # selected simulation functions
     p_time_fn: Any = field(default=get_p_time_fn(ROS_DEFAULT))
     p_moist_fn: Any = field(default=get_p_moisture_fn(MOISTURE_MODEL_DEFAULT))
@@ -232,6 +237,18 @@ class Propagator:
         if not self.do_spotting:
             self.fuels.disable_spotting()
         self._fuel_idx = build_fuel_index_grid(self.fuels, self.veg)
+        if self.seed is not None:
+            self.reseed(self.seed)
+
+    def reseed(self, seed: int) -> None:
+        """Seed the JIT kernels' per-thread RNGs deterministically.
+
+        Runs with the same seed, machine and numba thread count
+        (``NUMBA_NUM_THREADS``) are bitwise reproducible; results are not
+        portable across different thread counts. Call after restoring a
+        checkpoint to make the continuation deterministic.
+        """
+        seed_rngs(int(seed))
 
     def compute_fire_probability(self) -> npt.NDArray[np.floating]:
         """Return mean burn probability across realizations for each cell.
@@ -1038,6 +1055,114 @@ class Propagator:
             self.origin[1] + cols - 1,
         )
 
+    @staticmethod
+    def _growth_shifts(
+        old_origin: tuple[int, int],
+        old_shape: tuple[int, int],
+        veg: npt.NDArray[np.integer],
+        dem: npt.NDArray[np.floating] | None,
+        origin: tuple[int, int],
+    ) -> tuple[int, int]:
+        """Validate a domain-growth request and return the (row, col)
+        shift of the old grid inside the new one."""
+        if dem is None:
+            raise ValueError("dem is required when providing veg")
+        if veg.shape != dem.shape:
+            raise ValueError("veg and dem must have the same shape")
+        row_shift = old_origin[0] - origin[0]
+        col_shift = old_origin[1] - origin[1]
+        if row_shift < 0 or col_shift < 0:
+            raise ValueError(
+                "New origin must not be south/east of the current origin: "
+                "the new grid must contain the old one."
+            )
+        if row_shift % TILE_SIZE or col_shift % TILE_SIZE:
+            raise ValueError(
+                "North/west growth must be a multiple of "
+                f"TILE_SIZE ({TILE_SIZE}) cells; got shift "
+                f"({row_shift}, {col_shift})."
+            )
+        if (
+            row_shift + old_shape[0] > veg.shape[0]
+            or col_shift + old_shape[1] > veg.shape[1]
+        ):
+            raise ValueError(
+                "New grid does not fully contain the current grid."
+            )
+        return row_shift, col_shift
+
+    def expand(
+        self,
+        veg: npt.NDArray[np.integer],
+        dem: npt.NDArray[np.floating],
+        origin: tuple[int, int],
+    ) -> None:
+        """Grow the domain in place, preserving all simulation state.
+
+        This is the cheap growth path: unlike checkpoint/from_checkpoint
+        it does not copy the front heaps or tile pools — only the small
+        tile-index grid is re-anchored and 2D fields are padded. The same
+        rules apply: the new grid must contain the old one and north/west
+        growth must be a multiple of TILE_SIZE cells. Vegetation in the
+        overlap keeps the current (possibly mutated) values; weather pads
+        by edge replication until fresh boundary conditions arrive.
+        """
+        old_shape = self.veg.shape
+        row_shift, col_shift = self._growth_shifts(
+            self.origin, old_shape, veg, dem, origin
+        )
+        new_shape = veg.shape
+
+        veg = np.array(veg, copy=True)
+        veg[
+            row_shift : row_shift + old_shape[0],
+            col_shift : col_shift + old_shape[1],
+        ] = self.veg
+        self.veg = veg
+        self.dem = dem
+        self._fuel_idx = build_fuel_index_grid(self.fuels, self.veg)
+        self.origin = (int(origin[0]), int(origin[1]))
+
+        # front heaps: shift coordinates in place
+        if row_shift:
+            self._front_rows += row_shift
+        if col_shift:
+            self._front_cols += col_shift
+
+        # tile state: re-anchor the index grid; pools transfer untouched
+        tiles_h = -(-new_shape[0] // TILE_SIZE)
+        tiles_w = -(-new_shape[1] // TILE_SIZE)
+        old_tiles_h, old_tiles_w = self._tile_idx.shape[1:]
+        tile_row0 = row_shift >> TILE_SHIFT
+        tile_col0 = col_shift >> TILE_SHIFT
+        tile_idx = np.full(
+            (self.realizations, tiles_h, tiles_w), -1, dtype=np.int32
+        )
+        tile_idx[
+            :,
+            tile_row0 : tile_row0 + old_tiles_h,
+            tile_col0 : tile_col0 + old_tiles_w,
+        ] = self._tile_idx
+        self._tile_idx = tile_idx
+
+        # 2D condition fields
+        pad = (
+            (row_shift, new_shape[0] - old_shape[0] - row_shift),
+            (col_shift, new_shape[1] - old_shape[1] - col_shift),
+        )
+        for name in ("moisture", "wind_dir", "wind_speed"):
+            value = getattr(self, name, None)
+            if value is not None:
+                setattr(self, name, np.pad(value, pad, mode="edge"))
+        if self.actions_moisture is not None:
+            self.actions_moisture = np.pad(
+                self.actions_moisture, pad, mode="constant", constant_values=0
+            )
+
+        # pending boundary-condition queue
+        for _, event in self.scheduler.events():
+            reanchor_event(event, row_shift, col_shift, old_shape, new_shape)
+
     def checkpoint(self) -> PropagatorCheckpoint:
         """Snapshot the full dynamic state as an immutable checkpoint.
 
@@ -1120,6 +1245,7 @@ class Propagator:
         p_time_fn: Any = None,
         p_moist_fn: Any = None,
         out_of_bounds_mode: Literal["ignore", "raise"] = "raise",
+        seed: int | None = None,
     ) -> "Propagator":
         """Build a propagator resuming from a checkpoint.
 
@@ -1145,33 +1271,12 @@ class Propagator:
             row_shift = 0
             col_shift = 0
         else:
-            if dem is None:
-                raise ValueError("dem is required when providing veg")
-            if veg.shape != dem.shape:
-                raise ValueError("veg and dem must have the same shape")
             if origin is None:
                 origin = checkpoint.origin
-            row_shift = checkpoint.origin[0] - origin[0]
-            col_shift = checkpoint.origin[1] - origin[1]
+            row_shift, col_shift = cls._growth_shifts(
+                checkpoint.origin, checkpoint.shape, veg, dem, origin
+            )
             old_rows, old_cols = checkpoint.shape
-            if row_shift < 0 or col_shift < 0:
-                raise ValueError(
-                    "New origin must not be south/east of the checkpoint "
-                    "origin: the new grid must contain the old one."
-                )
-            if row_shift % TILE_SIZE or col_shift % TILE_SIZE:
-                raise ValueError(
-                    "North/west growth must be a multiple of "
-                    f"TILE_SIZE ({TILE_SIZE}) cells; got shift "
-                    f"({row_shift}, {col_shift})."
-                )
-            if (
-                row_shift + old_rows > veg.shape[0]
-                or col_shift + old_cols > veg.shape[1]
-            ):
-                raise ValueError(
-                    "New grid does not fully contain the checkpoint grid."
-                )
             veg = np.array(veg, copy=True)
             veg[
                 row_shift : row_shift + old_rows,
@@ -1193,6 +1298,7 @@ class Propagator:
             do_spotting=checkpoint.do_spotting,
             realizations=checkpoint.realizations,
             origin=(int(origin[0]), int(origin[1])),
+            seed=seed,
             out_of_bounds_mode=out_of_bounds_mode,
             **extra,
         )
