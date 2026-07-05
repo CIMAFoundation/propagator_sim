@@ -40,8 +40,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   all-burnt criterion when spotting is enabled), so dynamics and the RNG
   stream are unchanged — seeded runs are bitwise identical with or
   without freezing. Outputs and dense getters merge frozen tiles in
-  transparently; checkpoints thaw first; new ignitions thaw the reachable
-  component they seed.
+  transparently; new ignitions thaw the reachable component they seed.
+- Incremental checkpointing (format v2): `checkpoint()` references
+  frozen tiles in the append-only store instead of thawing them, so
+  snapshotting a run with a large frozen interior costs neither RAM nor
+  tile I/O, and restores roll the store index back. `save()` streams the
+  referenced records into a sidecar `.tiles` file next to the `.npz`
+  (keep them together); on resume, records import into the new session's
+  store (`freeze_dir`) or materialize into memory without one. Version 1
+  checkpoint files still load.
 - Boundary suspension: with `out_of_bounds_mode="raise"` the kernel now
   suspends a realization *before* igniting a boundary-ring cell, leaving
   its event heap intact, so a checkpoint taken after

@@ -3,7 +3,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from propagator.core import BoundaryConditions, Propagator  # type: ignore
+from propagator.core import (  # type: ignore
+    BoundaryConditions,
+    Propagator,
+    PropagatorCheckpoint,
+)
 from propagator.core.numba import TILE_SIZE  # type: ignore
 
 
@@ -112,22 +116,63 @@ def test_ignition_into_frozen_tile_thaws_it(tmp_path):
     assert len(propagator._tile_store) == count_before - 1
 
 
-def test_checkpoint_thaws_and_restore_clears_store(tmp_path):
+def test_incremental_checkpoint_references_frozen_tiles(tmp_path):
     propagator = make_propagator(tmp_path)
     frozen = run_until_frozen(propagator)
     assert frozen > 0
 
     reference = outputs_snapshot(propagator)
-    checkpoint = propagator.checkpoint()
-    # checkpoint() thaws so the snapshot is self-contained
-    assert len(propagator._tile_store) == 0
+    frozen_before = len(propagator._tile_store)
+    live_before = int(propagator._tile_counts.sum())
 
+    checkpoint = propagator.checkpoint()
+    # incremental: nothing is thawed, nothing is copied into RAM
+    assert len(propagator._tile_store) == frozen_before
+    assert int(propagator._tile_counts.sum()) == live_before
+    assert len(checkpoint.frozen_index) == frozen_before
+
+    # keep simulating, including thaw/refreeze churn, then roll back
     propagator.step(seconds=6 * 3600)
     propagator.freeze_inactive_tiles()
 
     propagator.restore(checkpoint)
-    assert len(propagator._tile_store) == 0
+    assert len(propagator._tile_store) == frozen_before
     for left, right in zip(reference, outputs_snapshot(propagator)):
+        np.testing.assert_array_equal(left, right)
+
+    # the checkpoint survives repeated restores
+    propagator.step(seconds=6 * 3600)
+    propagator.restore(checkpoint)
+    for left, right in zip(reference, outputs_snapshot(propagator)):
+        np.testing.assert_array_equal(left, right)
+
+
+def test_checkpoint_with_frozen_tiles_save_load(tmp_path):
+    propagator = make_propagator(tmp_path)
+    frozen = run_until_frozen(propagator)
+    assert frozen > 0
+    reference = outputs_snapshot(propagator)
+
+    checkpoint = propagator.checkpoint()
+    path = tmp_path / "state.npz"
+    checkpoint.save(path)
+    assert (tmp_path / "state.tiles").exists()
+
+    loaded = PropagatorCheckpoint.load(path)
+    assert len(loaded.frozen_index) == frozen
+
+    # resume WITH a store: records are imported, stay frozen
+    with_store = Propagator.from_checkpoint(
+        loaded, freeze_dir=tmp_path / "store2"
+    )
+    assert len(with_store._tile_store) == frozen
+    for left, right in zip(reference, outputs_snapshot(with_store)):
+        np.testing.assert_array_equal(left, right)
+
+    # resume WITHOUT a store: records are materialized into the pools
+    without_store = Propagator.from_checkpoint(loaded)
+    assert without_store._tile_store is None
+    for left, right in zip(reference, outputs_snapshot(without_store)):
         np.testing.assert_array_equal(left, right)
 
 

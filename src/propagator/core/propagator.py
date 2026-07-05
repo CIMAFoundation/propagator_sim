@@ -54,7 +54,7 @@ from propagator.core.numba import (
     seed_rngs,
 )
 from propagator.core.scheduler import Scheduler, SchedulerEvent
-from propagator.core.tile_store import TileStore
+from propagator.core.tile_store import TileStore, iter_records, parse_record
 
 from .utils import upcast_to_ndarray
 
@@ -1545,10 +1545,16 @@ class Propagator:
         Note: the stochastic RNG state is not captured, so runs resumed
         from a checkpoint are statistically equivalent but not bitwise
         reproductions of the original continuation (use reseed() for
-        deterministic continuations). Frozen tiles are thawed back into
-        memory first so the checkpoint is self-contained.
+        deterministic continuations).
+
+        Frozen tiles are captured incrementally: the checkpoint holds
+        references into the (append-only) session tile store rather than
+        thawing them, so snapshotting a run with a large frozen interior
+        costs neither RAM nor tile I/O. Such a checkpoint depends on the
+        session store — don't call `TileStore.clear()` while it is still
+        needed; `save()` copies the records to a sidecar file, making the
+        persisted form self-contained.
         """
-        self.thaw_all()
 
         def _optional(name: str) -> npt.NDArray | None:
             value = getattr(self, name, None)
@@ -1582,6 +1588,16 @@ class Propagator:
             tile_ros=self._tile_ros[:, :tile_count].copy(),
             tile_fli=self._tile_fli[:, :tile_count].copy(),
             scheduler_events=self.scheduler.snapshot(),
+            frozen_index=(
+                self._tile_store.snapshot_index()
+                if self._tile_store is not None
+                else {}
+            ),
+            frozen_source=(
+                self._tile_store
+                if self._tile_store is not None and len(self._tile_store)
+                else None
+            ),
         )
 
     def restore(self, checkpoint: PropagatorCheckpoint) -> None:
@@ -1797,7 +1813,47 @@ class Propagator:
             reanchor_event(event, row_shift, col_shift, old_shape, new_shape)
             self.scheduler.add_event(int(event_time), event)
 
-        # checkpoints are self-contained (taken after thaw_all), so any
-        # frozen tiles belong to the state being replaced
+        self._restore_frozen(checkpoint)
+
+    def _restore_frozen(self, checkpoint: PropagatorCheckpoint) -> None:
+        """Re-attach a checkpoint's frozen tiles to this propagator.
+
+        Same session store: just roll the index back (records are
+        append-only, so the checkpoint's offsets are still valid). Other
+        store or a save() sidecar file: stream-copy the records in. No
+        store on this propagator: load the records straight into the
+        tile pools instead (equivalent to thawing at load time).
+        """
+        index = checkpoint.frozen_index
+        if not index:
+            if self._tile_store is not None:
+                self._tile_store.restore_index({})
+            return
+        if checkpoint.frozen_source is None:
+            raise ValueError(
+                "Checkpoint references frozen tiles but has no source"
+            )
+
         if self._tile_store is not None:
-            self._tile_store.clear()
+            if checkpoint.frozen_source is self._tile_store:
+                self._tile_store.restore_index(index)
+                return
+            self._tile_store.restore_index({})
+            for key, payload in iter_records(checkpoint.frozen_source, index):
+                self._tile_store.write_record(key, payload)
+            return
+
+        # no store: materialize the frozen tiles into the pools
+        for key, payload in iter_records(checkpoint.frozen_source, index):
+            flags, arrival, ros, fli = parse_record(payload)
+            realization = key[0]
+            tile_row, tile_col = self._tile_local_pos(key)
+            if int(self._tile_counts[realization]) >= self._tile_capacity:
+                self._grow_tiles()
+            slot = int(self._tile_counts[realization])
+            self._tile_counts[realization] = slot + 1
+            self._tile_idx[realization, tile_row, tile_col] = slot
+            self._tile_flags[realization, slot] = flags
+            self._tile_arrival[realization, slot] = arrival
+            self._tile_ros[realization, slot] = ros
+            self._tile_fli[realization, slot] = fli

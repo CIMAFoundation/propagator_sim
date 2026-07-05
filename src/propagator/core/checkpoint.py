@@ -15,15 +15,23 @@ growth when the fire reaches a boundary.
 from __future__ import annotations
 
 import pickle
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
 
 from propagator.core.scheduler import SchedulerEvent
+from propagator.core.tile_store import (
+    RECORD_SIZE,
+    TileIndex,
+    TileStore,
+    iter_records,
+)
 
-CHECKPOINT_VERSION = 1
+# version 2 adds incremental frozen-tile references (sidecar .tiles file
+# on disk); version 1 files load fine with an empty frozen index
+CHECKPOINT_VERSION = 2
 
 # Array fields serialized directly as npz entries (None allowed for the
 # optional weather/actions fields).
@@ -96,6 +104,14 @@ class PropagatorCheckpoint:
     # pending boundary-condition queue as (time, event) pairs
     scheduler_events: list[tuple[int, SchedulerEvent]]
 
+    # incremental frozen tiles: {key: record offset} into frozen_source,
+    # which is the live session TileStore (fresh checkpoints) or the
+    # sidecar record file written by save() (loaded checkpoints). Frozen
+    # tiles are NOT copied into the checkpoint, so snapshotting a run
+    # with a huge frozen interior stays cheap.
+    frozen_index: TileIndex = field(default_factory=dict)
+    frozen_source: TileStore | Path | None = None
+
     @property
     def shape(self) -> tuple[int, int]:
         """Grid shape (rows, cols) the checkpoint was taken on."""
@@ -111,16 +127,48 @@ class PropagatorCheckpoint:
             self.origin[1] + cols - 1,
         )
 
+    @staticmethod
+    def _normalize_path(path: str | Path) -> Path:
+        path = Path(path)
+        if path.suffix != ".npz":
+            path = path.with_name(path.name + ".npz")
+        return path
+
+    @staticmethod
+    def _sidecar_path(path: Path) -> Path:
+        return path.with_suffix(".tiles")
+
     def save(self, path: str | Path) -> None:
         """Persist the checkpoint to a compressed ``.npz`` file.
 
         The scheduler queue is pickled into an object entry; everything
-        else is stored as plain arrays.
+        else is stored as plain arrays. Frozen tile records are streamed
+        (memory-bounded) into a sidecar ``.tiles`` file next to the
+        archive, which must be kept alongside it.
         """
+        path = self._normalize_path(path)
+        extra: dict[str, npt.NDArray] = {}
+        if self.frozen_index:
+            if self.frozen_source is None:
+                raise ValueError(
+                    "Checkpoint references frozen tiles but has no source"
+                )
+            keys = []
+            offsets = []
+            with open(self._sidecar_path(path), "wb") as sidecar:
+                for key, payload in iter_records(
+                    self.frozen_source, self.frozen_index
+                ):
+                    keys.append(key)
+                    offsets.append(sidecar.tell())
+                    sidecar.write(payload)
+            extra["frozen_keys"] = np.asarray(keys, dtype=np.int64)
+            extra["frozen_offsets"] = np.asarray(offsets, dtype=np.int64)
+
         arrays = {name: getattr(self, name) for name in _ARRAY_FIELDS}
         present = {k: v for k, v in arrays.items() if v is not None}
         np.savez_compressed(
-            Path(path),
+            path,
             version=np.int64(self.version),
             time=np.int64(self.time),
             origin=np.asarray(self.origin, dtype=np.int64),
@@ -130,13 +178,19 @@ class PropagatorCheckpoint:
             scheduler_events=np.frombuffer(
                 pickle.dumps(self.scheduler_events), dtype=np.uint8
             ),
+            **extra,
             **present,
         )
 
     @classmethod
     def load(cls, path: str | Path) -> "PropagatorCheckpoint":
-        """Load a checkpoint previously written by :meth:`save`."""
-        with np.load(Path(path)) as data:
+        """Load a checkpoint previously written by :meth:`save`.
+
+        Checkpoints with frozen tiles read their records lazily from the
+        sidecar ``.tiles`` file, which must sit next to the archive.
+        """
+        path = cls._normalize_path(path)
+        with np.load(path) as data:
             version = int(data["version"])
             if version > CHECKPOINT_VERSION:
                 raise ValueError(
@@ -148,6 +202,29 @@ class PropagatorCheckpoint:
                 for name in _ARRAY_FIELDS
             }
             scheduler_events = pickle.loads(data["scheduler_events"].tobytes())
+
+            frozen_index: TileIndex = {}
+            frozen_source: Path | None = None
+            if "frozen_keys" in data.files:
+                keys = data["frozen_keys"]
+                offsets = data["frozen_offsets"]
+                frozen_index = {
+                    (int(k[0]), int(k[1]), int(k[2])): int(offset)
+                    for k, offset in zip(keys, offsets)
+                }
+                if frozen_index:
+                    frozen_source = cls._sidecar_path(path)
+                    expected = len(frozen_index) * RECORD_SIZE
+                    if (
+                        not frozen_source.exists()
+                        or frozen_source.stat().st_size < expected
+                    ):
+                        raise ValueError(
+                            f"Checkpoint sidecar {frozen_source} is missing "
+                            "or truncated; it must be kept next to the "
+                            ".npz archive."
+                        )
+
             return cls(
                 version=version,
                 time=int(data["time"]),
@@ -156,6 +233,8 @@ class PropagatorCheckpoint:
                 realizations=int(data["realizations"]),
                 do_spotting=bool(data["do_spotting"]),
                 scheduler_events=scheduler_events,
+                frozen_index=frozen_index,
+                frozen_source=frozen_source,
                 **arrays,
             )
 

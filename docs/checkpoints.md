@@ -215,14 +215,17 @@ Everything stays transparent:
 - Igniting inside a frozen area (via boundary conditions) thaws the
   affected tile; vegetation changes thaw everything, since new fuel can
   invalidate the freeze criterion.
-- `checkpoint()` thaws all tiles first so snapshots are self-contained;
-  `restore()` clears the store.
+- `checkpoint()` is **incremental**: it records references into the
+  store instead of thawing, so snapshotting a run with a huge frozen
+  interior costs neither RAM nor tile I/O. Records are append-only
+  within a session, so the references stay valid across thaw/refreeze
+  churn and repeated restores.
 - `expand()` keeps frozen tiles valid — store keys are world-anchored.
 
-Frozen tiles are 13 KB each in a fixed-record file
-(`frozen_tiles.bin`), with slots reused on refreeze so the file never
-fragments. The store is session-scoped: it does not need to survive a
-process restart because checkpoints are always complete.
+Frozen tiles are 13 KB each in an append-only fixed-record file
+(`frozen_tiles.bin`). The store is session-scoped: `save()` copies the
+records a checkpoint references into a sidecar file (see below), so
+persisted checkpoints never depend on the session store.
 
 ## Checkpoint format
 
@@ -230,3 +233,10 @@ process restart because checkpoints are always complete.
 All state arrays are stored natively; the pending boundary-condition queue
 is embedded as a pickled blob. Checkpoints written by a newer format
 version are rejected on load.
+
+If the checkpoint references frozen tiles, `save()` streams their records
+(memory-bounded) into a sidecar file next to the archive —
+`run-042.npz` + `run-042.tiles` — and the two files must be kept
+together. On resume, `from_checkpoint(..., freeze_dir=...)` imports the
+records into the new session's store (they stay frozen); without a
+`freeze_dir` they are materialized into memory instead.
