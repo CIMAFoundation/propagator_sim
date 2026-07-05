@@ -227,6 +227,33 @@ Frozen tiles are 13 KB each in an append-only fixed-record file
 records a checkpoint references into a sidecar file (see below), so
 persisted checkpoints never depend on the session store.
 
+### Output aggregation cache
+
+Rendering outputs does **not** re-read frozen tiles from disk. When a
+tile is frozen, its contribution to the output aggregates (burn counts,
+spotting counts, arrival min/sum, RoS and intensity sum/max) is folded
+into an in-memory cache — one block per spatial tile position,
+aggregated across all realizations (~44 bytes per frozen cell, i.e.
+~45 KB per 32×32 position). `get_output()` then adds these cached
+blocks to the live-tile fold, so hourly outputs on a run with a huge
+frozen interior cost no tile I/O at all.
+
+The cache maintains itself:
+
+- **Freeze** adds the new record's contribution to its position's block.
+- **Thaw** marks the position dirty (min/max aggregates cannot be
+  subtracted); the next fold rebuilds just that position from the
+  remaining frozen records.
+- **Restore** invalidates the cache; the next fold rebuilds it in one
+  pass over the store — the same cost a single uncached output used to
+  pay on every call.
+
+One subtlety: the cache accumulates floating-point sums in a different
+order than a from-scratch fold, so the *mean* output fields
+(`mean_arrival_time`, `ros_mean`, `fli_mean`) can differ from an
+uncached computation in the last bits of floating-point precision.
+Counts, probabilities, minima and maxima are exact.
+
 ## Checkpoint format
 
 `save()` writes a compressed NumPy `.npz` archive with a `version` field.

@@ -90,6 +90,57 @@ class StateFold:
     fli_max: npt.NDArray[np.float32]
 
 
+def _empty_fold(shape: tuple[int, int]) -> StateFold:
+    return StateFold(
+        count=np.zeros(shape, dtype=np.int32),
+        spot_gen_count=np.zeros(shape, dtype=np.int32),
+        spot_recv_count=np.zeros(shape, dtype=np.int32),
+        arrival_min=np.full(shape, np.iinfo(np.int32).max, dtype=np.int32),
+        arrival_sum=np.zeros(shape, dtype=np.float64),
+        ros_sum=np.zeros(shape, dtype=np.float64),
+        ros_max=np.zeros(shape, dtype=np.float32),
+        fli_sum=np.zeros(shape, dtype=np.float64),
+        fli_max=np.zeros(shape, dtype=np.float32),
+    )
+
+
+def _accumulate_frozen_record(
+    block: StateFold,
+    flags: npt.NDArray[np.uint8],
+    arrival: npt.NDArray[np.int32],
+    ros: npt.NDArray[np.float32],
+    fli: npt.NDArray[np.float32],
+) -> None:
+    """Add one frozen tile record to a (TILE_SIZE, TILE_SIZE) fold block,
+    mirroring fold_state_tiles' per-cell semantics."""
+    # StateFold is frozen: operate on the arrays, never reassign fields
+    spot_gen = block.spot_gen_count
+    spot_gen += (flags & FLAG_SPOT_GEN).astype(bool)
+    spot_recv = block.spot_recv_count
+    spot_recv += (flags & FLAG_SPOT_RECV).astype(bool)
+
+    fire = (flags & FLAG_FIRE).astype(bool)
+    count = block.count
+    count += fire
+
+    np.minimum(
+        block.arrival_min,
+        np.where(fire, arrival, np.iinfo(np.int32).max),
+        out=block.arrival_min,
+    )
+    arrival_sum = block.arrival_sum
+    arrival_sum += np.where(fire, arrival, 0)
+
+    for values, the_sum, the_max in (
+        (ros, block.ros_sum, block.ros_max),
+        (fli, block.fli_sum, block.fli_max),
+    ):
+        valid = fire & ~np.isnan(values)
+        masked = np.where(valid, values, 0)
+        the_sum += masked
+        np.maximum(the_max, masked.astype(np.float32), out=the_max)
+
+
 @dataclass
 class Propagator:
     """Stochastic cellular wildfire spread simulator.
@@ -185,6 +236,19 @@ class Propagator:
     _tile_ros: npt.NDArray[np.float32] = field(init=False)
     _tile_fli: npt.NDArray[np.float32] = field(init=False)
     _tile_store: TileStore | None = field(init=False, default=None)
+
+    # precomputed fold contribution of frozen tiles, one (TILE_SIZE,
+    # TILE_SIZE) block per spatial tile position (world coords),
+    # aggregated across realizations: get_output() adds these in RAM
+    # instead of re-reading every frozen record from disk. Updated on
+    # freeze, marked dirty on thaw, invalidated by restore.
+    _frozen_fold_blocks: dict[tuple[int, int], StateFold] = field(
+        init=False, default_factory=dict
+    )
+    _frozen_fold_dirty: set[tuple[int, int]] = field(
+        init=False, default_factory=set
+    )
+    _frozen_fold_valid: bool = field(init=False, default=True)
 
     # simulation state
     time: int = field(init=False, default=0)
@@ -343,18 +407,7 @@ class Propagator:
 
     def _fold_state(self) -> StateFold:
         """Aggregate the tiled state into per-cell 2D maps in one pass."""
-        shape = self.veg.shape
-        fold = StateFold(
-            count=np.zeros(shape, dtype=np.int32),
-            spot_gen_count=np.zeros(shape, dtype=np.int32),
-            spot_recv_count=np.zeros(shape, dtype=np.int32),
-            arrival_min=np.full(shape, np.iinfo(np.int32).max, dtype=np.int32),
-            arrival_sum=np.zeros(shape, dtype=np.float64),
-            ros_sum=np.zeros(shape, dtype=np.float64),
-            ros_max=np.zeros(shape, dtype=np.float32),
-            fli_sum=np.zeros(shape, dtype=np.float64),
-            fli_max=np.zeros(shape, dtype=np.float32),
-        )
+        fold = _empty_fold(self.veg.shape)
         fold_state_tiles(
             self._tile_idx,
             self._tile_flags,
@@ -1152,13 +1205,13 @@ class Propagator:
                 tile_cols[freezable],
                 slots[freezable],
             ):
-                self._tile_store.freeze(
-                    self._tile_world_key(realization, tile_row, tile_col),
-                    self._tile_flags[realization, slot],
-                    self._tile_arrival[realization, slot],
-                    self._tile_ros[realization, slot],
-                    self._tile_fli[realization, slot],
-                )
+                key = self._tile_world_key(realization, tile_row, tile_col)
+                flags = self._tile_flags[realization, slot]
+                arrival = self._tile_arrival[realization, slot]
+                ros = self._tile_ros[realization, slot]
+                fli = self._tile_fli[realization, slot]
+                self._tile_store.freeze(key, flags, arrival, ros, fli)
+                self._fold_cache_add(key, flags, arrival, ros, fli)
                 idx[tile_row, tile_col] = FROZEN_TILE
             frozen_total += int(freezable.sum())
             self._compact_tiles(realization)
@@ -1323,6 +1376,9 @@ class Propagator:
         self._tile_arrival[realization, slot] = arrival
         self._tile_ros[realization, slot] = ros
         self._tile_fli[realization, slot] = fli
+        self._fold_cache_mark_dirty(
+            self._tile_world_key(realization, tile_row, tile_col)
+        )
         return slot
 
     def thaw_all(self) -> int:
@@ -1345,56 +1401,115 @@ class Propagator:
             tile_row, tile_col = self._tile_local_pos(key)
             yield (key[0], tile_row, tile_col, *self._tile_store.read(key))
 
+    def _fold_cache_add(
+        self,
+        key: tuple[int, int, int],
+        flags: npt.NDArray[np.uint8],
+        arrival: npt.NDArray[np.int32],
+        ros: npt.NDArray[np.float32],
+        fli: npt.NDArray[np.float32],
+    ) -> None:
+        """Fold a freshly frozen record into its position's cached block."""
+        if not self._frozen_fold_valid:
+            return
+        position = (key[1], key[2])
+        if position in self._frozen_fold_dirty:
+            # the block will be rebuilt from the store anyway
+            return
+        block = self._frozen_fold_blocks.get(position)
+        if block is None:
+            block = _empty_fold((TILE_SIZE, TILE_SIZE))
+            self._frozen_fold_blocks[position] = block
+        _accumulate_frozen_record(block, flags, arrival, ros, fli)
+
+    def _fold_cache_mark_dirty(self, key: tuple[int, int, int]) -> None:
+        """A record left this position (thaw): rebuild its block lazily.
+
+        min/max aggregates cannot be subtracted, so the whole position is
+        recomputed from the remaining frozen records on the next fold.
+        """
+        if self._frozen_fold_valid:
+            self._frozen_fold_dirty.add((key[1], key[2]))
+
+    def _fold_cache_invalidate(self) -> None:
+        """Drop the cache entirely (restore swapped the frozen index)."""
+        self._frozen_fold_blocks = {}
+        self._frozen_fold_dirty = set()
+        self._frozen_fold_valid = False
+
+    def _ensure_fold_cache(self) -> None:
+        """Rebuild invalid or dirty cache blocks from the tile store."""
+        if self._tile_store is None:
+            return
+        if self._frozen_fold_valid and not self._frozen_fold_dirty:
+            return
+        if self._frozen_fold_valid:
+            rebuild = self._frozen_fold_dirty
+            for position in rebuild:
+                self._frozen_fold_blocks.pop(position, None)
+        else:
+            rebuild = None  # rebuild everything
+            self._frozen_fold_blocks = {}
+        for key in self._tile_store.keys():
+            position = (key[1], key[2])
+            if rebuild is not None and position not in rebuild:
+                continue
+            block = self._frozen_fold_blocks.get(position)
+            if block is None:
+                block = _empty_fold((TILE_SIZE, TILE_SIZE))
+                self._frozen_fold_blocks[position] = block
+            _accumulate_frozen_record(block, *self._tile_store.read(key))
+        self._frozen_fold_dirty = set()
+        self._frozen_fold_valid = True
+
     def _fold_frozen(self, fold: StateFold) -> None:
-        """Merge frozen tiles into a fold, mirroring fold_state_tiles."""
-        if self._tile_store is None or len(self._tile_store) == 0:
+        """Merge the cached frozen-tile aggregates into a fold.
+
+        Steady state costs no disk I/O: blocks are maintained
+        incrementally at freeze time and only dirty/invalidated
+        positions re-read the store.
+        """
+        if self._tile_store is None:
+            return
+        self._ensure_fold_cache()
+        if not self._frozen_fold_blocks:
             return
         n_rows, n_cols = self.veg.shape
-        for (
-            _,
-            tile_row,
-            tile_col,
-            flags,
-            arrival,
-            ros,
-            fli,
-        ) in self._frozen_entries():
-            row0 = tile_row << TILE_SHIFT
-            col0 = tile_col << TILE_SHIFT
+        origin_row = int(self.origin[0])
+        origin_col = int(self.origin[1])
+        for (world_row, world_col), block in self._frozen_fold_blocks.items():
+            row0 = world_row - origin_row
+            col0 = world_col - origin_col
             height = min(TILE_SIZE, n_rows - row0)
             width = min(TILE_SIZE, n_cols - col0)
             rows = slice(row0, row0 + height)
             cols = slice(col0, col0 + width)
-            flags = flags[:height, :width]
 
-            fold.spot_gen_count[rows, cols] += (flags & FLAG_SPOT_GEN).astype(
-                bool
-            )
-            fold.spot_recv_count[rows, cols] += (
-                flags & FLAG_SPOT_RECV
-            ).astype(bool)
-
-            fire = (flags & FLAG_FIRE).astype(bool)
-            fold.count[rows, cols] += fire
-
-            arrival = arrival[:height, :width]
-            fold.arrival_min[rows, cols] = np.where(
-                fire,
-                np.minimum(fold.arrival_min[rows, cols], arrival),
+            fold.count[rows, cols] += block.count[:height, :width]
+            fold.spot_gen_count[rows, cols] += block.spot_gen_count[
+                :height, :width
+            ]
+            fold.spot_recv_count[rows, cols] += block.spot_recv_count[
+                :height, :width
+            ]
+            np.minimum(
                 fold.arrival_min[rows, cols],
+                block.arrival_min[:height, :width],
+                out=fold.arrival_min[rows, cols],
             )
-            fold.arrival_sum[rows, cols] += np.where(fire, arrival, 0)
-
-            for values, the_sum, the_max in (
-                (ros[:height, :width], fold.ros_sum, fold.ros_max),
-                (fli[:height, :width], fold.fli_sum, fold.fli_max),
-            ):
-                valid = fire & ~np.isnan(values)
-                masked = np.where(valid, values, 0)
-                the_sum[rows, cols] += masked
-                the_max[rows, cols] = np.maximum(
-                    the_max[rows, cols], masked.astype(np.float32)
-                )
+            fold.arrival_sum[rows, cols] += block.arrival_sum[:height, :width]
+            fold.ros_sum[rows, cols] += block.ros_sum[:height, :width]
+            fold.fli_sum[rows, cols] += block.fli_sum[:height, :width]
+            np.maximum(
+                fold.ros_max[rows, cols],
+                block.ros_max[:height, :width],
+                out=fold.ros_max[rows, cols],
+            )
+            np.maximum(
+                fold.fli_max[rows, cols],
+                block.fli_max[:height, :width],
+                out=fold.fli_max[rows, cols],
+            )
 
     def _scatter_frozen(self, out: npt.NDArray, component: int) -> None:
         """Scatter one component of every frozen tile into a dense
@@ -1824,6 +1939,7 @@ class Propagator:
         store on this propagator: load the records straight into the
         tile pools instead (equivalent to thawing at load time).
         """
+        self._fold_cache_invalidate()
         index = checkpoint.frozen_index
         if not index:
             if self._tile_store is not None:

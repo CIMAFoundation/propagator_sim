@@ -25,6 +25,7 @@ nav:
   - Simulation Outputs: outputs.md
   - Fire Spotting: spotting.md
   - Checkpoints & Domain Growth: checkpoints.md
+  - Migration Guide: migration.md
   - API Reference:
       - Overview: reference/index.md
       - Core: reference/propagator.md

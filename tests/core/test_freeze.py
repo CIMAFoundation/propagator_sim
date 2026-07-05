@@ -77,6 +77,55 @@ def test_freeze_preserves_outputs_and_releases_slots(tmp_path):
         np.testing.assert_array_equal(left, right)
 
 
+def test_freeze_preserves_mean_outputs(tmp_path):
+    propagator = make_propagator(tmp_path)
+    for _ in range(24):
+        propagator.step(seconds=3600)
+
+    before = propagator.get_output()
+    assert propagator.freeze_inactive_tiles() > 0
+    after = propagator.get_output()
+
+    # float sums are accumulated in a different order through the cache:
+    # equal up to floating-point associativity
+    for name in ("mean_arrival_time", "ros_mean", "fli_mean"):
+        np.testing.assert_allclose(
+            getattr(after, name),
+            getattr(before, name),
+            rtol=1e-9,
+            equal_nan=True,
+        )
+
+
+def test_fold_uses_cache_not_disk(tmp_path):
+    propagator = make_propagator(tmp_path)
+    frozen = run_until_frozen(propagator)
+    assert frozen > 0
+
+    store = propagator._tile_store
+    reads = {"count": 0}
+    original_read_bytes = store.read_bytes
+
+    def counting_read_bytes(offset):
+        reads["count"] += 1
+        return original_read_bytes(offset)
+
+    store.read_bytes = counting_read_bytes  # type: ignore[method-assign]
+
+    # blocks were built incrementally at freeze time: no disk reads
+    propagator.get_output()
+    propagator.get_output()
+    assert reads["count"] == 0
+
+    # a thaw dirties one position; the next fold re-reads only the
+    # remaining records at that position
+    key = next(iter(store.keys()))
+    tile_row, tile_col = propagator._tile_local_pos(key)
+    propagator._thaw_tile(key[0], tile_row, tile_col)
+    propagator.get_output()
+    assert reads["count"] <= propagator.realizations
+
+
 def test_freeze_does_not_change_seeded_evolution(tmp_path):
     # thread RNGs are process-global: run each simulation to completion
     # with a reseed right before it, instead of interleaving

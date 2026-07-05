@@ -41,6 +41,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   stream are unchanged — seeded runs are bitwise identical with or
   without freezing. Outputs and dense getters merge frozen tiles in
   transparently; new ignitions thaw the reachable component they seed.
+- Frozen-tile output cache: each frozen tile's contribution to the
+  output aggregates is folded at freeze time into an in-memory cache
+  (one block per spatial tile position, aggregated across
+  realizations), so `get_output()` costs no tile I/O in steady state
+  regardless of how much interior is frozen. Thaws dirty only their
+  position (rebuilt lazily from the store); restores invalidate the
+  cache. Mean output fields may differ from an uncached computation in
+  the last floating-point bits; counts, probabilities, minima and
+  maxima are exact.
 - Incremental checkpointing (format v2): `checkpoint()` references
   frozen tiles in the append-only store instead of thawing them, so
   snapshotting a run with a large frozen interior costs neither RAM nor
