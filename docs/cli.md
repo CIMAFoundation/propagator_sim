@@ -50,7 +50,7 @@ left at the default.
 | Flag | Type / Default | Description |
 | --- | --- | --- |
 | `--config PATH` | required | JSON configuration file parsed into `PropagatorConfigurationLegacy`. |
-| `--fuel-config PATH` | optional | YAML file defining a custom fuel system (`fuels` mapping). |
+| `--fuel_config PATH` | optional | YAML file defining a custom fuel system (`fuels` mapping). |
 | `--mode {tiles,geotiff,cog}` | `tiles` | Select how static rasters are loaded (see above). |
 | `--dem PATH` | required in geotiff mode | DEM GeoTIFF when running in geotiff mode. |
 | `--fuel PATH` | required in geotiff mode | Fuel/vegetation GeoTIFF when running in geotiff mode. |
@@ -79,14 +79,18 @@ fuel COGs hosted on S3, with spotting enabled and hourly weather
 boundary conditions:
 
 ```bash
-AWS_PROFILE=<profile> propagator \
+export AWS_PROFILE=<profile>
+export EU_DEM_COGS="<comma-separated DEM COG URLs>"
+export EU_FUEL_COGS="<comma-separated fuel COG URLs>"
+
+uv run propagator \
   --config example/pedrogao/config.json \
   --fuel_config example/pedrogao/fuels_eu12.yaml \
   --mode cog \
-  --cog_dem "s3://cima-propagator-return/cogs/eu/eu_dem_utm_26.tif,...,s3://cima-propagator-return/cogs/eu/eu_dem_utm_39.tif" \
-  --cog_fuel "s3://cima-propagator-return/cogs/eu/eu_fuel12_utm_26.tif,...,s3://cima-propagator-return/cogs/eu/eu_fuel12_utm_37.tif" \
+  --cog_dem "$EU_DEM_COGS" \
+  --cog_fuel "$EU_FUEL_COGS" \
   --grid_dim 1024 --grow_margin 512 --seed 2017 \
-  --output example/pedrogao/output --verbose
+  --output results/pedrogao-cog --verbose
 ```
 
 The loader picks the UTM-29 pair covering the ignition, reads a
@@ -94,6 +98,74 @@ The loader picks the UTM-29 pair covering the ignition, reads a
 if the fire reaches the boundary. Note the bundled weather boundary
 conditions are illustrative, not a validated reconstruction of the
 event's extreme fire weather.
+
+If a COG object is private, use an AWS profile or environment variables that
+can read the object. For public COGs, set the GDAL/AWS anonymous-access
+environment expected by your deployment instead. A failure such as
+`Access Denied` or `not recognized as being in a supported file format` during
+growth usually means GDAL could not read the remote object, not that the
+simulation state itself is invalid.
+
+## Example: Alexandroupolis / Evros on EU-wide COGs
+
+`example/alexandroupolis/` contains an illustrative Alexandroupolis / Evros
+configuration using the same EU COG set and fuel system. It is configured for a
+17-day horizon, so it is a much larger run than the Pedrogao demo and should be
+run with tile freezing enabled:
+
+```bash
+export AWS_PROFILE=<profile>
+export EU_DEM_COGS="<comma-separated DEM COG URLs>"
+export EU_FUEL_COGS="<comma-separated fuel COG URLs>"
+
+uv run propagator \
+  --config example/alexandroupolis/config.json \
+  --fuel_config example/pedrogao/fuels_eu12.yaml \
+  --mode cog \
+  --cog_dem "$EU_DEM_COGS" \
+  --cog_fuel "$EU_FUEL_COGS" \
+  --grid_dim 2048 --grow_margin 2048 \
+  --freeze_dir results/alexandroupolis-freeze \
+  --seed 2023 \
+  --output results/alexandroupolis-cog \
+  --record --verbose
+```
+
+The larger initial window and growth margin reduce how often the run has to
+re-open and expand remote COG windows. The tradeoff is a higher baseline memory
+footprint and larger per-timestep output rasters.
+
+## Large COG Runs and Tile Freezing
+
+For multi-day or continental-scale COG runs, use `--freeze_dir` to page
+burned-out inactive simulation tiles to disk. The CLI calls
+`freeze_inactive_tiles()` after each output interval when this option is set.
+Frozen tiles are restored automatically if later output statistics need them.
+
+Practical defaults:
+
+- Use a fast local SSD path for `--freeze_dir`; avoid network filesystems.
+- Use a unique, empty freeze directory per run, for example
+  `results/<run-name>-freeze`.
+- Keep `--output` separate from `--freeze_dir` so final artefacts and transient
+  tile pages are easy to inspect or remove independently.
+- Start with `--grid_dim 2048` and `--grow_margin 1024` or `2048` for large
+  fires. Larger values reduce COG growth events but increase memory and output
+  raster sizes.
+- Keep `time_resolution` as coarse as the analysis allows. Every output
+  interval writes all configured rasters, so hourly 17-day runs can produce
+  thousands of GeoTIFFs.
+- Monitor both output and freeze storage:
+
+```bash
+du -sh results/<run-name> results/<run-name>-freeze
+df -h .
+```
+
+Tile freezing reduces memory used by inactive burned tiles; it does not reduce
+the size of GeoTIFF/JSON outputs. If a run is dominated by the active front or
+by large output rasters, freezing may help less than increasing RAM, reducing
+`realizations`, using a coarser `time_resolution`, or writing to a faster disk.
 
 ## Output Products
 
