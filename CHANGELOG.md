@@ -58,6 +58,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (keep them together); on resume, records import into the new session's
   store (`freeze_dir`) or materialize into memory without one. Version 1
   checkpoint files still load.
+- COG mode with automatic domain growth (`--mode cog`): the CLI streams
+  windowed DEM/fuel inputs from cloud-optimized GeoTIFFs (`s3://`,
+  `https://` or local, listed per UTM zone and paired by `utm_<zone>`
+  filename hints), loading only a `--grid_dim` window around the
+  ignition; when the fire reaches the window boundary the domain grows
+  in place by `--grow_margin` cells per side, fetching the wider window
+  on demand. New `PropagatorDataFromCogs` loader
+  (`propagator.io.loader.cog`), plus `--seed` and `--freeze_dir` CLI
+  options, and a Pedrogao Grande demo under `example/pedrogao/`.
 - Boundary suspension: with `out_of_bounds_mode="raise"` the kernel now
   suspends a realization *before* igniting a boundary-ring cell, leaving
   its event heap intact, so a checkpoint taken after

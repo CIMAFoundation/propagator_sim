@@ -19,9 +19,14 @@ from propagator.cli.console import (
     status_propagator_msg,
 )
 from propagator.core import Propagator, PropagatorOutOfBoundsError
-from propagator.core.numba import FUEL_SYSTEM_LEGACY, fuelsystem_from_dict
+from propagator.core.numba import (
+    FUEL_SYSTEM_LEGACY,
+    TILE_SIZE,
+    fuelsystem_from_dict,
+)
 from propagator.core.numba.models import FuelSystem
 from propagator.io.configuration import PropagatorConfigurationLegacy
+from propagator.io.loader.cog import PropagatorDataFromCogs
 from propagator.io.loader.geotiff import PropagatorDataFromGeotiffs
 from propagator.io.loader.protocol import PropagatorInputDataProtocol
 from propagator.io.loader.tiles import PropagatorDataFromTiles
@@ -41,10 +46,12 @@ class PropagatorCLILegacy(BaseSettings):
     fuel_config: Optional[Path] = Field(
         None, description="Path to fuel configuration file (YAML)"
     )
-    mode: Literal["tiles", "geotiff"] = Field(
+    mode: Literal["tiles", "geotiff", "cog"] = Field(
         "tiles",
         description="Mode of static data load: 'tiles' for automatic, "
-        "'geotiff' for giving DEM and FUEL in input.",
+        "'geotiff' for giving DEM and FUEL in input, 'cog' for windowed "
+        "reads from cloud-optimized GeoTIFFs with automatic domain "
+        "growth when the fire reaches the boundary.",
     )
     dem: Optional[Path] = Field(
         None,
@@ -61,6 +68,38 @@ class PropagatorCLILegacy(BaseSettings):
     tileset: Optional[str] = Field(
         None,
         description="Tileset to be used in 'tiles' mode (default: 'default')",
+    )
+    cog_dem: Optional[str] = Field(
+        None,
+        description="Comma-separated DEM COG URLs (s3://, https:// or "
+        "paths), one per UTM zone; required in 'cog' mode",
+    )
+    cog_fuel: Optional[str] = Field(
+        None,
+        description="Comma-separated fuel COG URLs matching --cog-dem "
+        "one to one; required in 'cog' mode",
+    )
+    grid_dim: int = Field(
+        3072,
+        gt=0,
+        description="Initial window size in cells around the ignition "
+        "('cog' mode)",
+    )
+    grow_margin: int = Field(
+        512,
+        gt=0,
+        description="Cells added on every side when the fire reaches the "
+        f"domain boundary ('cog' mode); must be a multiple of {TILE_SIZE}",
+    )
+    freeze_dir: Optional[Path] = Field(
+        None,
+        description="Directory for freezing burned-out tiles to disk "
+        "(keeps memory proportional to the active front)",
+    )
+    seed: Optional[int] = Field(
+        None,
+        description="Seed for the simulation RNGs (reproducible for a "
+        "fixed machine and numba thread count)",
     )
     output: Path = Field(
         ...,
@@ -157,7 +196,24 @@ class PropagatorCLILegacy(BaseSettings):
                     f"TILESPATH path {self.tilespath} does not exist"
                 )
 
+        elif self.mode == "cog":
+            if self.cog_dem is None or self.cog_fuel is None:
+                raise ValueError(
+                    "COG_DEM and COG_FUEL URL lists must be provided in "
+                    "'cog' mode"
+                )
+            if self.grow_margin % TILE_SIZE:
+                raise ValueError(
+                    f"GROW_MARGIN must be a multiple of {TILE_SIZE} cells"
+                )
+
         return self
+
+    def cog_url_lists(self) -> tuple[list[str], list[str]]:
+        assert self.cog_dem is not None and self.cog_fuel is not None
+        dem_urls = [u.strip() for u in self.cog_dem.split(",") if u.strip()]
+        fuel_urls = [u.strip() for u in self.cog_fuel.split(",") if u.strip()]
+        return dem_urls, fuel_urls
 
     def build_configuration(self) -> PropagatorConfigurationLegacy:
         """Create configuration object from provided JSON file."""
@@ -219,14 +275,16 @@ def main() -> None:
             info_msg("Using legacy fuel system")
 
     loader: PropagatorInputDataProtocol | None = None
+    cog_loader: PropagatorDataFromCogs | None = None
 
-    if cli.mode == "tiles":
+    if cli.mode in ("tiles", "cog"):
         # first extract middle point from configuration
         mid_point = cfg.get_ignitions_middle_point()
         if mid_point is None:
             raise ValueError("Ignitions must be defined in the configuration.")
-
         mid_lat, mid_lon = mid_point[1], mid_point[0]
+
+    if cli.mode == "tiles":
         loader = PropagatorDataFromTiles(
             base_path=str(cli.tilespath),
             tileset=cli.tileset if cli.tileset is not None else "default",
@@ -240,6 +298,16 @@ def main() -> None:
             dem_file=str(cli.dem),
             veg_file=str(cli.fuel),
         )
+    elif cli.mode == "cog":
+        dem_urls, fuel_urls = cli.cog_url_lists()
+        cog_loader = PropagatorDataFromCogs(
+            dem_urls=dem_urls,
+            fuel_urls=fuel_urls,
+            mid_lon=mid_lon,
+            mid_lat=mid_lat,
+            grid_dim=cli.grid_dim,
+        )
+        loader = cog_loader
     else:
         raise ValueError(f"Unknown mode: {cli.mode}")
 
@@ -270,32 +338,33 @@ def main() -> None:
             }
         )
 
-    raster_writer = GeoTiffWriter(
-        start_date=cfg.init_date,
-        raster_variables_mapping=raster_variables_mapping,
-        output_folder=cli.output,
-        geo_info=geo_info,
-        dst_crs=dst_crs,
-    )
+    def build_writer(current_geo_info) -> OutputWriter:
+        """(Re)build the output writers; called again after every domain
+        growth since the grid shape and georeferencing change."""
+        return OutputWriter(
+            raster_writer=GeoTiffWriter(
+                start_date=cfg.init_date,
+                raster_variables_mapping=raster_variables_mapping,
+                output_folder=cli.output,
+                geo_info=current_geo_info,
+                dst_crs=dst_crs,
+            ),
+            metadata_writer=MetadataJSONWriter(
+                start_date=cfg.init_date,
+                output_folder=cli.output,
+                prefix="metadata",
+            ),
+            isochrones_writer=IsochronesGeoJSONWriter(
+                start_date=cfg.init_date,
+                output_folder=cli.output,
+                prefix="isochrones",
+                thresholds=cli.isochrones,
+                geo_info=current_geo_info,
+                dst_crs=dst_crs,
+            ),
+        )
 
-    metadata_writer = MetadataJSONWriter(
-        start_date=cfg.init_date, output_folder=cli.output, prefix="metadata"
-    )
-
-    isochrones_writer = IsochronesGeoJSONWriter(
-        start_date=cfg.init_date,
-        output_folder=cli.output,
-        prefix="isochrones",
-        thresholds=cli.isochrones,
-        geo_info=geo_info,
-        dst_crs=dst_crs,
-    )
-
-    writer = OutputWriter(
-        raster_writer=raster_writer,
-        metadata_writer=metadata_writer,
-        isochrones_writer=isochrones_writer,
-    )
+    writer = build_writer(geo_info)
 
     simulator = Propagator(
         dem=dem,
@@ -303,6 +372,11 @@ def main() -> None:
         realizations=cfg.realizations,
         fuels=fuel_system,
         do_spotting=cfg.do_spotting,
+        origin=(
+            cog_loader.initial_origin if cog_loader is not None else (0, 0)
+        ),
+        seed=cli.seed,
+        freeze_dir=cli.freeze_dir,
         out_of_bounds_mode="ignore" if cli.ignore_out_of_bounds else "raise",
         p_time_fn=cfg.p_time_fn if cfg.p_time_fn is not None else None,
         p_moist_fn=cfg.p_moist_fn if cfg.p_moist_fn is not None else None,
@@ -318,28 +392,65 @@ def main() -> None:
     if cli.verbose:
         print_boundary_conditions_table(cfg.boundary_conditions)
 
-    while True:
+    def grow_domain() -> None:
+        """Enlarge the domain by grow_margin cells on every side, loading
+        the wider window from the COGs (in-place, nothing is lost)."""
+        nonlocal writer
+        assert cog_loader is not None
+        margin = cli.grow_margin
+        new_origin = (
+            simulator.origin[0] - margin,
+            simulator.origin[1] - margin,
+        )
+        new_shape = (
+            simulator.veg.shape[0] + 2 * margin,
+            simulator.veg.shape[1] + 2 * margin,
+        )
+        new_dem, new_veg, new_geo_info = cog_loader.load_window(
+            new_origin, new_shape
+        )
+        simulator.expand(new_veg, new_dem, new_origin)
+        writer = build_writer(new_geo_info)
+        if cli.verbose:
+            info_msg(
+                f"Fire reached the boundary: domain grown to "
+                f"{new_shape[0]}x{new_shape[1]} cells (origin {new_origin})"
+            )
+
+    stopped = False
+    while not stopped:
         next_time = simulator.next_time()
         if next_time is None:
             break
 
-        try:
-            simulator.step(seconds=cfg.time_resolution)
-        except PropagatorOutOfBoundsError as e:
-            warn(f"Simulation stopped due to PropagatorOutOfBoundsError: {e}")
-            break
+        target_time = simulator.time + cfg.time_resolution
+        while True:
+            try:
+                simulator.step(seconds=target_time - simulator.time)
+                break
+            except PropagatorOutOfBoundsError as e:
+                if cog_loader is None:
+                    warn(
+                        "Simulation stopped due to "
+                        f"PropagatorOutOfBoundsError: {e}"
+                    )
+                    stopped = True
+                    break
+                grow_domain()
 
-        finally:
-            output = simulator.get_output()
+        output = simulator.get_output()
 
-            status_propagator_msg(
-                cfg.init_date,
-                output.time,
-                output.stats,
-                verbose=cli.verbose,
-            )
+        status_propagator_msg(
+            cfg.init_date,
+            output.time,
+            output.stats,
+            verbose=cli.verbose,
+        )
 
-            writer.write_output(output)
+        writer.write_output(output)
+
+        if cli.freeze_dir is not None:
+            simulator.freeze_inactive_tiles()
 
         if simulator.time > cfg.time_limit:
             break
