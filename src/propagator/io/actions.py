@@ -35,6 +35,7 @@ def build_mask(
 
 
 class ActionType(str, Enum):
+    WATERLINE = "waterline"
     WATERLINE_ACTION = "waterline_action"
     CANADAIR = "canadair"
     HELICOPTER = "helicopter"
@@ -87,8 +88,8 @@ class Action(BaseModel):
 
 
 class WaterlineAction(Action):
-    action_type: Literal[ActionType.WATERLINE_ACTION] = Field(
-        default=ActionType.WATERLINE_ACTION, frozen=True
+    action_type: Literal[ActionType.WATERLINE] = Field(
+        default=ActionType.WATERLINE, frozen=True
     )
 
     @classmethod
@@ -198,10 +199,18 @@ def parse_actions(
         List of parsed Action objects.
     """
     actions: list[Action] = []
-    if ActionType.WATERLINE_ACTION.value in data:
-        raw = data.pop(ActionType.WATERLINE_ACTION.value)
+
+    raw_waterline = []
+    for key in (ActionType.WATERLINE.value, ActionType.WATERLINE_ACTION.value):
+        if key in data:
+            raw = data.pop(key)
+            if isinstance(raw, list):
+                raw_waterline.extend(raw)
+            else:
+                raw_waterline.append(raw)
+    if raw_waterline:
         geometries = parse_geometry_list(
-            raw,
+            raw_waterline,
             allowed=WaterlineAction.allowed_kinds(),
             epsg=epsg,
         )
