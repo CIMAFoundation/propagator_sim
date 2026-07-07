@@ -82,10 +82,12 @@ impl TileGrid {
         self.idx[tile_row * self.tiles_w + tile_col] = slot;
     }
 
+    #[allow(dead_code)]
     pub fn pool(&self) -> &[Box<Tile>] {
         &self.pool
     }
 
+    #[allow(dead_code)]
     pub fn pool_len(&self) -> usize {
         self.pool.len()
     }
@@ -190,6 +192,7 @@ impl TileGrid {
     }
 
     /// Iterate frozen tile positions: (tile_row, tile_col).
+    #[allow(dead_code)]
     pub fn frozen_positions(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
         let tiles_w = self.tiles_w;
         self.idx

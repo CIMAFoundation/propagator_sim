@@ -18,6 +18,7 @@ impl FrontHeap {
     }
 
     #[inline]
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.times.len()
     }

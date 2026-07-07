@@ -135,6 +135,6 @@ work/
 
 .DS_Store
 
-output/
-example/*.xml
 benchmarks/results/
+example/*/output*/
+example/*/freeze/

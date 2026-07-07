@@ -19,6 +19,7 @@ from propagator.cli.console import (
     status_propagator_msg,
 )
 from propagator.core import Propagator, PropagatorOutOfBoundsError
+from propagator.core.constants import FUEL_SYSTEM_LEGACY_DICT
 from propagator.core.numba import (
     FUEL_SYSTEM_LEGACY,
     TILE_SIZE,
@@ -119,6 +120,12 @@ class PropagatorCLILegacy(BaseSettings):
     ignore_out_of_bounds: CliImplicitFlag[bool] = Field(
         False,
         description="Continue simulation when reaching bounds.",
+    )
+
+    core: Literal["numba", "rust"] = Field(
+        "numba",
+        description="Simulation core: 'numba' (default) or 'rust' (native "
+        "extension, requires the propagator_rust wheel).",
     )
 
     # Quiet mode to suppress console output, set to true when --quiet is passed
@@ -222,15 +229,23 @@ class PropagatorCLILegacy(BaseSettings):
         return PropagatorConfigurationLegacy(**json_cfg)
 
 
-def fuels_from_yaml(path: str | Path) -> FuelSystem:
+def _fuels_node_from_yaml(path: str | Path) -> Mapping:
     path = Path(path)
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     fuels_node = data.get("fuels")
     if not isinstance(fuels_node, Mapping):
         raise ValueError("YAML must contain 'fuels' (mapping)")
+    return fuels_node
+
+
+def fuels_from_yaml(path: str | Path) -> FuelSystem:
     # coerce IDs to int and build Fuel objects
-    fs = fuelsystem_from_dict(fuels_node)  # type: ignore
-    return fs
+    return fuelsystem_from_dict(_fuels_node_from_yaml(path))  # type: ignore
+
+
+def fuel_dict_from_yaml(path: str | Path) -> dict:
+    """Raw fuel definitions (config units) for the Rust core."""
+    return {int(k): v for k, v in _fuels_node_from_yaml(path).items()}
 
 
 # --- main function -----------------------------------------------------------
@@ -267,10 +282,12 @@ def main() -> None:
 
     if cli.fuel_config is not None:
         fuel_system = fuels_from_yaml(cli.fuel_config)
+        fuel_dict = fuel_dict_from_yaml(cli.fuel_config)
         if cli.verbose:
             info_msg(f"Fuel system loaded from {cli.fuel_config}")
     else:
         fuel_system = FUEL_SYSTEM_LEGACY
+        fuel_dict = FUEL_SYSTEM_LEGACY_DICT
         if cli.verbose:
             info_msg("Using legacy fuel system")
 
@@ -366,21 +383,42 @@ def main() -> None:
 
     writer = build_writer(geo_info)
 
-    simulator = Propagator(
-        dem=dem,
-        veg=veg,
-        realizations=cfg.realizations,
-        fuels=fuel_system,
-        do_spotting=cfg.do_spotting,
-        origin=(
-            cog_loader.initial_origin if cog_loader is not None else (0, 0)
-        ),
-        seed=cli.seed,
-        freeze_dir=cli.freeze_dir,
-        out_of_bounds_mode="ignore" if cli.ignore_out_of_bounds else "raise",
-        p_time_fn=cfg.p_time_fn if cfg.p_time_fn is not None else None,
-        p_moist_fn=cfg.p_moist_fn if cfg.p_moist_fn is not None else None,
-    )
+    origin = cog_loader.initial_origin if cog_loader is not None else (0, 0)
+    oob_mode = "ignore" if cli.ignore_out_of_bounds else "raise"
+
+    if cli.core == "rust":
+        from propagator.rust_core import Propagator as RustPropagator
+
+        simulator = RustPropagator(
+            dem=dem,
+            veg=veg,
+            realizations=cfg.realizations,
+            fuels_dict=fuel_dict,
+            do_spotting=cfg.do_spotting,
+            origin=origin,
+            seed=cli.seed,
+            freeze_dir=cli.freeze_dir,
+            out_of_bounds_mode=oob_mode,
+            ros_model=cfg.ros_model,
+            moisture_model=cfg.prob_moist_model,
+            cellsize=cfg.cellsize,
+        )
+        if cli.verbose:
+            info_msg("Using Rust core (propagator_rust)")
+    else:
+        simulator = Propagator(
+            dem=dem,
+            veg=veg,
+            realizations=cfg.realizations,
+            fuels=fuel_system,
+            do_spotting=cfg.do_spotting,
+            origin=origin,
+            seed=cli.seed,
+            freeze_dir=cli.freeze_dir,
+            out_of_bounds_mode=oob_mode,
+            p_time_fn=cfg.p_time_fn if cfg.p_time_fn is not None else None,
+            p_moist_fn=cfg.p_moist_fn if cfg.p_moist_fn is not None else None,
+        )
 
     non_vegetated = fuel_system.get_non_vegetated()
     boundary_conditions_list = cfg.get_boundary_conditions(

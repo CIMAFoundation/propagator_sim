@@ -1,0 +1,19 @@
+[package]
+name = "propagator-py"
+version = "0.1.0"
+edition = "2021"
+description = "Python bindings for the Rust PROPAGATOR core"
+license = "EUPL-1.2"
+
+[lib]
+name = "propagator_rust"
+crate-type = ["cdylib"]
+
+[dependencies]
+propagator-core = { path = "../propagator-core" }
+pyo3 = { version = "0.25", features = ["abi3-py311", "extension-module"] }
+numpy = "0.25"
+
+[profile.release]
+lto = true
+codegen-units = 1

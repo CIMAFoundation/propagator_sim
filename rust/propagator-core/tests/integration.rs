@@ -23,17 +23,6 @@ fn basic_conditions(ignition: (usize, usize)) -> BoundaryConditions {
     }
 }
 
-/// Bitwise f32 comparison (NaN-safe: identical NaNs compare equal).
-fn assert_f32_slices_eq(a: &[f32], b: &[f32]) {
-    assert_eq!(a.len(), b.len());
-    for (i, (x, y)) in a.iter().zip(b.iter()).enumerate() {
-        assert!(
-            x.to_bits() == y.to_bits() || x == y,
-            "mismatch at {i}: {x} vs {y}"
-        );
-    }
-}
-
 fn new_sim(seed: u64) -> Propagator {
     let (veg, dem) = flat_grass();
     let mut config = PropagatorConfig::new(veg, dem);
@@ -284,8 +273,14 @@ fn freezing_is_behaviour_neutral() {
         let mut sim = Propagator::new(config).unwrap();
         sim.set_boundary_conditions(basic_conditions((64, 64))).unwrap();
         let mut frozen_any = 0;
-        for _ in 0..8 {
-            sim.step_window(600).unwrap();
+        // Run to exhaustion in 1-hour windows: grassland at 20 m/cell
+        // spreads ~10 min/cell crosswind, so the interior tiles only burn
+        // out (and become freezable) after several hours of sim time.
+        for _ in 0..48 {
+            if sim.next_time().is_none() {
+                break;
+            }
+            sim.step_window(3600).unwrap();
             if freeze {
                 frozen_any += sim.freeze_inactive_tiles().unwrap();
             }
@@ -334,9 +329,18 @@ fn frozen_checkpoint_restores_incrementally() {
     config.freeze_dir = Some(freeze_dir.clone());
     let mut sim = Propagator::new(config).unwrap();
     sim.set_boundary_conditions(basic_conditions((64, 64))).unwrap();
-    for _ in 0..4 {
-        sim.step_window(600).unwrap();
-        sim.freeze_inactive_tiles().unwrap();
+    // Run until interior tiles have burned out and been frozen (see
+    // `freezing_is_behaviour_neutral` for the timing rationale).
+    let mut frozen = 0;
+    for _ in 0..48 {
+        if sim.next_time().is_none() {
+            break;
+        }
+        sim.step_window(3600).unwrap();
+        frozen += sim.freeze_inactive_tiles().unwrap();
+        if frozen > 0 {
+            break;
+        }
     }
     let checkpoint = sim.checkpoint();
     assert!(!checkpoint.frozen_index.is_empty());

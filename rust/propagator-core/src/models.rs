@@ -37,29 +37,19 @@ pub const MOISTURE_OF_EXTINCTION: f64 = 0.3;
 /// Fire-spotting distance coefficient (Alexandridis).
 pub const FIRE_SPOTTING_DISTANCE_COEFFICIENT: f64 = 0.191;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum RosModel {
+    #[default]
     Wang,
     Rothermel,
     Standard,
 }
 
-impl Default for RosModel {
-    fn default() -> Self {
-        RosModel::Wang
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum MoistureModel {
+    #[default]
     Trucchia,
     Baghino,
-}
-
-impl Default for MoistureModel {
-    fn default() -> Self {
-        MoistureModel::Trucchia
-    }
 }
 
 #[inline]

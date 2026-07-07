@@ -89,8 +89,10 @@ uv run propagator \
   --mode cog \
   --cog_dem "$EU_DEM_COGS" \
   --cog_fuel "$EU_FUEL_COGS" \
-  --grid_dim 1024 --grow_margin 512 --seed 2017 \
-  --output results/pedrogao-cog --verbose
+  --grid_dim 1024 \
+  --grow_margin 512 \
+  --seed 2017 \
+  --output example/pedrogao/output --verbose
 ```
 
 The loader picks the UTM-29 pair covering the ignition, reads a
@@ -120,14 +122,15 @@ export EU_FUEL_COGS="<comma-separated fuel COG URLs>"
 
 uv run propagator \
   --config example/alexandroupolis/config.json \
-  --fuel_config example/pedrogao/fuels_eu12.yaml \
+  --fuel_config example/alexandroupolis/fuels_eu12.yaml \
   --mode cog \
   --cog_dem "$EU_DEM_COGS" \
   --cog_fuel "$EU_FUEL_COGS" \
-  --grid_dim 2048 --grow_margin 2048 \
-  --freeze_dir results/alexandroupolis-freeze \
+  --grid_dim 2048 \
+  --grow_margin 2048 \
+  --freeze_dir example/alexandroupolis/freeze \
   --seed 2023 \
-  --output results/alexandroupolis-cog \
+  --output example/alexandroupolis/output \
   --record --verbose
 ```
 
