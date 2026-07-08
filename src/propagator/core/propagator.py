@@ -285,6 +285,11 @@ class Propagator:
         )
         self._front_sizes = np.zeros((self.realizations,), dtype=np.int32)
         self._front_overflow = np.zeros((self.realizations,), dtype=np.int8)
+        # per-realization boundary-halt flags from the last propagate call,
+        # kept so callers can query which edges the front reached
+        self._front_out_of_bounds = np.zeros(
+            (self.realizations,), dtype=np.int8
+        )
         tiles_h = -(-shape[0] // TILE_SIZE)
         tiles_w = -(-shape[1] // TILE_SIZE)
         self._tile_idx = np.full(
@@ -899,6 +904,28 @@ class Propagator:
             self.veg[mask] = scheduler_event.vegetation_changes[mask]
             self._fuel_idx = build_fuel_index_grid(self.fuels, self.veg)
 
+    def boundary_pressure(self) -> tuple[bool, bool, bool, bool]:
+        """Which domain edges the front is pressing against, as
+        ``(north, south, west, east)`` — north/west are the low-row/low-col
+        edges. A flag is set when some realization halted on that edge in
+        ``out_of_bounds_mode='raise'`` (i.e. the last ``step`` raised
+        :class:`PropagatorOutOfBoundsError`); all-false otherwise. Lets a
+        caller grow only the sides the fire actually reached.
+        """
+        n_rows, n_cols = self.veg.shape
+        north = south = west = east = False
+        for r in np.nonzero(self._front_out_of_bounds)[0]:
+            if int(self._front_sizes[r]) <= 0:
+                continue
+            # the halting event sits at the heap root (it was not popped)
+            row = int(self._front_rows[r, 0])
+            col = int(self._front_cols[r, 0])
+            north |= row <= 0
+            south |= row >= n_rows - 1
+            west |= col <= 0
+            east |= col >= n_cols - 1
+        return north, south, west, east
+
     def step(
         self,
         seconds: int | None = None,
@@ -1038,6 +1065,8 @@ class Propagator:
                     "resource; this is a bug."
                 )
             self._front_overflow[:] = 0
+
+        self._front_out_of_bounds = out_of_bounds
 
         if (
             self.out_of_bounds_mode == "raise"

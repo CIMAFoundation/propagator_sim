@@ -9,7 +9,7 @@ errors are re-raised as the core's :class:`PropagatorOutOfBoundsError`.
 
 Build the extension with::
 
-    maturin develop -m rust/propagator-py/Cargo.toml --release
+    ./rust/build.sh
 """
 
 from __future__ import annotations
@@ -30,9 +30,8 @@ try:
     import propagator_rust as _rust
 except ImportError as exc:  # pragma: no cover - only hit without the wheel
     raise ImportError(
-        "The Rust core is not installed. Build it with "
-        "`maturin develop -m rust/propagator-py/Cargo.toml --release` "
-        "(or `make rust-core`) before using --core rust."
+        "The Rust core is not installed. Build it with `./rust/build.sh` "
+        "before using --core rust."
     ) from exc
 
 
@@ -120,6 +119,11 @@ class Propagator:
     # ---- driving the simulation -----------------------------------------
     def next_time(self) -> Optional[int]:
         return self._sim.next_time()
+
+    def boundary_pressure(self) -> tuple[bool, bool, bool, bool]:
+        """(north, south, west, east) edges the front halted on; matches the
+        numba core's method so the CLI is core-agnostic."""
+        return self._sim.boundary_pressure()
 
     def set_boundary_conditions(self, bc: BoundaryConditions) -> None:
         ignitions = bc.ignitions

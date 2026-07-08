@@ -320,6 +320,13 @@ impl Propagator {
         self.inner.next_time()
     }
 
+    /// `(north, south, west, east)` edges the front is pressing against
+    /// after a boundary halt; all-false unless the last `step` hit a
+    /// boundary in out_of_bounds_mode='raise'.
+    fn boundary_pressure(&self) -> (bool, bool, bool, bool) {
+        self.inner.boundary_pressure()
+    }
+
     #[pyo3(signature = (
         time,
         moisture = None,

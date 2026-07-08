@@ -196,6 +196,29 @@ impl Propagator {
         &self.veg
     }
 
+    /// Which domain edges the front is pressing against, as
+    /// `(north, south, west, east)` — north/west are the low-row/low-col
+    /// edges. A flag is set when some realization halted on that edge in
+    /// `OobMode::Raise` (i.e. the last `step` returned
+    /// `PropagatorError::OutOfBounds`); all-false otherwise. Lets the caller
+    /// grow only the sides the fire actually reached.
+    pub fn boundary_pressure(&self) -> (bool, bool, bool, bool) {
+        let (n_rows, n_cols) = self.veg.shape();
+        let (mut north, mut south, mut west, mut east) = (false, false, false, false);
+        for real in &self.reals {
+            if !real.halted_on_boundary {
+                continue;
+            }
+            if let Some((row, col)) = real.heap.peek_cell() {
+                north |= row <= 0;
+                south |= row >= n_rows as i32 - 1;
+                west |= col <= 0;
+                east |= col >= n_cols as i32 - 1;
+            }
+        }
+        (north, south, west, east)
+    }
+
     /// Inclusive world-cell bounds (row0, col0, row1, col1) of the grid.
     pub fn world_bounds(&self) -> (i64, i64, i64, i64) {
         let (rows, cols) = self.veg.shape();

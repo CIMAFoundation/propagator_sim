@@ -33,9 +33,9 @@ from propagator.io.loader.protocol import PropagatorInputDataProtocol
 from propagator.io.loader.tiles import PropagatorDataFromTiles
 from propagator.io.writer import (
     GeoTiffWriter,
-    IsochronesGeoJSONWriter,
     MetadataJSONWriter,
 )
+from propagator.io.writer.isochrones_geojson import build_isochrones_writer
 from propagator.io.writer.protocol import OutputWriter
 
 
@@ -110,6 +110,19 @@ class PropagatorCLILegacy(BaseSettings):
         [0.5, 0.75, 0.9],
         description="Isochrones thresholds to be saved. \
             Default: [0.5,0.75,0.9]",
+    )
+    isochrones_mode: Literal["none", "single", "multiple", "jsonl"] = Field(
+        "none",
+        description="Isochrones output mode: 'none' (off, default), "
+        "'single' (one consolidated file, rewritten each step), 'multiple' "
+        "(one file per timestep, that step only), or 'jsonl' (one GeoJSON "
+        "FeatureCollection per line, appended).",
+    )
+    isochrones_format: Literal["geojson", "gpkg"] = Field(
+        "geojson",
+        description="Isochrones file format for 'single'/'multiple' modes: "
+        "'geojson' (default) or 'gpkg' (GeoPackage). 'jsonl' is always "
+        "GeoJSON lines.",
     )
 
     record: CliImplicitFlag[bool] = Field(
@@ -355,9 +368,25 @@ def main() -> None:
             }
         )
 
+    # The isochrones writer is persistent across domain growth (it may
+    # accumulate state); only its geo_info is refreshed when the grid grows.
+    isochrones_writer = build_isochrones_writer(
+        cli.isochrones_mode,
+        start_date=cfg.init_date,
+        output_folder=cli.output,
+        prefix="isochrones",
+        geo_info=geo_info,
+        dst_crs=dst_crs,
+        fmt=cli.isochrones_format,
+        thresholds=cli.isochrones,
+    )
+
     def build_writer(current_geo_info) -> OutputWriter:
-        """(Re)build the output writers; called again after every domain
-        growth since the grid shape and georeferencing change."""
+        """(Re)build the shape-dependent writers; called again after every
+        domain growth. The isochrones writer is reused (its geo_info is
+        refreshed in grow_domain)."""
+        if isochrones_writer is not None:
+            isochrones_writer.geo_info = current_geo_info
         return OutputWriter(
             raster_writer=GeoTiffWriter(
                 start_date=cfg.init_date,
@@ -371,14 +400,7 @@ def main() -> None:
                 output_folder=cli.output,
                 prefix="metadata",
             ),
-            isochrones_writer=IsochronesGeoJSONWriter(
-                start_date=cfg.init_date,
-                output_folder=cli.output,
-                prefix="isochrones",
-                thresholds=cli.isochrones,
-                geo_info=current_geo_info,
-                dst_crs=dst_crs,
-            ),
+            isochrones_writer=isochrones_writer,
         )
 
     writer = build_writer(geo_info)
@@ -431,28 +453,49 @@ def main() -> None:
         print_boundary_conditions_table(cfg.boundary_conditions)
 
     def grow_domain() -> None:
-        """Enlarge the domain by grow_margin cells on every side, loading
-        the wider window from the COGs (in-place, nothing is lost)."""
+        """Enlarge the domain by grow_margin cells, but only on the side(s)
+        the fire actually reached (reported by the core), loading the wider
+        window from the COGs (in-place, nothing is lost)."""
         nonlocal writer
         assert cog_loader is not None
         margin = cli.grow_margin
-        new_origin = (
-            simulator.origin[0] - margin,
-            simulator.origin[1] - margin,
-        )
-        new_shape = (
-            simulator.veg.shape[0] + 2 * margin,
-            simulator.veg.shape[1] + 2 * margin,
-        )
+        north, south, west, east = simulator.boundary_pressure()
+        if not (north or south or west or east):
+            # no edge reported (shouldn't happen right after a halt): grow
+            # every side so the run can still make progress
+            north = south = west = east = True
+
+        grow_n = margin if north else 0
+        grow_s = margin if south else 0
+        grow_w = margin if west else 0
+        grow_e = margin if east else 0
+
+        row0, col0 = simulator.origin
+        rows, cols = simulator.veg.shape
+        # north/west growth shifts the origin; the shift stays a multiple of
+        # TILE_SIZE because grow_margin is, which the core's expand requires
+        new_origin = (row0 - grow_n, col0 - grow_w)
+        new_shape = (rows + grow_n + grow_s, cols + grow_w + grow_e)
+
         new_dem, new_veg, new_geo_info = cog_loader.load_window(
             new_origin, new_shape
         )
         simulator.expand(new_veg, new_dem, new_origin)
         writer = build_writer(new_geo_info)
         if cli.verbose:
+            grew = [
+                name
+                for name, flag in (
+                    ("N", north),
+                    ("S", south),
+                    ("W", west),
+                    ("E", east),
+                )
+                if flag
+            ]
             info_msg(
-                f"Fire reached the boundary: domain grown to "
-                f"{new_shape[0]}x{new_shape[1]} cells (origin {new_origin})"
+                f"Fire reached the boundary ({'+'.join(grew)}): domain grown "
+                f"to {new_shape[0]}x{new_shape[1]} cells (origin {new_origin})"
             )
 
     stopped = False
