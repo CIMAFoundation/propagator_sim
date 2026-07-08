@@ -20,6 +20,7 @@ extra:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Interactive Demo: demo.md
   - Programmatic Workflow: programmatic.md
   - CLI Usage: cli.md
   - Simulation Outputs: outputs.md

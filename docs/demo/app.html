@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PROPAGATOR WebAssembly demo</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f4f4f6;
+    --border: #dcdce3;
+    --text: #1c1c22;
+    --muted: #6b6b78;
+    --accent: #e8552a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16161a;
+      --panel: #202028;
+      --border: #35353f;
+      --text: #e8e8ee;
+      --muted: #9a9aa8;
+      --accent: #ff6b3d;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap {
+    display: flex;
+    gap: 20px;
+    padding: 16px;
+    height: 100vh;
+    align-items: stretch;
+  }
+  .stage {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .canvas-box {
+    flex: 1 1 auto;
+    min-height: 0;
+    container-type: size;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  /* Largest square that fits the box: 100cqmin is the smaller of the
+     container's width/height, so the map fills the available space and
+     never forces the page to scroll. */
+  .canvas-wrap {
+    position: relative;
+    width: 100cqmin;
+    height: 100cqmin;
+  }
+  #veg, #fire {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+  }
+  #fire {
+    cursor: crosshair;
+    touch-action: none;
+  }
+  .hint {
+    color: var(--muted);
+    font-size: 12px;
+    margin: 8px 2px 0;
+  }
+  .panel {
+    flex: 0 0 300px;
+    max-width: 100%;
+    align-self: stretch;
+    overflow-y: auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  @media (max-width: 680px) {
+    body { overflow: auto; }
+    .wrap { height: auto; flex-direction: column; }
+    .panel { flex: 0 0 auto; }
+  }
+  .panel h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+  .control { margin-bottom: 16px; }
+  .control label {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .control label span { color: var(--accent); font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  select {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+  }
+  .buttons { display: flex; gap: 8px; }
+  button {
+    flex: 1;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg);
+    color: var(--text);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 16px;
+    margin-top: 4px;
+  }
+  .stats .k { color: var(--muted); }
+  .stats .v { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+  .legend { margin-top: 16px; font-size: 12px; color: var(--muted); }
+  .bar {
+    height: 10px;
+    border-radius: 5px;
+    margin: 6px 0 4px;
+    background: linear-gradient(90deg, #ffe08a, #ffab3d, #f4622e, #b31212);
+  }
+  .barlabels { display: flex; justify-content: space-between; }
+  #status { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage">
+    <div class="canvas-box">
+      <div class="canvas-wrap">
+        <canvas id="veg"></canvas>
+        <canvas id="fire"></canvas>
+      </div>
+    </div>
+    <p class="hint">Click or drag on the map to place ignition points, then press <b>Run</b>. The colours underneath are the fuel/vegetation types; the orange overlay is the fire-arrival probability across all realizations.</p>
+    <p id="status">Loading WebAssembly core…</p>
+  </div>
+
+  <div class="panel">
+    <h2>Weather</h2>
+    <div class="control">
+      <label for="wspeed">Wind speed <span id="wspeed-v">20 km/h</span></label>
+      <input id="wspeed" type="range" min="0" max="60" step="1" value="20" />
+    </div>
+    <div class="control">
+      <label for="wdir">Wind direction <span id="wdir-v">225°</span></label>
+      <input id="wdir" type="range" min="0" max="359" step="1" value="225" />
+    </div>
+    <div class="control">
+      <label for="moist">Fuel moisture <span id="moist-v">10 %</span></label>
+      <input id="moist" type="range" min="1" max="40" step="1" value="10" />
+    </div>
+
+    <h2 style="margin-top:20px">Simulation</h2>
+    <div class="control">
+      <label for="reals">Realizations <span id="reals-v">30</span></label>
+      <input id="reals" type="range" min="1" max="100" step="1" value="30" />
+    </div>
+    <div class="control">
+      <label for="ros">Rate-of-spread model</label>
+      <select id="ros">
+        <option value="wang" selected>Wang</option>
+        <option value="rothermel">Rothermel</option>
+        <option value="standard">Standard</option>
+      </select>
+    </div>
+    <div class="control">
+      <label style="font-weight:600"><input type="checkbox" id="spotting" /> &nbsp;Enable fire spotting</label>
+    </div>
+
+    <div class="buttons">
+      <button id="run" class="primary" disabled>Run</button>
+      <button id="reset" disabled>Reset</button>
+    </div>
+
+    <div class="stats">
+      <div class="k">Sim time</div><div class="v" id="stat-time">0.0 h</div>
+      <div class="k">Burned area</div><div class="v" id="stat-area">0 ha</div>
+      <div class="k">Ignitions</div><div class="v" id="stat-ign">0</div>
+    </div>
+
+    <div class="legend">
+      Fire-arrival probability
+      <div class="bar"></div>
+      <div class="barlabels"><span>low</span><span>high</span></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import init, { Propagator } from "./pkg/propagator_wasm.js";
+
+// ---- landscape -----------------------------------------------------------
+const N = 180;              // grid is N x N
+const CELL = 20.0;          // metres per cell
+const STEP_SECONDS = 600;   // sim seconds advanced per animation frame (10 min)
+
+// Fuel palette (legacy fuel codes -> RGB). 0 = no fuel.
+const FUEL_COLORS = {
+  0: [70, 72, 78],     // no fuel
+  1: [45, 92, 45],     // broadleaves
+  2: [120, 128, 58],   // shrubs
+  3: [150, 142, 120],  // non-vegetated (barrier)
+  4: [176, 190, 104],  // grassland
+  5: [28, 74, 52],     // conifers
+  6: [150, 170, 80],   // agro-forestry
+};
+
+// Deterministic value-noise landscape so every load looks the same.
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function makeNoise(seed, freq) {
+  const rnd = mulberry32(seed);
+  const g = (freq + 1) * (freq + 1);
+  const grid = Array.from({ length: g }, () => rnd());
+  return (x, y) => {
+    const fx = x * freq, fy = y * freq;
+    const x0 = Math.floor(fx), y0 = Math.floor(fy);
+    const tx = fx - x0, ty = fy - y0;
+    const at = (i, j) => grid[(Math.min(j, freq) * (freq + 1)) + Math.min(i, freq)];
+    const s = (t) => t * t * (3 - 2 * t);
+    const a = at(x0, y0), b = at(x0 + 1, y0), c = at(x0, y0 + 1), d = at(x0 + 1, y0 + 1);
+    const u = s(tx), v = s(ty);
+    return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+  };
+}
+
+const veg = new Int32Array(N * N);
+const dem = new Float64Array(N * N);
+function buildLandscape() {
+  const fuelNoise = makeNoise(7, 6);
+  const patchNoise = makeNoise(23, 10);
+  const elevNoise = makeNoise(51, 4);
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      const i = r * N + c;
+      const nx = c / N, ny = r / N;
+      const f = fuelNoise(nx, ny);
+      let code;
+      if (f < 0.30) code = 4;        // grassland
+      else if (f < 0.52) code = 2;   // shrubs
+      else if (f < 0.72) code = 6;   // agro-forestry
+      else if (f < 0.88) code = 1;   // broadleaves
+      else code = 5;                 // conifers
+      // scattered rocky / bare barriers
+      if (patchNoise(nx, ny) > 0.80) code = 3;
+      veg[i] = code;
+      // gentle ridge climbing toward the NE
+      dem[i] = 200 + 350 * elevNoise(nx, ny) + 120 * (nx + (1 - ny));
+    }
+  }
+}
+buildLandscape();
+
+// ---- canvases ------------------------------------------------------------
+const vegCanvas = document.getElementById("veg");
+const fireCanvas = document.getElementById("fire");
+vegCanvas.width = fireCanvas.width = N;
+vegCanvas.height = fireCanvas.height = N;
+const vegCtx = vegCanvas.getContext("2d");
+const fireCtx = fireCanvas.getContext("2d");
+
+function drawVeg() {
+  const img = vegCtx.createImageData(N, N);
+  for (let i = 0; i < N * N; i++) {
+    const [rr, gg, bb] = FUEL_COLORS[veg[i]] || FUEL_COLORS[0];
+    img.data[i * 4] = rr;
+    img.data[i * 4 + 1] = gg;
+    img.data[i * 4 + 2] = bb;
+    img.data[i * 4 + 3] = 255;
+  }
+  vegCtx.putImageData(img, 0, 0);
+}
+drawVeg();
+
+// probability -> RGBA (transparent -> yellow -> orange -> deep red)
+function probColor(p) {
+  if (p <= 0.001) return [0, 0, 0, 0];
+  // stops
+  const stops = [
+    [0.0, [255, 224, 138]],
+    [0.35, [255, 171, 61]],
+    [0.7, [244, 98, 46]],
+    [1.0, [179, 18, 18]],
+  ];
+  let lo = stops[0], hi = stops[stops.length - 1];
+  for (let k = 0; k < stops.length - 1; k++) {
+    if (p >= stops[k][0] && p <= stops[k + 1][0]) { lo = stops[k]; hi = stops[k + 1]; break; }
+  }
+  const t = (p - lo[0]) / Math.max(1e-6, hi[0] - lo[0]);
+  const mix = (a, b) => Math.round(a + (b - a) * t);
+  const a = Math.min(255, 60 + p * 210);
+  return [mix(lo[1][0], hi[1][0]), mix(lo[1][1], hi[1][1]), mix(lo[1][2], hi[1][2]), a];
+}
+
+function drawFire(prob) {
+  const img = fireCtx.createImageData(N, N);
+  for (let i = 0; i < prob.length; i++) {
+    const [rr, gg, bb, aa] = probColor(prob[i]);
+    img.data[i * 4] = rr;
+    img.data[i * 4 + 1] = gg;
+    img.data[i * 4 + 2] = bb;
+    img.data[i * 4 + 3] = aa;
+  }
+  fireCtx.putImageData(img, 0, 0);
+}
+
+function drawIgnitions() {
+  fireCtx.clearRect(0, 0, N, N);
+  fireCtx.fillStyle = "#b31212";
+  for (const [r, c] of ignitions) fireCtx.fillRect(c - 1, r - 1, 3, 3);
+}
+
+// ---- controls ------------------------------------------------------------
+const el = (id) => document.getElementById(id);
+const bind = (id, fmt) => {
+  const input = el(id), out = el(id + "-v");
+  const update = () => { if (out) out.textContent = fmt(input.value); };
+  input.addEventListener("input", update); update();
+  return input;
+};
+bind("wspeed", (v) => `${v} km/h`);
+bind("wdir", (v) => `${v}°`);
+bind("moist", (v) => `${v} %`);
+bind("reals", (v) => v);
+
+let ignitions = [];       // [[row,col], ...]
+let sim = null;
+let running = false;
+let rafId = null;
+
+function canvasToCell(ev) {
+  const rect = fireCanvas.getBoundingClientRect();
+  const x = (ev.clientX - rect.left) / rect.width;
+  const y = (ev.clientY - rect.top) / rect.height;
+  const c = Math.max(0, Math.min(N - 1, Math.floor(x * N)));
+  const r = Math.max(0, Math.min(N - 1, Math.floor(y * N)));
+  return [r, c];
+}
+function addIgnition(ev) {
+  if (running) return;
+  const [r, c] = canvasToCell(ev);
+  if (veg[r * N + c] === 3 || veg[r * N + c] === 0) return; // don't ignite barriers
+  if (!ignitions.some(([ir, ic]) => ir === r && ic === c)) ignitions.push([r, c]);
+  el("stat-ign").textContent = ignitions.length;
+  drawIgnitions();
+}
+let dragging = false;
+fireCanvas.addEventListener("pointerdown", (e) => { dragging = true; addIgnition(e); });
+fireCanvas.addEventListener("pointermove", (e) => { if (dragging) addIgnition(e); });
+window.addEventListener("pointerup", () => { dragging = false; });
+
+// ---- run loop ------------------------------------------------------------
+function fmtTime(sec) { return (sec / 3600).toFixed(1) + " h"; }
+
+function stopSim() {
+  running = false;
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = null;
+  el("run").textContent = "Run";
+  el("run").classList.add("primary");
+  setControlsDisabled(false);
+}
+
+function setControlsDisabled(d) {
+  for (const id of ["wspeed", "wdir", "moist", "reals", "ros", "spotting", "reset"]) el(id).disabled = d;
+}
+
+function frame() {
+  if (!running) return;
+  try {
+    sim.step(BigInt(STEP_SECONDS));
+  } catch (e) {
+    el("status").textContent = "Simulation error: " + e;
+    stopSim();
+    return;
+  }
+  const prob = sim.fire_probability();
+  drawFire(prob);
+  const t = Number(sim.time);
+  el("stat-time").textContent = fmtTime(t);
+  el("stat-area").textContent = Math.round(sim.burned_area_ha()) + " ha";
+
+  // stop when the front is exhausted or after 24 sim-hours
+  if (sim.next_time() < 0 || t >= 24 * 3600) { stopSim(); el("status").textContent = "Simulation complete."; return; }
+  rafId = requestAnimationFrame(frame);
+}
+
+function startSim() {
+  if (ignitions.length === 0) { el("status").textContent = "Place at least one ignition point first."; return; }
+  const reals = parseInt(el("reals").value, 10);
+  const ros = el("ros").value;
+  const spotting = el("spotting").checked;
+
+  sim = new Propagator(N, N, veg, dem, reals, 42, spotting, CELL, ros, "trucchia");
+
+  const wspeed = parseFloat(el("wspeed").value);
+  const wdir = parseFloat(el("wdir").value);
+  const moist = parseFloat(el("moist").value);
+  const flat = new Int32Array(ignitions.flat());
+  sim.set_boundary_conditions(0n, moist, wdir, wspeed, flat);
+
+  running = true;
+  el("run").textContent = "Stop";
+  el("run").classList.remove("primary");
+  setControlsDisabled(true);
+  el("status").textContent = "Running…";
+  rafId = requestAnimationFrame(frame);
+}
+
+el("run").addEventListener("click", () => {
+  if (running) { stopSim(); el("status").textContent = "Stopped."; }
+  else startSim();
+});
+el("reset").addEventListener("click", () => {
+  stopSim();
+  sim = null;
+  ignitions = [];
+  el("stat-ign").textContent = "0";
+  el("stat-time").textContent = "0.0 h";
+  el("stat-area").textContent = "0 ha";
+  el("status").textContent = "Ready. Place ignition points and press Run.";
+  drawIgnitions();
+});
+
+// ---- boot ----------------------------------------------------------------
+init().then(() => {
+  el("run").disabled = false;
+  el("reset").disabled = false;
+  el("status").textContent = "Ready. Place ignition points and press Run.";
+}).catch((e) => {
+  el("status").textContent = "Failed to load WebAssembly core: " + e;
+});
+</script>
+</body>
+</html>
