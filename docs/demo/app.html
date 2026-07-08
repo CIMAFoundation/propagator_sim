@@ -171,7 +171,8 @@
     height: 10px;
     border-radius: 5px;
     margin: 6px 0 4px;
-    background: linear-gradient(90deg, #ffe08a, #ffab3d, #f4622e, #b31212);
+    border: 1px solid var(--border);
+    background: linear-gradient(90deg, #96161a, #d63414, #ff821c, #ffca3c, #fff0be);
   }
   .barlabels { display: flex; justify-content: space-between; }
   .fuel-key {
@@ -198,7 +199,7 @@
         <div id="clock" class="clock">0.0 h</div>
       </div>
     </div>
-    <p class="hint">Real terrain and EU 12-class fuel around <b>Alexandroupolis / Evros</b> (Greece), read from the <code>eu_fuel12</code> / <code>eu_dem</code> COGs. Click or drag on the map to (re)place ignition points, tune the weather, then press <b>Run</b>. The orange overlay is the fire-arrival probability across all realizations.</p>
+    <p class="hint">Real terrain and EU 12-class fuel around <b>Alexandroupolis / Evros</b> (Greece), read from the <code>eu_fuel12</code> / <code>eu_dem</code> COGs. Click or drag on the map to (re)place ignition points, tune the weather, then press <b>Run</b>. The glowing overlay is the fire-arrival probability across all realizations.</p>
     <p id="status">Loading WebAssembly core…</p>
   </div>
 
@@ -408,14 +409,18 @@ function drawVeg() {
   vegCtx.putImageData(img, 0, 0);
 }
 
-// probability -> RGBA (pale orange -> deep red, opacity rising with p)
+// probability -> RGBA on a "hot" ramp: dark red (low) through orange to a
+// near-white hot core (high). Brightness rises with probability so the fire
+// stands apart from the warm fuel colours, and the alpha floor keeps even
+// faint edges above the basemap dimming.
 function probColor(p) {
-  if (p <= 0.001) return [0, 0, 0, 0];
+  if (p <= 0.004) return [0, 0, 0, 0];
   const stops = [
-    [0.0, [255, 236, 150]],
-    [0.35, [255, 150, 40]],
-    [0.7, [232, 66, 24]],
-    [1.0, [120, 0, 0]],
+    [0.0, [150, 22, 26]],
+    [0.3, [214, 52, 20]],
+    [0.6, [255, 130, 28]],
+    [0.85, [255, 202, 60]],
+    [1.0, [255, 240, 190]],
   ];
   let lo = stops[0], hi = stops[stops.length - 1];
   for (let k = 0; k < stops.length - 1; k++) {
@@ -423,18 +428,27 @@ function probColor(p) {
   }
   const t = (p - lo[0]) / Math.max(1e-6, hi[0] - lo[0]);
   const mix = (a, b) => Math.round(a + (b - a) * t);
-  const a = Math.min(255, 90 + p * 165);
+  const a = Math.min(255, 165 + p * 90);
   return [mix(lo[1][0], hi[1][0]), mix(lo[1][1], hi[1][1]), mix(lo[1][2], hi[1][2]), a];
 }
 
+// While a run exists, dim the (un-burnt) basemap so the fire overlay reads
+// clearly against the multi-coloured fuel map instead of blending into it.
+const SCRIM_ALPHA = 135;
+
 function drawFire(prob) {
   const img = fireCtx.createImageData(N, N);
+  const d = img.data;
+  const scrim = sim ? SCRIM_ALPHA : 0;
   for (let i = 0; i < prob.length; i++) {
-    const [rr, gg, bb, aa] = probColor(prob[i]);
-    img.data[i * 4] = rr;
-    img.data[i * 4 + 1] = gg;
-    img.data[i * 4 + 2] = bb;
-    img.data[i * 4 + 3] = aa;
+    const j = i * 4;
+    const p = prob[i];
+    if (p <= 0.004) {
+      d[j] = 8; d[j + 1] = 7; d[j + 2] = 10; d[j + 3] = scrim;
+    } else {
+      const [rr, gg, bb, aa] = probColor(p);
+      d[j] = rr; d[j + 1] = gg; d[j + 2] = bb; d[j + 3] = aa;
+    }
   }
   fireCtx.putImageData(img, 0, 0);
 }
