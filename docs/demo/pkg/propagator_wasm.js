@@ -1,6 +1,61 @@
 /* @ts-self-types="./propagator_wasm.d.ts" */
 
 /**
+ * Accumulates fuel definitions supplied from JavaScript into a
+ * [`FuelSystem`]. The demo builds this from the EU 12-class table defined in
+ * `app.html`, keeping the fuel model out of the wasm binary.
+ */
+export class FuelSystemBuilder {
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        FuelSystemBuilderFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_fuelsystembuilder_free(ptr, 0);
+    }
+    /**
+     * Append one fuel. Units match the config dictionaries (`v0` m/h,
+     * `humidity` percent, or `undefined` for a fuel with no live load).
+     * `spread_to`/`spread_prob` are parallel arrays giving the base spread
+     * probability toward each target fuel id.
+     * @param {number} id
+     * @param {string} name
+     * @param {number} v0
+     * @param {number} d0
+     * @param {number} d1
+     * @param {number} hhv
+     * @param {number | null | undefined} humidity
+     * @param {boolean} spotting
+     * @param {number} prob_ign_by_embers
+     * @param {boolean} burn
+     * @param {Int32Array} spread_to
+     * @param {Float64Array} spread_prob
+     */
+    add_fuel(id, name, v0, d0, d1, hhv, humidity, spotting, prob_ign_by_embers, burn, spread_to, spread_prob) {
+        const ptr0 = passStringToWasm0(name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray32ToWasm0(spread_to, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArrayF64ToWasm0(spread_prob, wasm.__wbindgen_malloc);
+        const len2 = WASM_VECTOR_LEN;
+        const ret = wasm.fuelsystembuilder_add_fuel(this.__wbg_ptr, id, ptr0, len0, v0, d0, d1, hhv, !isLikeNone(humidity), isLikeNone(humidity) ? 0 : humidity, spotting, prob_ign_by_embers, burn, ptr1, len1, ptr2, len2);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    constructor() {
+        const ret = wasm.fuelsystembuilder_new();
+        this.__wbg_ptr = ret;
+        FuelSystemBuilderFinalization.register(this, this.__wbg_ptr, this);
+        return this;
+    }
+}
+if (Symbol.dispose) FuelSystemBuilder.prototype[Symbol.dispose] = FuelSystemBuilder.prototype.free;
+
+/**
  * Browser-facing wrapper around the core [`CorePropagator`].
  *
  * Constructed from flat, row-major vegetation (fuel-code) and DEM rasters;
@@ -53,14 +108,16 @@ export class Propagator {
     /**
      * Build a propagator over a `rows x cols` domain.
      *
-     * `veg` (fuel codes, matching the legacy fuel table) and `dem`
-     * (elevation, metres) are row-major and must both hold `rows * cols`
-     * entries. Fires reaching the boundary are ignored rather than raised,
-     * which keeps the demo running when the flame front hits an edge.
+     * `veg` (fuel codes matching `fuels`) and `dem` (elevation, metres) are
+     * row-major and must both hold `rows * cols` entries. `fuels` is the
+     * fuel model assembled from JavaScript. Fires reaching the boundary are
+     * ignored rather than raised, which keeps the demo running when the
+     * flame front hits an edge.
      * @param {number} rows
      * @param {number} cols
      * @param {Int32Array} veg
      * @param {Float64Array} dem
+     * @param {FuelSystemBuilder} fuels
      * @param {number} realizations
      * @param {number} seed
      * @param {boolean} do_spotting
@@ -68,16 +125,17 @@ export class Propagator {
      * @param {string} ros_model
      * @param {string} moisture_model
      */
-    constructor(rows, cols, veg, dem, realizations, seed, do_spotting, cellsize, ros_model, moisture_model) {
+    constructor(rows, cols, veg, dem, fuels, realizations, seed, do_spotting, cellsize, ros_model, moisture_model) {
         const ptr0 = passArray32ToWasm0(veg, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passArrayF64ToWasm0(dem, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
+        _assertClass(fuels, FuelSystemBuilder);
         const ptr2 = passStringToWasm0(ros_model, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len2 = WASM_VECTOR_LEN;
         const ptr3 = passStringToWasm0(moisture_model, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len3 = WASM_VECTOR_LEN;
-        const ret = wasm.propagator_new(rows, cols, ptr0, len0, ptr1, len1, realizations, seed, do_spotting, cellsize, ptr2, len2, ptr3, len3);
+        const ret = wasm.propagator_new(rows, cols, ptr0, len0, ptr1, len1, fuels.__wbg_ptr, realizations, seed, do_spotting, cellsize, ptr2, len2, ptr3, len3);
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
@@ -176,9 +234,18 @@ function __wbg_get_imports() {
     };
 }
 
+const FuelSystemBuilderFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_fuelsystembuilder_free(ptr, 1));
 const PropagatorFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_propagator_free(ptr, 1));
+
+function _assertClass(instance, klass) {
+    if (!(instance instanceof klass)) {
+        throw new Error(`expected instance of ${klass.name}`);
+    }
+}
 
 function getArrayF32FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
@@ -219,6 +286,10 @@ function getUint8ArrayMemory0() {
         cachedUint8ArrayMemory0 = new Uint8Array(wasm.memory.buffer);
     }
     return cachedUint8ArrayMemory0;
+}
+
+function isLikeNone(x) {
+    return x === undefined || x === null;
 }
 
 function passArray32ToWasm0(arg, malloc) {

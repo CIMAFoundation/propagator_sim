@@ -8,6 +8,8 @@ repos:
     -   id: end-of-file-fixer
     -   id: check-yaml
     -   id: check-added-large-files
+        # the compressed demo landscape asset is ~0.8 MB
+        args: [--maxkb=1024]
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.

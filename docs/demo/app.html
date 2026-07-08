@@ -76,6 +76,31 @@
     cursor: crosshair;
     touch-action: none;
   }
+  .clock {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    padding: 4px 9px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+  }
+  .clock.live::before {
+    content: "";
+    display: inline-block;
+    width: 7px; height: 7px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: #ff5b39;
+    vertical-align: middle;
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
   .hint {
     color: var(--muted);
     font-size: 12px;
@@ -149,6 +174,17 @@
     background: linear-gradient(90deg, #ffe08a, #ffab3d, #f4622e, #b31212);
   }
   .barlabels { display: flex; justify-content: space-between; }
+  .fuel-key {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px 10px;
+  }
+  .fuel-key .row { display: flex; align-items: center; gap: 6px; }
+  .fuel-key .sw {
+    width: 11px; height: 11px; border-radius: 2px; flex: 0 0 auto;
+    border: 1px solid rgba(128,128,128,0.4);
+  }
   #status { color: var(--muted); font-size: 12px; }
 </style>
 </head>
@@ -159,31 +195,32 @@
       <div class="canvas-wrap">
         <canvas id="veg"></canvas>
         <canvas id="fire"></canvas>
+        <div id="clock" class="clock">0.0 h</div>
       </div>
     </div>
-    <p class="hint">Click or drag on the map to place ignition points, then press <b>Run</b>. The colours underneath are the fuel/vegetation types; the orange overlay is the fire-arrival probability across all realizations.</p>
+    <p class="hint">Real terrain and EU 12-class fuel around <b>Alexandroupolis / Evros</b> (Greece), read from the <code>eu_fuel12</code> / <code>eu_dem</code> COGs. Click or drag on the map to (re)place ignition points, tune the weather, then press <b>Run</b>. The orange overlay is the fire-arrival probability across all realizations.</p>
     <p id="status">Loading WebAssembly core…</p>
   </div>
 
   <div class="panel">
     <h2>Weather</h2>
     <div class="control">
-      <label for="wspeed">Wind speed <span id="wspeed-v">20 km/h</span></label>
-      <input id="wspeed" type="range" min="0" max="60" step="1" value="20" />
+      <label for="wspeed">Wind speed <span id="wspeed-v">30 km/h</span></label>
+      <input id="wspeed" type="range" min="0" max="60" step="1" value="30" />
     </div>
     <div class="control">
-      <label for="wdir">Wind direction <span id="wdir-v">225°</span></label>
-      <input id="wdir" type="range" min="0" max="359" step="1" value="225" />
+      <label for="wdir">Wind direction <span id="wdir-v">30°</span></label>
+      <input id="wdir" type="range" min="0" max="359" step="1" value="30" />
     </div>
     <div class="control">
-      <label for="moist">Fuel moisture <span id="moist-v">10 %</span></label>
-      <input id="moist" type="range" min="1" max="40" step="1" value="10" />
+      <label for="moist">Fuel moisture <span id="moist-v">6 %</span></label>
+      <input id="moist" type="range" min="1" max="40" step="1" value="6" />
     </div>
 
     <h2 style="margin-top:20px">Simulation</h2>
     <div class="control">
-      <label for="reals">Realizations <span id="reals-v">30</span></label>
-      <input id="reals" type="range" min="1" max="100" step="1" value="30" />
+      <label for="reals">Realizations <span id="reals-v">20</span></label>
+      <input id="reals" type="range" min="1" max="100" step="1" value="20" />
     </div>
     <div class="control">
       <label for="ros">Rate-of-spread model</label>
@@ -194,11 +231,12 @@
       </select>
     </div>
     <div class="control">
-      <label style="font-weight:600"><input type="checkbox" id="spotting" /> &nbsp;Enable fire spotting</label>
+      <label style="font-weight:600"><input type="checkbox" id="spotting" checked /> &nbsp;Enable fire spotting</label>
     </div>
 
     <div class="buttons">
-      <button id="run" class="primary" disabled>Run</button>
+      <button id="run" class="primary" disabled>Play</button>
+      <button id="step" disabled>Step</button>
       <button id="reset" disabled>Reset</button>
     </div>
 
@@ -212,111 +250,172 @@
       Fire-arrival probability
       <div class="bar"></div>
       <div class="barlabels"><span>low</span><span>high</span></div>
+      <div id="fuel-key" class="fuel-key"></div>
     </div>
   </div>
 </div>
 
 <script type="module">
-import init, { Propagator } from "./pkg/propagator_wasm.js";
+import init, { Propagator, FuelSystemBuilder } from "./pkg/propagator_wasm.js";
 
-// ---- landscape -----------------------------------------------------------
-const N = 180;              // grid is N x N
-const CELL = 20.0;          // metres per cell
-const STEP_SECONDS = 600;   // sim seconds advanced per animation frame (10 min)
+// Real Alexandroupolis / Evros terrain + EU 12-class fuel, extracted from the
+// eu_fuel12 / eu_dem COGs (see ../demo.md). Dimensions and cell size come from
+// the binary header.
+const DATA_URL = "./alexandroupolis.bin.gz";
+const STEP_SECONDS = 1800;  // sim seconds advanced per step (30 sim-minutes)
+const MAX_HOURS = 48;       // stop the animation after this much sim time
 
-// Fuel palette (legacy fuel codes -> RGB). 0 = no fuel.
+// EU 12-class fuel system (config units: v0 m/h, humidity percent), mirroring
+// example/pedrogao/fuels_eu12.yaml. Kept here in JS and handed to the Rust
+// core through FuelSystemBuilder, so the fuel model lives outside the wasm
+// binary. `p` lists spread probability toward burnable classes 1..=12; the
+// non-vegetated targets (-1, 0) are constant.
+const NOVEG = Array(12).fill(0.005);
+function fuel(id, name, v0, d0, d1, hhv, humidity, spotting, probIgn, burn, p) {
+  return { id, name, v0, d0, d1, hhv, humidity, spotting, probIgn, burn, p };
+}
+const EU12_FUELS = [
+  fuel(-1, "not vegetated", 20, 0.1, 0, 100, null, false, 0, false, NOVEG),
+  fuel(0, "not vegetated", 20, 0.1, 0, 100, null, false, 0, false, NOVEG),
+  fuel(1, "grassland - low", 60, 0.5, 0, 17000, null, false, 0, true,
+    [0.075, 0.475, 0.475, 0.075, 0.25, 0.25, 0.075, 0.375, 0.375, 0.075, 0.35, 0.35]),
+  fuel(2, "grassland - medium", 120, 0.5, 0, 17000, null, false, 0, true,
+    [0.075, 0.475, 0.475, 0.075, 0.25, 0.25, 0.075, 0.35, 0.35, 0.075, 0.25, 0.25]),
+  fuel(3, "grassland - high", 120, 0.5, 0, 17000, null, false, 0, true,
+    [0.075, 0.475, 0.475, 0.075, 0.25, 0.25, 0.075, 0.35, 0.35, 0.075, 0.25, 0.25]),
+  fuel(4, "broadleaves - low", 60, 1.5, 3, 20000, 60, false, 0, true,
+    [0.075, 0.475, 0.475, 0.075, 0.25, 0.25, 0.075, 0.375, 0.375, 0.075, 0.35, 0.35]),
+  fuel(5, "broadleaves - medium", 140, 1.5, 3, 20000, 60, false, 0, true,
+    [0.075, 0.45, 0.45, 0.075, 0.3, 0.3, 0.075, 0.375, 0.375, 0.075, 0.225, 0.225]),
+  fuel(6, "broadleaves - high", 140, 1.5, 3, 20000, 60, false, 0, true,
+    [0.075, 0.45, 0.45, 0.075, 0.3, 0.3, 0.075, 0.375, 0.375, 0.075, 0.225, 0.225]),
+  fuel(7, "shrubs - low", 60, 1, 3, 21000, 45, false, 0, true,
+    [0.075, 0.475, 0.475, 0.075, 0.25, 0.25, 0.075, 0.375, 0.375, 0.075, 0.35, 0.35]),
+  fuel(8, "shrubs - medium", 140, 1, 3, 21000, 45, false, 0, true,
+    [0.1, 0.475, 0.475, 0.1, 0.375, 0.375, 0.1, 0.375, 0.375, 0.1, 0.325, 0.325]),
+  fuel(9, "shrubs - high", 140, 1, 3, 21000, 45, false, 0, true,
+    [0.1, 0.475, 0.475, 0.1, 0.375, 0.375, 0.1, 0.375, 0.375, 0.1, 0.325, 0.325]),
+  fuel(10, "conifers - low", 60, 1, 4, 21000, 55, true, 0.4, true,
+    [0.075, 0.475, 0.475, 0.075, 0.25, 0.25, 0.075, 0.375, 0.375, 0.075, 0.35, 0.35]),
+  fuel(11, "conifers - medium", 200, 1, 4, 21000, 55, true, 0.4, true,
+    [0.275, 0.475, 0.475, 0.275, 0.275, 0.275, 0.275, 0.4, 0.4, 0.275, 0.35, 0.35]),
+  fuel(12, "conifers - high", 200, 1, 4, 21000, 55, true, 0.4, true,
+    [0.275, 0.475, 0.475, 0.275, 0.275, 0.275, 0.275, 0.4, 0.4, 0.275, 0.35, 0.35]),
+];
+
+// Assemble a FuelSystemBuilder from the table above.
+function buildFuelSystem() {
+  const b = new FuelSystemBuilder();
+  for (const f of EU12_FUELS) {
+    const to = [-1, 0];
+    const pr = [0.0, 0.005];
+    for (let i = 0; i < 12; i++) { to.push(i + 1); pr.push(f.p[i]); }
+    b.add_fuel(
+      f.id, f.name, f.v0, f.d0, f.d1, f.hhv,
+      f.humidity === null ? undefined : f.humidity,
+      f.spotting, f.probIgn, f.burn,
+      new Int32Array(to), new Float64Array(pr),
+    );
+  }
+  return b;
+}
+
+// EU 12-class fuel palette (eu_fuel12 colormap from the titiler WMS config).
+// Code 0 (no data / sea) is drawn as a neutral water tone rather than clear.
 const FUEL_COLORS = {
-  0: [70, 72, 78],     // no fuel
-  1: [45, 92, 45],     // broadleaves
-  2: [120, 128, 58],   // shrubs
-  3: [150, 142, 120],  // non-vegetated (barrier)
-  4: [176, 190, 104],  // grassland
-  5: [28, 74, 52],     // conifers
-  6: [150, 170, 80],   // agro-forestry
+  0:  [170, 190, 205], 1: [153, 255, 153], 2: [0, 234, 0],   3: [0, 102, 0],
+  4:  [255, 255, 153], 5: [232, 232, 0],   6: [204, 153, 0], 7: [204, 153, 255],
+  8:  [157, 54, 208],  9: [102, 0, 153],  10: [255, 123, 123], 11: [255, 0, 0],
+  12: [153, 0, 0],
+};
+const FUEL_NAMES = {
+  1: "grassland (low)", 2: "grassland (med)", 3: "grassland (high)",
+  4: "broadleaves (low)", 5: "broadleaves (med)", 6: "broadleaves (high)",
+  7: "shrubs (low)", 8: "shrubs (med)", 9: "shrubs (high)",
+  10: "conifers (low)", 11: "conifers (med)", 12: "conifers (high)",
 };
 
-// Deterministic value-noise landscape so every load looks the same.
-function mulberry32(a) {
-  return function () {
-    a |= 0; a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-function makeNoise(seed, freq) {
-  const rnd = mulberry32(seed);
-  const g = (freq + 1) * (freq + 1);
-  const grid = Array.from({ length: g }, () => rnd());
-  return (x, y) => {
-    const fx = x * freq, fy = y * freq;
-    const x0 = Math.floor(fx), y0 = Math.floor(fy);
-    const tx = fx - x0, ty = fy - y0;
-    const at = (i, j) => grid[(Math.min(j, freq) * (freq + 1)) + Math.min(i, freq)];
-    const s = (t) => t * t * (3 - 2 * t);
-    const a = at(x0, y0), b = at(x0 + 1, y0), c = at(x0, y0 + 1), d = at(x0 + 1, y0 + 1);
-    const u = s(tx), v = s(ty);
-    return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
-  };
+const el = (id) => document.getElementById(id);
+
+// Filled in once the data asset is parsed.
+let N = 0, CELL = 20.0;
+let veg = null;   // Int32Array (wasm wants i32)
+let dem = null;   // Float64Array (wasm wants f64)
+let shade = null; // Float32Array hillshade factor per cell
+let defaultIgnition = null;
+
+let vegCanvas, fireCanvas, vegCtx, fireCtx;
+let ignitions = [];
+let sim = null, running = false, rafId = null;
+
+// ---- data asset ----------------------------------------------------------
+async function loadData() {
+  // The asset is gzip-compressed on disk; inflate it in the browser.
+  const resp = await fetch(DATA_URL);
+  const stream = resp.body.pipeThrough(new DecompressionStream("gzip"));
+  const buf = await new Response(stream).arrayBuffer();
+  const dv = new DataView(buf);
+  const rows = dv.getUint32(0, true);
+  const cols = dv.getUint32(4, true);
+  CELL = dv.getFloat32(8, true);
+  const igR = dv.getInt32(12, true);
+  const igC = dv.getInt32(16, true);
+  N = rows; // grid is square
+  const n = rows * cols;
+
+  const veg8 = new Int8Array(buf, 20, n);
+  const pad = n % 2;                 // int16 dem is 2-byte aligned
+  const demI16 = new Int16Array(buf, 20 + n + pad, n);
+
+  veg = new Int32Array(n);
+  dem = new Float64Array(n);
+  for (let i = 0; i < n; i++) { veg[i] = veg8[i]; dem[i] = demI16[i]; }
+  defaultIgnition = [igR, igC];
+  computeShade();
 }
 
-const veg = new Int32Array(N * N);
-const dem = new Float64Array(N * N);
-function buildLandscape() {
-  const fuelNoise = makeNoise(7, 6);
-  const patchNoise = makeNoise(23, 10);
-  const elevNoise = makeNoise(51, 4);
+// Simple hillshade (light from the NW) so the terrain reads as relief.
+function computeShade() {
+  shade = new Float32Array(N * N);
+  const lx = -0.6, ly = -0.6, lz = 0.9; // light direction
   for (let r = 0; r < N; r++) {
     for (let c = 0; c < N; c++) {
       const i = r * N + c;
-      const nx = c / N, ny = r / N;
-      const f = fuelNoise(nx, ny);
-      let code;
-      if (f < 0.30) code = 4;        // grassland
-      else if (f < 0.52) code = 2;   // shrubs
-      else if (f < 0.72) code = 6;   // agro-forestry
-      else if (f < 0.88) code = 1;   // broadleaves
-      else code = 5;                 // conifers
-      // scattered rocky / bare barriers
-      if (patchNoise(nx, ny) > 0.80) code = 3;
-      veg[i] = code;
-      // gentle ridge climbing toward the NE
-      dem[i] = 200 + 350 * elevNoise(nx, ny) + 120 * (nx + (1 - ny));
+      const l = dem[i - (c > 0 ? 1 : 0)];
+      const rt = dem[i + (c < N - 1 ? 1 : 0)];
+      const up = dem[i - (r > 0 ? N : 0)];
+      const dn = dem[i + (r < N - 1 ? N : 0)];
+      const dzdx = (rt - l) / (2 * CELL);
+      const dzdy = (dn - up) / (2 * CELL);
+      const nl = Math.hypot(dzdx, dzdy, 1);
+      const dot = (-dzdx * lx - dzdy * ly + lz) / nl;
+      shade[i] = 0.78 + 0.42 * Math.max(0, Math.min(1, dot));
     }
   }
 }
-buildLandscape();
 
-// ---- canvases ------------------------------------------------------------
-const vegCanvas = document.getElementById("veg");
-const fireCanvas = document.getElementById("fire");
-vegCanvas.width = fireCanvas.width = N;
-vegCanvas.height = fireCanvas.height = N;
-const vegCtx = vegCanvas.getContext("2d");
-const fireCtx = fireCanvas.getContext("2d");
-
+// ---- rendering -----------------------------------------------------------
 function drawVeg() {
   const img = vegCtx.createImageData(N, N);
   for (let i = 0; i < N * N; i++) {
-    const [rr, gg, bb] = FUEL_COLORS[veg[i]] || FUEL_COLORS[0];
-    img.data[i * 4] = rr;
-    img.data[i * 4 + 1] = gg;
-    img.data[i * 4 + 2] = bb;
+    const rgb = FUEL_COLORS[veg[i]] || FUEL_COLORS[0];
+    const s = shade[i];
+    img.data[i * 4]     = Math.min(255, rgb[0] * s);
+    img.data[i * 4 + 1] = Math.min(255, rgb[1] * s);
+    img.data[i * 4 + 2] = Math.min(255, rgb[2] * s);
     img.data[i * 4 + 3] = 255;
   }
   vegCtx.putImageData(img, 0, 0);
 }
-drawVeg();
 
-// probability -> RGBA (transparent -> yellow -> orange -> deep red)
+// probability -> RGBA (pale orange -> deep red, opacity rising with p)
 function probColor(p) {
   if (p <= 0.001) return [0, 0, 0, 0];
-  // stops
   const stops = [
-    [0.0, [255, 224, 138]],
-    [0.35, [255, 171, 61]],
-    [0.7, [244, 98, 46]],
-    [1.0, [179, 18, 18]],
+    [0.0, [255, 236, 150]],
+    [0.35, [255, 150, 40]],
+    [0.7, [232, 66, 24]],
+    [1.0, [120, 0, 0]],
   ];
   let lo = stops[0], hi = stops[stops.length - 1];
   for (let k = 0; k < stops.length - 1; k++) {
@@ -324,7 +423,7 @@ function probColor(p) {
   }
   const t = (p - lo[0]) / Math.max(1e-6, hi[0] - lo[0]);
   const mix = (a, b) => Math.round(a + (b - a) * t);
-  const a = Math.min(255, 60 + p * 210);
+  const a = Math.min(255, 90 + p * 165);
   return [mix(lo[1][0], hi[1][0]), mix(lo[1][1], hi[1][1]), mix(lo[1][2], hi[1][2]), a];
 }
 
@@ -342,12 +441,28 @@ function drawFire(prob) {
 
 function drawIgnitions() {
   fireCtx.clearRect(0, 0, N, N);
-  fireCtx.fillStyle = "#b31212";
-  for (const [r, c] of ignitions) fireCtx.fillRect(c - 1, r - 1, 3, 3);
+  fireCtx.fillStyle = "#111";
+  fireCtx.strokeStyle = "#fff";
+  fireCtx.lineWidth = 0.5;
+  for (const [r, c] of ignitions) {
+    fireCtx.fillRect(c - 1, r - 1, 3, 3);
+    fireCtx.strokeRect(c - 1.25, r - 1.25, 3.5, 3.5);
+  }
+}
+
+function buildFuelKey() {
+  const key = el("fuel-key");
+  key.innerHTML = "";
+  for (const code of Object.keys(FUEL_NAMES)) {
+    const rgb = FUEL_COLORS[code];
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<span class="sw" style="background:rgb(${rgb.join(",")})"></span>${FUEL_NAMES[code]}`;
+    key.appendChild(row);
+  }
 }
 
 // ---- controls ------------------------------------------------------------
-const el = (id) => document.getElementById(id);
 const bind = (id, fmt) => {
   const input = el(id), out = el(id + "-v");
   const update = () => { if (out) out.textContent = fmt(input.value); };
@@ -359,11 +474,6 @@ bind("wdir", (v) => `${v}°`);
 bind("moist", (v) => `${v} %`);
 bind("reals", (v) => v);
 
-let ignitions = [];       // [[row,col], ...]
-let sim = null;
-let running = false;
-let rafId = null;
-
 function canvasToCell(ev) {
   const rect = fireCanvas.getBoundingClientRect();
   const x = (ev.clientX - rect.left) / rect.width;
@@ -373,98 +483,168 @@ function canvasToCell(ev) {
   return [r, c];
 }
 function addIgnition(ev) {
-  if (running) return;
+  if (sim) return; // ignition set is locked once a run is built
   const [r, c] = canvasToCell(ev);
-  if (veg[r * N + c] === 3 || veg[r * N + c] === 0) return; // don't ignite barriers
+  if (veg[r * N + c] <= 0) return; // don't ignite sea / non-vegetated
   if (!ignitions.some(([ir, ic]) => ir === r && ic === c)) ignitions.push([r, c]);
   el("stat-ign").textContent = ignitions.length;
   drawIgnitions();
 }
 let dragging = false;
-fireCanvas.addEventListener("pointerdown", (e) => { dragging = true; addIgnition(e); });
-fireCanvas.addEventListener("pointermove", (e) => { if (dragging) addIgnition(e); });
-window.addEventListener("pointerup", () => { dragging = false; });
 
 // ---- run loop ------------------------------------------------------------
-function fmtTime(sec) { return (sec / 3600).toFixed(1) + " h"; }
-
-function stopSim() {
-  running = false;
-  if (rafId) cancelAnimationFrame(rafId);
-  rafId = null;
-  el("run").textContent = "Run";
-  el("run").classList.add("primary");
-  setControlsDisabled(false);
+function fmtTime(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return `${h}h ${String(m).padStart(2, "0")}m`;
 }
 
-function setControlsDisabled(d) {
-  for (const id of ["wspeed", "wdir", "moist", "reals", "ros", "spotting", "reset"]) el(id).disabled = d;
+// Lock the construction-time controls (they can't change mid-run); the
+// weather sliders stay live and reset is always available.
+function lockBuildControls(d) {
+  for (const id of ["reals", "ros", "spotting"]) el(id).disabled = d;
 }
 
-function frame() {
-  if (!running) return;
+function readouts() {
+  const t = Number(sim.time);
+  el("clock").textContent = fmtTime(t);
+  el("stat-time").textContent = fmtTime(t);
+  el("stat-area").textContent = Math.round(sim.burned_area_ha()).toLocaleString() + " ha";
+}
+
+// Apply the current weather sliders as a boundary condition at the current
+// sim time, so wind/moisture can be steered live during a run.
+function applyWeather() {
+  if (!sim) return;
+  sim.set_boundary_conditions(
+    BigInt(Number(sim.time)),
+    parseFloat(el("moist").value),
+    parseFloat(el("wdir").value),
+    parseFloat(el("wspeed").value),
+    new Int32Array(0),
+  );
+}
+
+// Build the propagator from the current controls + ignitions (once).
+function ensureSim() {
+  if (sim) return true;
+  if (ignitions.length === 0) {
+    el("status").textContent = "Place at least one ignition point first.";
+    return false;
+  }
+  const reals = parseInt(el("reals").value, 10);
+  sim = new Propagator(
+    N, N, veg, dem, buildFuelSystem(), reals, 42,
+    el("spotting").checked, CELL, el("ros").value, "trucchia",
+  );
+  sim.set_boundary_conditions(
+    0n,
+    parseFloat(el("moist").value),
+    parseFloat(el("wdir").value),
+    parseFloat(el("wspeed").value),
+    new Int32Array(ignitions.flat()),
+  );
+  lockBuildControls(true);
+  return true;
+}
+
+// Advance one window; render + update readouts. Returns false when the run
+// is finished (front exhausted or time cap reached).
+function advanceOne() {
   try {
     sim.step(BigInt(STEP_SECONDS));
   } catch (e) {
     el("status").textContent = "Simulation error: " + e;
-    stopSim();
-    return;
+    return false;
   }
-  const prob = sim.fire_probability();
-  drawFire(prob);
-  const t = Number(sim.time);
-  el("stat-time").textContent = fmtTime(t);
-  el("stat-area").textContent = Math.round(sim.burned_area_ha()) + " ha";
-
-  // stop when the front is exhausted or after 24 sim-hours
-  if (sim.next_time() < 0 || t >= 24 * 3600) { stopSim(); el("status").textContent = "Simulation complete."; return; }
-  rafId = requestAnimationFrame(frame);
+  drawFire(sim.fire_probability());
+  readouts();
+  return sim.next_time() >= 0 && Number(sim.time) < MAX_HOURS * 3600;
 }
 
-function startSim() {
-  if (ignitions.length === 0) { el("status").textContent = "Place at least one ignition point first."; return; }
-  const reals = parseInt(el("reals").value, 10);
-  const ros = el("ros").value;
-  const spotting = el("spotting").checked;
+function frame() {
+  if (!running) return;
+  if (advanceOne()) {
+    rafId = requestAnimationFrame(frame);
+  } else {
+    pause();
+    el("status").textContent = "Simulation complete.";
+  }
+}
 
-  sim = new Propagator(N, N, veg, dem, reals, 42, spotting, CELL, ros, "trucchia");
-
-  const wspeed = parseFloat(el("wspeed").value);
-  const wdir = parseFloat(el("wdir").value);
-  const moist = parseFloat(el("moist").value);
-  const flat = new Int32Array(ignitions.flat());
-  sim.set_boundary_conditions(0n, moist, wdir, wspeed, flat);
-
+function play() {
+  if (!ensureSim()) return;
   running = true;
-  el("run").textContent = "Stop";
+  if (rafId) cancelAnimationFrame(rafId);
+  el("run").textContent = "Pause";
   el("run").classList.remove("primary");
-  setControlsDisabled(true);
+  el("clock").classList.add("live");
   el("status").textContent = "Running…";
   rafId = requestAnimationFrame(frame);
 }
 
-el("run").addEventListener("click", () => {
-  if (running) { stopSim(); el("status").textContent = "Stopped."; }
-  else startSim();
-});
-el("reset").addEventListener("click", () => {
-  stopSim();
+function pause() {
+  running = false;
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = null;
+  el("run").textContent = "Play";
+  el("run").classList.add("primary");
+  el("clock").classList.remove("live");
+}
+
+function togglePlay() {
+  if (running) { pause(); el("status").textContent = "Paused."; }
+  else play();
+}
+
+function stepOnce() {
+  if (running) pause();
+  if (!ensureSim()) return;
+  const more = advanceOne();
+  el("status").textContent = more ? "Paused (stepped)." : "Simulation complete.";
+}
+
+function resetSim() {
+  pause();
   sim = null;
-  ignitions = [];
-  el("stat-ign").textContent = "0";
-  el("stat-time").textContent = "0.0 h";
+  lockBuildControls(false);
+  ignitions = defaultIgnition ? [defaultIgnition.slice()] : [];
+  el("stat-ign").textContent = ignitions.length;
+  el("clock").textContent = fmtTime(0);
+  el("stat-time").textContent = fmtTime(0);
   el("stat-area").textContent = "0 ha";
-  el("status").textContent = "Ready. Place ignition points and press Run.";
+  el("status").textContent = "Ready. Click the map to move the ignition, then press Play or Step.";
+  drawFire(new Float32Array(N * N));
   drawIgnitions();
-});
+}
 
 // ---- boot ----------------------------------------------------------------
-init().then(() => {
+Promise.all([init(), loadData()]).then(() => {
+  vegCanvas = el("veg");
+  fireCanvas = el("fire");
+  vegCanvas.width = fireCanvas.width = N;
+  vegCanvas.height = fireCanvas.height = N;
+  vegCtx = vegCanvas.getContext("2d");
+  fireCtx = fireCanvas.getContext("2d");
+
+  fireCanvas.addEventListener("pointerdown", (e) => { dragging = true; addIgnition(e); });
+  fireCanvas.addEventListener("pointermove", (e) => { if (dragging) addIgnition(e); });
+  window.addEventListener("pointerup", () => { dragging = false; });
+  el("run").addEventListener("click", togglePlay);
+  el("step").addEventListener("click", stepOnce);
+  el("reset").addEventListener("click", resetSim);
+  for (const id of ["wspeed", "wdir", "moist"]) {
+    el(id).addEventListener("input", applyWeather);
+  }
+
+  drawVeg();
+  buildFuelKey();
   el("run").disabled = false;
+  el("step").disabled = false;
   el("reset").disabled = false;
-  el("status").textContent = "Ready. Place ignition points and press Run.";
+  resetSim();
 }).catch((e) => {
-  el("status").textContent = "Failed to load WebAssembly core: " + e;
+  el("status").textContent = "Failed to load demo: " + e;
 });
 </script>
 </body>

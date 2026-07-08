@@ -15,14 +15,72 @@
 //! shape, exactly as `Grid2` stores them internally.
 
 use propagator_core::{
-    legacy_fuel_system, BoundaryConditions, FieldInput, Grid2, Ignitions, MoistureModel, OobMode,
-    Propagator as CorePropagator, PropagatorConfig, PropagatorError, RosModel,
+    BoundaryConditions, FieldInput, FuelDef, FuelSystem, Grid2, Ignitions, MoistureModel,
+    OobMode, Propagator as CorePropagator, PropagatorConfig, PropagatorError, RosModel,
 };
 use wasm_bindgen::prelude::*;
 
 /// Map a core error to a JS `Error`-friendly string value.
 fn to_js(err: PropagatorError) -> JsValue {
     JsValue::from_str(&err.to_string())
+}
+
+/// Accumulates fuel definitions supplied from JavaScript into a
+/// [`FuelSystem`]. The demo builds this from the EU 12-class table defined in
+/// `app.html`, keeping the fuel model out of the wasm binary.
+#[wasm_bindgen]
+#[derive(Default)]
+pub struct FuelSystemBuilder {
+    defs: Vec<FuelDef>,
+}
+
+#[wasm_bindgen]
+impl FuelSystemBuilder {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> FuelSystemBuilder {
+        FuelSystemBuilder::default()
+    }
+
+    /// Append one fuel. Units match the config dictionaries (`v0` m/h,
+    /// `humidity` percent, or `undefined` for a fuel with no live load).
+    /// `spread_to`/`spread_prob` are parallel arrays giving the base spread
+    /// probability toward each target fuel id.
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_fuel(
+        &mut self,
+        id: i32,
+        name: String,
+        v0: f64,
+        d0: f64,
+        d1: f64,
+        hhv: f64,
+        humidity: Option<f64>,
+        spotting: bool,
+        prob_ign_by_embers: f64,
+        burn: bool,
+        spread_to: Vec<i32>,
+        spread_prob: Vec<f64>,
+    ) -> Result<(), JsValue> {
+        if spread_to.len() != spread_prob.len() {
+            return Err(JsValue::from_str(
+                "spread_to and spread_prob must have the same length",
+            ));
+        }
+        self.defs.push(FuelDef {
+            id,
+            name,
+            v0,
+            d0,
+            d1,
+            hhv,
+            humidity,
+            spotting,
+            prob_ign_by_embers,
+            burn,
+            spread_probability: spread_to.into_iter().zip(spread_prob).collect(),
+        });
+        Ok(())
+    }
 }
 
 fn ros_from_str(s: &str) -> Result<RosModel, JsValue> {
@@ -58,10 +116,11 @@ pub struct Propagator {
 impl Propagator {
     /// Build a propagator over a `rows x cols` domain.
     ///
-    /// `veg` (fuel codes, matching the legacy fuel table) and `dem`
-    /// (elevation, metres) are row-major and must both hold `rows * cols`
-    /// entries. Fires reaching the boundary are ignored rather than raised,
-    /// which keeps the demo running when the flame front hits an edge.
+    /// `veg` (fuel codes matching `fuels`) and `dem` (elevation, metres) are
+    /// row-major and must both hold `rows * cols` entries. `fuels` is the
+    /// fuel model assembled from JavaScript. Fires reaching the boundary are
+    /// ignored rather than raised, which keeps the demo running when the
+    /// flame front hits an edge.
     #[wasm_bindgen(constructor)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -69,6 +128,7 @@ impl Propagator {
         cols: usize,
         veg: Vec<i32>,
         dem: Vec<f64>,
+        fuels: &FuelSystemBuilder,
         realizations: usize,
         seed: u32,
         do_spotting: bool,
@@ -103,7 +163,7 @@ impl Propagator {
         // Ignore boundary hits and stay off the threaded/entropy/fs paths.
         config.oob_mode = OobMode::Ignore;
         config.n_threads = Some(1);
-        config.fuels = Some(legacy_fuel_system());
+        config.fuels = Some(FuelSystem::from_defs(&fuels.defs).map_err(to_js)?);
 
         let inner = CorePropagator::new(config).map_err(to_js)?;
         Ok(Propagator { inner, rows, cols })
