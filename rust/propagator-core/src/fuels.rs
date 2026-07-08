@@ -55,6 +55,11 @@ pub struct FuelSystem {
 }
 
 impl FuelSystem {
+    /// Build the dense table from per-fuel definitions, applying the
+    /// config->internal unit conversions (v0 m/h -> m/min, humidity percent
+    /// -> fraction). Errors on duplicate ids, spread-probability references
+    /// to unknown ids, or a live fuel load (`d1 != 0`) without a humidity.
+    /// The last non-burnable fuel becomes the unknown-code fallback.
     pub fn from_defs(defs: &[FuelDef]) -> Result<FuelSystem> {
         let n = defs.len();
         let mut system = FuelSystem {
@@ -120,18 +125,22 @@ impl FuelSystem {
         Ok(system)
     }
 
+    /// Number of fuels in the table.
     pub fn n_fuels(&self) -> usize {
         self.v0.len()
     }
 
+    /// Human-readable name of the fuel at a dense index.
     pub fn name(&self, index: usize) -> &str {
         &self.names[index]
     }
 
+    /// Id of the non-vegetated fallback fuel, if one is defined.
     pub fn non_vegetated(&self) -> Option<i32> {
         self.non_vegetated
     }
 
+    /// Base spread probability from one fuel to another (both dense indices).
     #[inline]
     pub fn transition_probability(&self, from_index: usize, to_index: usize) -> f64 {
         self.spread_probability[from_index * self.v0.len() + to_index]

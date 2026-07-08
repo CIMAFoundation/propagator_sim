@@ -32,10 +32,14 @@ const NEIGHBOURS: [(i64, i64); N_NEIGHBOURS] = [
 ];
 
 // spotting model constants (Alexandridis et al.)
+/// baseline per-ember ignition probability (before the fuel embers bonus)
 const P_C0: f64 = 0.6;
+/// Poisson mean number of embers emitted by a burning spotting cell
 const LAMBDA_SPOTTING: f64 = 2.0;
+/// mean/std of the normal "thrust" that sets each ember's flight distance
 const SPOTTING_RN_MEAN: f64 = 100.0;
 const SPOTTING_RN_STD: f64 = 25.0;
+/// hard cap on embers per cell, bounding worst-case work per ignition
 pub const MAX_SPOTTING_EMBERS: u32 = 32;
 
 /// Distance (in cell units) and angle (meteorological convention: 0 =

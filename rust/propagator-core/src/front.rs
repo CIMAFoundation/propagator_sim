@@ -3,36 +3,53 @@
 //! implementation, but growing independently per realization — no
 //! suspension protocol needed).
 
+/// A binary min-heap of pending ignition events for one realization.
+///
+/// The heap is stored as five parallel vectors (struct-of-arrays) that are
+/// permuted together, so index `i` across all five describes one event.
+/// Ordering is by `times` alone; `rows`/`cols`/`ros`/`fli` are payload that
+/// rides along with its key. The classic implicit-tree layout is used:
+/// element `i`'s children are `2i + 1` and `2i + 2`, its parent `(i - 1) / 2`.
 #[derive(Clone, Default)]
 pub struct FrontHeap {
+    /// event times (seconds from simulation start); the heap key
     pub times: Vec<i64>,
+    /// target cell rows (local grid coordinates)
     pub rows: Vec<i32>,
+    /// target cell columns (local grid coordinates)
     pub cols: Vec<i32>,
+    /// rate of spread carried into the target cell, m/min
     pub ros: Vec<f32>,
+    /// fireline intensity carried into the target cell, kW/m
     pub fli: Vec<f32>,
 }
 
 impl FrontHeap {
+    /// An empty heap.
     pub fn new() -> FrontHeap {
         FrontHeap::default()
     }
 
+    /// Number of pending events.
     #[inline]
     #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.times.len()
     }
 
+    /// `true` when no events remain (the realization's front is exhausted).
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.times.is_empty()
     }
 
+    /// Time of the earliest pending event without removing it.
     #[inline]
     pub fn peek_time(&self) -> Option<i64> {
         self.times.first().copied()
     }
 
+    /// Target cell of the earliest pending event without removing it.
     #[inline]
     pub fn peek_cell(&self) -> Option<(i32, i32)> {
         if self.is_empty() {
@@ -42,6 +59,7 @@ impl FrontHeap {
         }
     }
 
+    /// Swap two events across all parallel arrays (keeps rows aligned).
     #[inline]
     fn swap(&mut self, i: usize, j: usize) {
         self.times.swap(i, j);
@@ -51,6 +69,11 @@ impl FrontHeap {
         self.fli.swap(i, j);
     }
 
+    /// Schedule an ignition event, keeping the heap invariant.
+    ///
+    /// The event is appended to the end (the next open leaf) and then
+    /// sifted up — repeatedly swapped with its parent while it is earlier —
+    /// until every parent precedes its children again. O(log n).
     pub fn push(&mut self, time: i64, row: i32, col: i32, ros: f32, fli: f32) {
         self.times.push(time);
         self.rows.push(row);
@@ -68,6 +91,12 @@ impl FrontHeap {
         }
     }
 
+    /// Remove and return the earliest `(time, row, col, ros, fli)` event.
+    ///
+    /// The root (minimum) is swapped with the last leaf and popped, then the
+    /// leaf now at the root is sifted down — repeatedly swapped with its
+    /// smaller child while it is later than that child — restoring the heap.
+    /// O(log n). Returns `None` on an empty heap.
     pub fn pop_min(&mut self) -> Option<(i64, i32, i32, f32, f32)> {
         if self.is_empty() {
             return None;

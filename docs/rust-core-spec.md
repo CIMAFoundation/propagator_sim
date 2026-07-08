@@ -640,6 +640,38 @@ violations (containment, TILE_SIZE alignment), freeze without
   `benchmarks/`); the Rust port should target ≥ parity single-threaded
   and better scaling.
 
+### 11.1 Python adapter benchmark
+
+Use `benchmarks/compare_cores.py` to compare the Python/numba core and
+the Rust core through the same Python-facing interface:
+
+```bash
+uv run python benchmarks/compare_cores.py --core numba --grid 1000 --realizations 100 --hours 12
+uv run python benchmarks/compare_cores.py --core rust --grid 1000 --realizations 100 --hours 12
+```
+
+The benchmark uses a homogeneous grassland grid, point ignition at the
+centre, wind 30 km/h from 90°, moisture 0%, spotting disabled, and a
+fixed seed. It runs each core in a separate process, reports RSS from
+that process, and excludes warmup from the timed loop. For numba this
+means one `sim.step(seconds=1)` is executed before `timed_seconds`
+starts, so JIT compilation is not counted in runtime. Warmup duration is
+reported separately.
+
+Local measurements on the development machine:
+
+| Mode | Core | Timed loop | Peak RSS | Output fold |
+|---|---:|---:|---:|---:|
+| default threads | numba | 5.846 s | 618.8 MB | 0.534 s |
+| default threads | Rust | 0.205 s | 465.3 MB | 0.027 s |
+| single thread | numba | 2.154 s | 625.5 MB | 0.498 s |
+| single thread | Rust | 1.485 s | 458.0 MB | 0.026 s |
+
+In this scenario the Rust core reduced peak RSS by about 150-170 MB
+and was about 1.45× faster in the controlled single-thread run. The
+larger default-thread speedup also includes thread-pool configuration
+differences between numba/OpenMP and the Rust core.
+
 ## 12. Invariants (checklist for tests)
 
 1. A cell burns at most once per realization (lazy heap deletion).

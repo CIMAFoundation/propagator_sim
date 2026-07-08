@@ -7,25 +7,37 @@ use crate::error::{PropagatorError, Result};
 use crate::fuels::NO_FUEL;
 use crate::grid::Grid2;
 
-/// Batch of ignition updates (parallel arrays).
+/// Batch of ignition updates to inject into realizations' front heaps.
+///
+/// Struct-of-arrays (parallel vectors): index `i` is one ignition of cell
+/// `(rows[i], cols[i])` in realization `realizations[i]`, seeding its heap
+/// with the given rate of spread and fireline intensity.
 #[derive(Clone, Debug, Default)]
 pub struct UpdateBatch {
+    /// ignition cell rows (local grid coordinates)
     pub rows: Vec<i32>,
+    /// ignition cell columns (local grid coordinates)
     pub cols: Vec<i32>,
+    /// which realization each ignition targets
     pub realizations: Vec<u32>,
+    /// seed rate of spread, m/min (0 for a plain ignition)
     pub ros: Vec<f32>,
+    /// seed fireline intensity, kW/m (0 for a plain ignition)
     pub fli: Vec<f32>,
 }
 
 impl UpdateBatch {
+    /// Number of queued ignitions.
     pub fn len(&self) -> usize {
         self.rows.len()
     }
 
+    /// `true` when no ignitions are queued.
     pub fn is_empty(&self) -> bool {
         self.rows.is_empty()
     }
 
+    /// Append one ignition.
     pub fn push(&mut self, row: i32, col: i32, realization: u32, ros: f32, fli: f32) {
         self.rows.push(row);
         self.cols.push(col);
@@ -34,6 +46,7 @@ impl UpdateBatch {
         self.fli.push(fli);
     }
 
+    /// Append every ignition of `other`.
     pub fn extend(&mut self, other: &UpdateBatch) {
         self.rows.extend_from_slice(&other.rows);
         self.cols.extend_from_slice(&other.cols);
@@ -102,17 +115,23 @@ impl SchedulerEvent {
     }
 }
 
-/// Time-ordered event queue.
+/// Time-ordered event queue, keyed by event time.
+///
+/// Backed by a `BTreeMap` so the earliest event is always `O(log n)` to find
+/// and pop. Events scheduled at the same time are merged (see
+/// [`SchedulerEvent::merge`]) rather than kept separate.
 #[derive(Clone, Debug, Default)]
 pub struct Scheduler {
     queue: BTreeMap<i64, SchedulerEvent>,
 }
 
 impl Scheduler {
+    /// An empty queue.
     pub fn new() -> Scheduler {
         Scheduler::default()
     }
 
+    /// Enqueue `event` at `time`, merging into any event already there.
     pub fn add_event(&mut self, time: i64, event: SchedulerEvent) {
         match self.queue.get_mut(&time) {
             Some(existing) => existing.merge(event),
@@ -122,32 +141,40 @@ impl Scheduler {
         }
     }
 
+    /// Time of the earliest queued event, or `None` when empty.
     pub fn next_time(&self) -> Option<i64> {
         self.queue.keys().next().copied()
     }
 
+    /// Remove and return the earliest `(time, event)`.
     pub fn pop(&mut self) -> Option<(i64, SchedulerEvent)> {
         let time = self.next_time()?;
         let event = self.queue.remove(&time)?;
         Some((time, event))
     }
 
+    /// Number of distinct event times queued.
     pub fn len(&self) -> usize {
         self.queue.len()
     }
 
+    /// `true` when nothing is queued.
     pub fn is_empty(&self) -> bool {
         self.queue.is_empty()
     }
 
+    /// Iterate queued `(time, event)` pairs in time order.
     pub fn events(&self) -> impl Iterator<Item = (&i64, &SchedulerEvent)> {
         self.queue.iter()
     }
 
+    /// Mutably iterate queued events in time order (used to re-anchor them
+    /// after domain growth).
     pub fn events_mut(&mut self) -> impl Iterator<Item = (&i64, &mut SchedulerEvent)> {
         self.queue.iter_mut()
     }
 
+    /// Deep-copy the whole queue as `(time, event)` pairs (for checkpoints).
     pub fn snapshot(&self) -> Vec<(i64, SchedulerEvent)> {
         self.queue
             .iter()

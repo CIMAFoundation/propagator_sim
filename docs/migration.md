@@ -104,3 +104,10 @@ these.
   realizations).
 - Kernel event throughput is at or above the 0.1.x baseline
   (~800–860k events/s vs 788–829k in the benchmark scenario).
+- The Rust core can be compared against the numba core with
+  `benchmarks/compare_cores.py`. On the local development machine, a
+  1000×1000 grid with 100 realizations over 12 simulated hours used
+  ~459 MB peak RSS for Rust vs ~626 MB for numba in single-thread mode,
+  with timed loop runtimes of 1.485 s vs 2.154 s. The benchmark excludes
+  numba JIT warmup from the timed loop by running a one-second warmup
+  step first; warmup is reported separately.

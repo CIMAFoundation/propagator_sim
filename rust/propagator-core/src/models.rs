@@ -4,51 +4,61 @@
 //! Formula-for-formula port of `core/numba/functions.py` (see the spec
 //! §5); all functions are pure and kernel-safe.
 
-// wind/slope effect constants
+// Empirical wind/slope effect constants of the `Standard` model (`w_h_effect`).
 const D1: f64 = 0.5;
 const D2: f64 = 1.4;
 const D3: f64 = 8.2;
 const D4: f64 = 2.0;
 const D5: f64 = 50.0;
 
-// Rothermel parameters
+// Rothermel ROS slope/wind exponents.
 const ROTHERMEL_ALPHA1: f64 = 0.0693;
 const ROTHERMEL_ALPHA2: f64 = 0.0576;
 
-// Wang parameters
+// Wang ROS wind/slope factor coefficients.
 const WANG_BETA1: f64 = 0.1783;
 const WANG_BETA2: f64 = 3.533;
 const WANG_BETA3: f64 = 1.2;
 
-// Moisture probability polynomial (baghino)
+// Cubic moisture-probability polynomial coefficients (Baghino model).
 const M1: f64 = -3.5995;
 const M2: f64 = 5.2389;
 const M3: f64 = -2.6355;
 const M4: f64 = 1.019;
 
-// ROS moisture effect
+// Exponential decay rate of ROS with fuel moisture (`exp(C_MOIST * moist)`).
 const C_MOIST: f64 = -0.014;
 
-// latent heat term for fireline intensity
+// Latent heat of vaporization term (kJ/kg) subtracted per unit fuel moisture
+// when computing the lower heating value.
 const Q: f64 = 2442.0;
 
+/// Fuel moisture (fraction) at which spread ceases; also normalizes the
+/// Trucchia moisture polynomial.
 pub const MOISTURE_OF_EXTINCTION: f64 = 0.3;
 
 /// Fire-spotting distance coefficient (Alexandridis).
 pub const FIRE_SPOTTING_DISTANCE_COEFFICIENT: f64 = 0.191;
 
+/// Rate-of-spread model selecting how wind and slope scale the base ROS.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum RosModel {
+    /// Wang (default): exponential wind and slope factors.
     #[default]
     Wang,
+    /// Rothermel: exponential slope and wind factors in degrees.
     Rothermel,
+    /// Standard: the combined `w_h_effect` wind+slope scaling.
     Standard,
 }
 
+/// Model relating fuel moisture to the spread-probability correction.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum MoistureModel {
+    /// Trucchia (default): quintic polynomial normalized by extinction.
     #[default]
     Trucchia,
+    /// Baghino: cubic polynomial in the moisture fraction.
     Baghino,
 }
 

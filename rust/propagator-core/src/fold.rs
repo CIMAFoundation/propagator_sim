@@ -7,20 +7,35 @@ use crate::tiles::{
 };
 
 /// Per-cell aggregates across realizations (see spec §3.4).
+///
+/// Every grid is `rows x cols`. Counts and sums are reduced across all
+/// realizations; dividing a `*_sum` by `count` yields the mean over the
+/// realizations that burned the cell. `arrival_min` starts at `i32::MAX` so
+/// the min reduction is well-defined for never-burnt cells.
 #[derive(Clone)]
 pub struct StateFold {
+    /// number of realizations in which the cell burned
     pub count: Grid2<i32>,
+    /// number of realizations in which the cell emitted embers (spotting)
     pub spot_gen_count: Grid2<i32>,
+    /// number of realizations in which the cell was ignited by embers
     pub spot_recv_count: Grid2<i32>,
+    /// earliest arrival time across realizations (`i32::MAX` if never burnt)
     pub arrival_min: Grid2<i32>,
+    /// sum of arrival times over burning realizations
     pub arrival_sum: Grid2<f64>,
+    /// sum of rate of spread over burning realizations
     pub ros_sum: Grid2<f64>,
+    /// maximum rate of spread across realizations
     pub ros_max: Grid2<f32>,
+    /// sum of fireline intensity over burning realizations
     pub fli_sum: Grid2<f64>,
+    /// maximum fireline intensity across realizations
     pub fli_max: Grid2<f32>,
 }
 
 impl StateFold {
+    /// A zeroed fold (with `arrival_min` seeded to `i32::MAX`).
     pub fn empty(rows: usize, cols: usize) -> StateFold {
         StateFold {
             count: Grid2::filled(rows, cols, 0),

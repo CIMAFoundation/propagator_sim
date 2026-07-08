@@ -2,6 +2,8 @@
 
 use std::ops::{Index, IndexMut};
 
+/// A dense, row-major `rows x cols` 2D array. Element `(row, col)` lives at
+/// flat index `row * cols + col`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Grid2<T> {
     rows: usize,
@@ -10,6 +12,7 @@ pub struct Grid2<T> {
 }
 
 impl<T: Clone> Grid2<T> {
+    /// A `rows x cols` grid with every cell set to `value`.
     pub fn filled(rows: usize, cols: usize, value: T) -> Self {
         Grid2 {
             rows,
@@ -18,6 +21,7 @@ impl<T: Clone> Grid2<T> {
         }
     }
 
+    /// Wrap a row-major `data` vector; panics if `data.len() != rows * cols`.
     pub fn from_vec(rows: usize, cols: usize, data: Vec<T>) -> Self {
         assert_eq!(data.len(), rows * cols, "grid data length mismatch");
         Grid2 { rows, cols, data }
@@ -86,30 +90,37 @@ impl<T: Clone> Grid2<T> {
 }
 
 impl<T> Grid2<T> {
+    /// Number of rows.
     #[inline]
     pub fn rows(&self) -> usize {
         self.rows
     }
 
+    /// Number of columns.
     #[inline]
     pub fn cols(&self) -> usize {
         self.cols
     }
 
+    /// `(rows, cols)`.
     #[inline]
     pub fn shape(&self) -> (usize, usize) {
         (self.rows, self.cols)
     }
 
+    /// `true` if `(row, col)` lies inside the grid (signed inputs so callers
+    /// can test neighbour offsets that may go negative).
     #[inline]
     pub fn in_bounds(&self, row: i64, col: i64) -> bool {
         row >= 0 && col >= 0 && (row as usize) < self.rows && (col as usize) < self.cols
     }
 
+    /// The backing row-major data.
     pub fn as_slice(&self) -> &[T] {
         &self.data
     }
 
+    /// The backing row-major data, mutably.
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         &mut self.data
     }

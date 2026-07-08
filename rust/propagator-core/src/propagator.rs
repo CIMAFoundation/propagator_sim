@@ -66,6 +66,8 @@ pub struct PropagatorConfig {
 }
 
 impl PropagatorConfig {
+    /// Config with default everything but the mandatory `veg`/`dem` grids
+    /// (which must share a shape). Mutate the public fields to customize.
     pub fn new(veg: Grid2<i32>, dem: Grid2<f64>) -> PropagatorConfig {
         PropagatorConfig {
             veg,
@@ -117,6 +119,11 @@ pub struct Propagator {
 }
 
 impl Propagator {
+    /// Build a propagator from a config: validate the grids, resolve the
+    /// fuel system (legacy table when unset; spotting stripped when
+    /// disabled), pre-map vegetation codes to dense fuel indices, seed one
+    /// RNG per realization, and open the freeze store if a `freeze_dir` was
+    /// given. Time starts at 0 with no weather set.
     pub fn new(config: PropagatorConfig) -> Result<Propagator> {
         if config.veg.shape() != config.dem.shape() {
             return Err(PropagatorError::InvalidBoundaryConditions(
@@ -176,22 +183,27 @@ impl Propagator {
 
     // --- accessors ------------------------------------------------------
 
+    /// Current simulation time, seconds from start.
     pub fn time(&self) -> i64 {
         self.time
     }
 
+    /// Number of stochastic realizations.
     pub fn realizations(&self) -> usize {
         self.n_realizations
     }
 
+    /// Current grid shape `(rows, cols)`.
     pub fn shape(&self) -> (usize, usize) {
         self.veg.shape()
     }
 
+    /// World (row, col) of local cell (0, 0); shifts as the domain grows.
     pub fn origin(&self) -> (i64, i64) {
         self.origin
     }
 
+    /// Current vegetation-code grid (reflects any applied changes).
     pub fn veg(&self) -> &Grid2<i32> {
         &self.veg
     }

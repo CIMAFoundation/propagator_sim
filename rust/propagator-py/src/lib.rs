@@ -28,32 +28,42 @@ create_exception!(
 
 // ---------------------------------------------------------------------------
 // conversions
+//
+// numpy <-> Grid2 marshalling. Inbound arrays are copied element-wise into a
+// row-major Grid2 (the caller guarantees C-contiguity via the Python
+// adapter); outbound grids are copied into a fresh numpy array owned by
+// Python. Scalar physics inputs pass through as f64.
 // ---------------------------------------------------------------------------
 
+/// Copy a 2-D int32 numpy array into a `Grid2<i32>`.
 fn grid_i32(a: PyReadonlyArray2<i32>) -> Grid2<i32> {
     let view = a.as_array();
     let (r, c) = (view.nrows(), view.ncols());
     Grid2::from_vec(r, c, view.iter().copied().collect())
 }
 
+/// Copy a 2-D float64 numpy array into a `Grid2<f64>`.
 fn grid_f64(a: PyReadonlyArray2<f64>) -> Grid2<f64> {
     let view = a.as_array();
     let (r, c) = (view.nrows(), view.ncols());
     Grid2::from_vec(r, c, view.iter().copied().collect())
 }
 
+/// Copy a 2-D float32 numpy array into a `Grid2<f32>`.
 fn grid_f32(a: PyReadonlyArray2<f32>) -> Grid2<f32> {
     let view = a.as_array();
     let (r, c) = (view.nrows(), view.ncols());
     Grid2::from_vec(r, c, view.iter().copied().collect())
 }
 
+/// Copy a 2-D bool numpy array into a `Grid2<bool>`.
 fn grid_bool(a: PyReadonlyArray2<bool>) -> Grid2<bool> {
     let view = a.as_array();
     let (r, c) = (view.nrows(), view.ncols());
     Grid2::from_vec(r, c, view.iter().copied().collect())
 }
 
+/// Copy a `Grid2<f32>` into a fresh Python-owned float32 array.
 fn f32_grid_to_py<'py>(py: Python<'py>, g: &Grid2<f32>) -> Bound<'py, PyArray2<f32>> {
     let (r, c) = g.shape();
     Array2::from_shape_vec((r, c), g.as_slice().to_vec())
@@ -61,6 +71,7 @@ fn f32_grid_to_py<'py>(py: Python<'py>, g: &Grid2<f32>) -> Bound<'py, PyArray2<f
         .into_pyarray(py)
 }
 
+/// Copy a `Grid2<i32>` into a fresh Python-owned int32 array.
 fn i32_grid_to_py<'py>(py: Python<'py>, g: &Grid2<i32>) -> Bound<'py, PyArray2<i32>> {
     let (r, c) = g.shape();
     Array2::from_shape_vec((r, c), g.as_slice().to_vec())
@@ -68,6 +79,9 @@ fn i32_grid_to_py<'py>(py: Python<'py>, g: &Grid2<i32>) -> Bound<'py, PyArray2<i
         .into_pyarray(py)
 }
 
+/// Map a core error to a Python exception: `OutOfBounds` becomes the
+/// dedicated `PropagatorOutOfBoundsError` (which the CLI catches to grow the
+/// domain); everything else becomes a `ValueError`.
 fn err(e: PropagatorError) -> PyErr {
     match e {
         PropagatorError::OutOfBounds => PropagatorOutOfBoundsError::new_err(e.to_string()),
@@ -224,6 +238,8 @@ fn parse_fuels(fuels: &Bound<'_, PyDict>) -> PyResult<FuelSystem> {
 // Propagator
 // ---------------------------------------------------------------------------
 
+/// Python-facing wrapper around the core [`CorePropagator`]. Every method
+/// marshals numpy <-> `Grid2` and maps core errors through [`err`].
 #[pyclass]
 struct Propagator {
     inner: CorePropagator,
@@ -231,6 +247,12 @@ struct Propagator {
 
 #[pymethods]
 impl Propagator {
+    /// Construct a propagator. `dem`/`veg` are the (identically shaped)
+    /// terrain and vegetation rasters; the remaining keyword arguments mirror
+    /// [`PropagatorConfig`]. `fuels`, when given, is a `{id: {...}}` mapping
+    /// in config units (see [`parse_fuels`]); otherwise the legacy table is
+    /// used. String enums (`out_of_bounds_mode`, `ros_model`, `moisture_model`)
+    /// are parsed case-insensitively.
     #[new]
     #[pyo3(signature = (
         dem,
@@ -291,31 +313,37 @@ impl Propagator {
         Ok(Propagator { inner })
     }
 
+    /// Current simulation time, seconds from start.
     #[getter]
     fn time(&self) -> i64 {
         self.inner.time()
     }
 
+    /// World (row, col) of local cell (0, 0).
     #[getter]
     fn origin(&self) -> (i64, i64) {
         self.inner.origin()
     }
 
+    /// Number of stochastic realizations.
     #[getter]
     fn realizations(&self) -> usize {
         self.inner.realizations()
     }
 
+    /// Current grid shape `(rows, cols)`.
     #[getter]
     fn shape(&self) -> (usize, usize) {
         self.inner.shape()
     }
 
+    /// Current vegetation-code grid as a numpy array.
     #[getter]
     fn veg<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<i32>> {
         i32_grid_to_py(py, self.inner.veg())
     }
 
+    /// Next event time (scheduler or front), or `None` when idle.
     fn next_time(&self) -> Option<i64> {
         self.inner.next_time()
     }
@@ -336,6 +364,10 @@ impl Propagator {
         additional_moisture = None,
         vegetation_changes = None,
     ))]
+    /// Enqueue boundary conditions at `time` (external units: percent
+    /// moisture, degrees wind direction, km/h wind speed). Weather fields
+    /// accept a scalar or a 2-D float32 raster; `ignitions` accepts point
+    /// tuples or a boolean mask.
     #[allow(clippy::too_many_arguments)]
     fn set_boundary_conditions(
         &mut self,
@@ -359,11 +391,17 @@ impl Propagator {
         self.inner.set_boundary_conditions(bc).map_err(err)
     }
 
+    /// Propagate for `seconds` of simulation time, applying scheduled events
+    /// on the way. Raises `PropagatorOutOfBoundsError` if the fire reaches the
+    /// boundary in `out_of_bounds_mode='raise'`.
     #[pyo3(signature = (seconds))]
     fn step(&mut self, seconds: i64) -> PyResult<()> {
         self.inner.step_window(seconds).map_err(err)
     }
 
+    /// Grow the domain in place onto the larger `veg`/`dem` at `origin`,
+    /// preserving all state. The new grid must contain the old one and
+    /// north/west growth must be a multiple of the tile size.
     fn expand(
         &mut self,
         veg: PyReadonlyArray2<i32>,
@@ -375,6 +413,8 @@ impl Propagator {
             .map_err(err)
     }
 
+    /// Freeze burned-out tiles to disk, releasing their memory; returns the
+    /// number frozen. Requires a `freeze_dir`.
     fn freeze_inactive_tiles(&mut self) -> PyResult<usize> {
         self.inner.freeze_inactive_tiles().map_err(err)
     }
@@ -421,6 +461,8 @@ impl Propagator {
     }
 }
 
+/// Module init: register the `Propagator` class and the
+/// `PropagatorOutOfBoundsError` exception on the `propagator_rust` module.
 #[pymodule]
 fn propagator_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Propagator>()?;

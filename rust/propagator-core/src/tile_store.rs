@@ -28,6 +28,8 @@ const ROS_BYTES: usize = TILE_CELLS * 4;
 const FLI_BYTES: usize = TILE_CELLS * 4;
 pub const RECORD_SIZE: usize = FLAGS_BYTES + ARRIVAL_BYTES + ROS_BYTES + FLI_BYTES;
 
+/// Serialize a tile to a fixed-size little-endian record: the flags byte
+/// array followed by the arrival, ros, and fli arrays (see [`RECORD_SIZE`]).
 pub fn tile_to_record(tile: &Tile) -> Vec<u8> {
     let mut buffer = Vec::with_capacity(RECORD_SIZE);
     buffer.extend_from_slice(&tile.flags);
@@ -43,6 +45,7 @@ pub fn tile_to_record(tile: &Tile) -> Vec<u8> {
     buffer
 }
 
+/// Inverse of [`tile_to_record`]; panics if `buffer` is not `RECORD_SIZE`.
 pub fn record_to_tile(buffer: &[u8]) -> Box<Tile> {
     assert_eq!(buffer.len(), RECORD_SIZE, "invalid tile record size");
     let mut tile = Tile::zeroed();
@@ -77,6 +80,8 @@ pub struct TileStore {
 }
 
 impl TileStore {
+    /// Create (truncating any existing file) `frozen_tiles.bin` under
+    /// `directory`, making the directory tree if needed.
     pub fn open(directory: impl AsRef<Path>) -> Result<TileStore> {
         let directory = directory.as_ref();
         std::fs::create_dir_all(directory)?;
@@ -97,22 +102,27 @@ impl TileStore {
         })
     }
 
+    /// Number of tiles currently frozen.
     pub fn len(&self) -> usize {
         self.inner.lock().unwrap().index.len()
     }
 
+    /// `true` when no tiles are frozen.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Whether `key` is currently frozen.
     pub fn contains(&self, key: &TileKey) -> bool {
         self.inner.lock().unwrap().index.contains_key(key)
     }
 
+    /// All currently frozen keys.
     pub fn keys(&self) -> Vec<TileKey> {
         self.inner.lock().unwrap().index.keys().copied().collect()
     }
 
+    /// Currently frozen keys belonging to one realization.
     pub fn keys_for_realization(&self, realization: u32) -> Vec<TileKey> {
         self.inner
             .lock()
@@ -124,6 +134,9 @@ impl TileStore {
             .collect()
     }
 
+    /// Append `payload` at the end of the file and point `key` at its
+    /// offset. Never overwrites existing records, so offsets a checkpoint
+    /// captured earlier stay valid.
     fn append_locked(inner: &mut StoreInner, key: TileKey, payload: &[u8]) -> Result<()> {
         debug_assert_eq!(payload.len(), RECORD_SIZE);
         let offset = inner.end;
