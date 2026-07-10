@@ -277,6 +277,17 @@ impl Propagator {
         self.inner.origin().1
     }
 
+    /// Sides currently pressuring the domain boundary, encoded as a bitmask:
+    /// north=1, south=2, west=4, east=8. A zero mask means that no specific
+    /// side was recorded, in which case callers should grow every side.
+    pub fn boundary_pressure(&self) -> u8 {
+        let (north, south, west, east) = self.inner.boundary_pressure();
+        u8::from(north)
+            | (u8::from(south) << 1)
+            | (u8::from(west) << 2)
+            | (u8::from(east) << 3)
+    }
+
     /// Grow the domain in place onto the larger `veg`/`dem` anchored at
     /// `(origin_row, origin_col)`, preserving all simulation state. The new
     /// grid must fully contain the old one and growth to the north/west must
