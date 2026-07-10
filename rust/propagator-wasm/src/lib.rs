@@ -431,4 +431,40 @@ impl Propagator {
         let out = self.inner.get_output().map_err(to_js)?;
         Ok(out.stats.area_mean / 10_000.0)
     }
+
+    /// All per-cell output variables packed into one row-major buffer, so a
+    /// single [`Propagator::get_output`] call feeds every layer the browser
+    /// wants to render or animate.
+    ///
+    /// Layout is `OUTPUT_VARIABLE_COUNT` grids of `rows * cols` values each,
+    /// concatenated in this order (also see [`output_variable_count`]):
+    ///
+    /// 0. fire probability, `[0, 1]`
+    /// 1. time of arrival (first), seconds — `0` where never burnt
+    /// 2. mean rate of spread, m/min — `NaN` where never burnt
+    /// 3. mean fireline intensity, kW/m — `NaN` where never burnt
+    /// 4. spotting generation probability, `[0, 1]`
+    /// 5. spotting receiving probability, `[0, 1]`
+    pub fn output_snapshot(&mut self) -> Result<Vec<f32>, JsValue> {
+        let out = self.inner.get_output().map_err(to_js)?;
+        let layers = [
+            &out.fire_probability,
+            &out.min_arrival_time,
+            &out.ros_mean,
+            &out.fli_mean,
+            &out.spotting_generation_probability,
+            &out.spotting_receiving_probability,
+        ];
+        let mut packed = Vec::with_capacity(layers.len() * self.rows * self.cols);
+        for layer in layers {
+            packed.extend_from_slice(layer.as_slice());
+        }
+        Ok(packed)
+    }
+}
+
+/// Number of per-cell variables packed by [`Propagator::output_snapshot`].
+#[wasm_bindgen]
+pub fn output_variable_count() -> usize {
+    6
 }

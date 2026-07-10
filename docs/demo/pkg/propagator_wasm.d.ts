@@ -74,6 +74,22 @@ export class Propagator {
      */
     next_time(): bigint;
     /**
+     * All per-cell output variables packed into one row-major buffer, so a
+     * single [`Propagator::get_output`] call feeds every layer the browser
+     * wants to render or animate.
+     *
+     * Layout is `OUTPUT_VARIABLE_COUNT` grids of `rows * cols` values each,
+     * concatenated in this order (also see [`output_variable_count`]):
+     *
+     * 0. fire probability, `[0, 1]`
+     * 1. time of arrival (first), seconds — `0` where never burnt
+     * 2. mean rate of spread, m/min — `NaN` where never burnt
+     * 3. mean fireline intensity, kW/m — `NaN` where never burnt
+     * 4. spotting generation probability, `[0, 1]`
+     * 5. spotting receiving probability, `[0, 1]`
+     */
+    output_snapshot(): Float32Array;
+    /**
      * Enqueue suppression-action fields at `time`, merged into any weather /
      * ignition event already scheduled there.
      *
@@ -137,6 +153,11 @@ export class Propagator {
 }
 
 /**
+ * Number of per-cell variables packed by [`Propagator::output_snapshot`].
+ */
+export function output_variable_count(): number;
+
+/**
  * Tile size in cells: north/west domain growth must be a multiple of this.
  */
 export function tile_size(): number;
@@ -149,6 +170,7 @@ export interface InitOutput {
     readonly __wbg_propagator_free: (a: number, b: number) => void;
     readonly fuelsystembuilder_add_fuel: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number) => [number, number];
     readonly fuelsystembuilder_new: () => number;
+    readonly output_variable_count: () => number;
     readonly propagator_boundary_pressure: (a: number) => number;
     readonly propagator_boundary_proximity: (a: number, b: number) => number;
     readonly propagator_burned_area_ha: (a: number) => [number, number, number];
@@ -159,6 +181,7 @@ export interface InitOutput {
     readonly propagator_next_time: (a: number) => bigint;
     readonly propagator_origin_col: (a: number) => bigint;
     readonly propagator_origin_row: (a: number) => bigint;
+    readonly propagator_output_snapshot: (a: number) => [number, number, number, number];
     readonly propagator_realizations: (a: number) => number;
     readonly propagator_rows: (a: number) => number;
     readonly propagator_set_action_fields: (a: number, b: bigint, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number];

@@ -5,6 +5,7 @@ export const __wbg_fuelsystembuilder_free: (a: number, b: number) => void;
 export const __wbg_propagator_free: (a: number, b: number) => void;
 export const fuelsystembuilder_add_fuel: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number) => [number, number];
 export const fuelsystembuilder_new: () => number;
+export const output_variable_count: () => number;
 export const propagator_boundary_pressure: (a: number) => number;
 export const propagator_boundary_proximity: (a: number, b: number) => number;
 export const propagator_burned_area_ha: (a: number) => [number, number, number];
@@ -15,6 +16,7 @@ export const propagator_new: (a: number, b: number, c: number, d: number, e: num
 export const propagator_next_time: (a: number) => bigint;
 export const propagator_origin_col: (a: number) => bigint;
 export const propagator_origin_row: (a: number) => bigint;
+export const propagator_output_snapshot: (a: number) => [number, number, number, number];
 export const propagator_realizations: (a: number) => number;
 export const propagator_rows: (a: number) => number;
 export const propagator_set_action_fields: (a: number, b: bigint, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number];

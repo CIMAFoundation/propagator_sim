@@ -216,6 +216,31 @@ export class Propagator {
         return ret;
     }
     /**
+     * All per-cell output variables packed into one row-major buffer, so a
+     * single [`Propagator::get_output`] call feeds every layer the browser
+     * wants to render or animate.
+     *
+     * Layout is `OUTPUT_VARIABLE_COUNT` grids of `rows * cols` values each,
+     * concatenated in this order (also see [`output_variable_count`]):
+     *
+     * 0. fire probability, `[0, 1]`
+     * 1. time of arrival (first), seconds — `0` where never burnt
+     * 2. mean rate of spread, m/min — `NaN` where never burnt
+     * 3. mean fireline intensity, kW/m — `NaN` where never burnt
+     * 4. spotting generation probability, `[0, 1]`
+     * 5. spotting receiving probability, `[0, 1]`
+     * @returns {Float32Array}
+     */
+    output_snapshot() {
+        const ret = wasm.propagator_output_snapshot(this.__wbg_ptr);
+        if (ret[3]) {
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
+    }
+    /**
      * Number of stochastic realizations.
      * @returns {number}
      */
@@ -313,6 +338,15 @@ export class Propagator {
     }
 }
 if (Symbol.dispose) Propagator.prototype[Symbol.dispose] = Propagator.prototype.free;
+
+/**
+ * Number of per-cell variables packed by [`Propagator::output_snapshot`].
+ * @returns {number}
+ */
+export function output_variable_count() {
+    const ret = wasm.output_variable_count();
+    return ret >>> 0;
+}
 
 /**
  * Tile size in cells: north/west domain growth must be a multiple of this.
