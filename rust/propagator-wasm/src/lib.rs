@@ -17,8 +17,15 @@
 use propagator_core::{
     BoundaryConditions, FieldInput, FuelDef, FuelSystem, Grid2, Ignitions, MoistureModel,
     OobMode, Propagator as CorePropagator, PropagatorConfig, PropagatorError, RosModel,
+    TILE_SIZE,
 };
 use wasm_bindgen::prelude::*;
+
+/// Tile size in cells: north/west domain growth must be a multiple of this.
+#[wasm_bindgen]
+pub fn tile_size() -> usize {
+    TILE_SIZE
+}
 
 /// Map a core error to a JS `Error`-friendly string value.
 fn to_js(err: PropagatorError) -> JsValue {
@@ -118,9 +125,13 @@ impl Propagator {
     ///
     /// `veg` (fuel codes matching `fuels`) and `dem` (elevation, metres) are
     /// row-major and must both hold `rows * cols` entries. `fuels` is the
-    /// fuel model assembled from JavaScript. Fires reaching the boundary are
-    /// ignored rather than raised, which keeps the demo running when the
-    /// flame front hits an edge.
+    /// fuel model assembled from JavaScript.
+    ///
+    /// By default fires reaching the boundary are ignored, which keeps the
+    /// demo running when the flame front hits an edge. Pass
+    /// `halt_on_boundary = true` to have [`Propagator::step`] report boundary
+    /// hits instead, so the caller can grow the domain with
+    /// [`Propagator::expand`] and continue.
     #[wasm_bindgen(constructor)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -135,6 +146,7 @@ impl Propagator {
         cellsize: f64,
         ros_model: &str,
         moisture_model: &str,
+        halt_on_boundary: Option<bool>,
     ) -> Result<Propagator, JsValue> {
         if veg.len() != rows * cols {
             return Err(JsValue::from_str(&format!(
@@ -160,8 +172,13 @@ impl Propagator {
         config.cellsize = cellsize;
         config.ros_model = ros_from_str(ros_model)?;
         config.moisture_model = moisture_from_str(moisture_model)?;
-        // Ignore boundary hits and stay off the threaded/entropy/fs paths.
-        config.oob_mode = OobMode::Ignore;
+        // Stay off the threaded/entropy/fs paths; boundary handling is the
+        // caller's choice (Ignore for the demo, Raise for domain growth).
+        config.oob_mode = if halt_on_boundary.unwrap_or(false) {
+            OobMode::Raise
+        } else {
+            OobMode::Ignore
+        };
         config.n_threads = Some(1);
         config.fuels = Some(FuelSystem::from_defs(&fuels.defs).map_err(to_js)?);
 
@@ -234,8 +251,60 @@ impl Propagator {
     }
 
     /// Propagate for `seconds` of simulation time, applying scheduled events.
-    pub fn step(&mut self, seconds: i64) -> Result<(), JsValue> {
-        self.inner.step_window(seconds).map_err(to_js)
+    ///
+    /// Returns `true` when the run was constructed with
+    /// `halt_on_boundary = true` and at least one realization was suspended
+    /// at the domain boundary: grow the domain with [`Propagator::expand`]
+    /// and step again to resume it — nothing is lost.
+    pub fn step(&mut self, seconds: i64) -> Result<bool, JsValue> {
+        match self.inner.step_window(seconds) {
+            Ok(()) => Ok(false),
+            Err(PropagatorError::OutOfBounds) => Ok(true),
+            Err(err) => Err(to_js(err)),
+        }
+    }
+
+    /// Grid origin (row, col) in global cell coordinates. Growth to the
+    /// north/west moves the origin to smaller values.
+    #[wasm_bindgen(getter)]
+    pub fn origin_row(&self) -> i64 {
+        self.inner.origin().0
+    }
+
+    /// See [`Propagator::origin_row`].
+    #[wasm_bindgen(getter)]
+    pub fn origin_col(&self) -> i64 {
+        self.inner.origin().1
+    }
+
+    /// Grow the domain in place onto the larger `veg`/`dem` anchored at
+    /// `(origin_row, origin_col)`, preserving all simulation state. The new
+    /// grid must fully contain the old one and growth to the north/west must
+    /// be a multiple of [`tile_size`] cells.
+    #[allow(clippy::too_many_arguments)]
+    pub fn expand(
+        &mut self,
+        rows: usize,
+        cols: usize,
+        veg: Vec<i32>,
+        dem: Vec<f64>,
+        origin_row: i64,
+        origin_col: i64,
+    ) -> Result<(), JsValue> {
+        if veg.len() != rows * cols || dem.len() != rows * cols {
+            return Err(JsValue::from_str(&format!(
+                "veg/dem length must equal rows*cols ({})",
+                rows * cols
+            )));
+        }
+        let veg = Grid2::from_vec(rows, cols, veg);
+        let dem = Grid2::from_vec(rows, cols, dem);
+        self.inner
+            .expand(veg, dem, (origin_row, origin_col))
+            .map_err(to_js)?;
+        self.rows = rows;
+        self.cols = cols;
+        Ok(())
     }
 
     /// Next event time (scheduler or front), or `-1` when the run is idle.
