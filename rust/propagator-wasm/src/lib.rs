@@ -250,6 +250,93 @@ impl Propagator {
         self.inner.set_boundary_conditions(bc).map_err(to_js)
     }
 
+    /// Enqueue suppression-action fields at `time`, merged into any weather /
+    /// ignition event already scheduled there.
+    ///
+    /// Actions are supplied as sparse cell lists so the caller never marshals a
+    /// full grid:
+    ///
+    /// * `moisture_cells` — flat `[row0, col0, row1, col1, …]` cells wetted by
+    ///   a moisture action (waterline / canadair / helicopter), each with the
+    ///   matching **percent** increment in `moisture_values`. The core adds
+    ///   these on top of the base moisture, clamps to `[0, 100]%`, and decays
+    ///   them over time.
+    /// * `veg_cells` — flat `[row, col, …]` cells a fuel action (heavy) turns
+    ///   into the `veg_fuel` non-vegetated fuel id, i.e. a fire break.
+    ///
+    /// Pass empty arrays for whichever action kind is absent; a call with no
+    /// cells at all is a no-op.
+    pub fn set_action_fields(
+        &mut self,
+        time: i64,
+        moisture_cells: Vec<i32>,
+        moisture_values: Vec<f32>,
+        veg_cells: Vec<i32>,
+        veg_fuel: i32,
+    ) -> Result<(), JsValue> {
+        if moisture_cells.len() % 2 != 0 {
+            return Err(JsValue::from_str(
+                "moisture_cells must be a flat list of [row, col] pairs",
+            ));
+        }
+        if moisture_cells.len() / 2 != moisture_values.len() {
+            return Err(JsValue::from_str(
+                "moisture_values must have one value per moisture cell",
+            ));
+        }
+        if veg_cells.len() % 2 != 0 {
+            return Err(JsValue::from_str(
+                "veg_cells must be a flat list of [row, col] pairs",
+            ));
+        }
+
+        let additional_moisture = if moisture_cells.is_empty() {
+            None
+        } else {
+            let mut grid = Grid2::filled(self.rows, self.cols, 0.0f32);
+            for (rc, value) in moisture_cells.chunks_exact(2).zip(moisture_values.iter()) {
+                let (row, col) = (rc[0] as usize, rc[1] as usize);
+                if row >= self.rows || col >= self.cols {
+                    return Err(JsValue::from_str(&format!(
+                        "moisture cell ({row}, {col}) outside grid {}x{}",
+                        self.rows, self.cols
+                    )));
+                }
+                grid[(row, col)] = *value;
+            }
+            Some(grid)
+        };
+
+        let vegetation_changes = if veg_cells.is_empty() {
+            None
+        } else {
+            let mut grid = Grid2::filled(self.rows, self.cols, f64::NAN);
+            for rc in veg_cells.chunks_exact(2) {
+                let (row, col) = (rc[0] as usize, rc[1] as usize);
+                if row >= self.rows || col >= self.cols {
+                    return Err(JsValue::from_str(&format!(
+                        "veg cell ({row}, {col}) outside grid {}x{}",
+                        self.rows, self.cols
+                    )));
+                }
+                grid[(row, col)] = veg_fuel as f64;
+            }
+            Some(grid)
+        };
+
+        if additional_moisture.is_none() && vegetation_changes.is_none() {
+            return Ok(());
+        }
+
+        let bc = BoundaryConditions {
+            time,
+            additional_moisture,
+            vegetation_changes,
+            ..BoundaryConditions::default()
+        };
+        self.inner.set_boundary_conditions(bc).map_err(to_js)
+    }
+
     /// Propagate for `seconds` of simulation time, applying scheduled events.
     ///
     /// Returns `true` when the run was constructed with
@@ -282,6 +369,16 @@ impl Propagator {
     /// side was recorded, in which case callers should grow every side.
     pub fn boundary_pressure(&self) -> u8 {
         let (north, south, west, east) = self.inner.boundary_pressure();
+        u8::from(north)
+            | (u8::from(south) << 1)
+            | (u8::from(west) << 2)
+            | (u8::from(east) << 3)
+    }
+
+    /// Sides with pending front events within `margin` cells, using the same
+    /// north=1, south=2, west=4, east=8 bitmask as `boundary_pressure`.
+    pub fn boundary_proximity(&self, margin: u32) -> u8 {
+        let (north, south, west, east) = self.inner.boundary_proximity(margin as usize);
         u8::from(north)
             | (u8::from(south) << 1)
             | (u8::from(west) << 2)
