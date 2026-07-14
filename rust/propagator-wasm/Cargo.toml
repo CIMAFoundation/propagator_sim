@@ -10,7 +10,10 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 propagator-core = { path = "../propagator-core" }
+propagator-geo = { path = "../propagator-geo" }
 wasm-bindgen = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
 
 [profile.release]
 # The core is compute-bound, so optimise for speed rather than size.

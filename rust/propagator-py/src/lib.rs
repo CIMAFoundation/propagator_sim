@@ -18,6 +18,7 @@ use propagator_core::{
     BoundaryConditions, FieldInput, FuelDef, FuelSystem, Grid2, Ignitions, MoistureModel, OobMode,
     Propagator as CorePropagator, PropagatorConfig, PropagatorError, RosModel,
 };
+use propagator_geo::{extract_isochrone as extract_isochrone_geo, IsochroneOptions};
 
 create_exception!(
     propagator_rust,
@@ -232,6 +233,91 @@ fn parse_fuels(fuels: &Bound<'_, PyDict>) -> PyResult<FuelSystem> {
         });
     }
     FuelSystem::from_defs(&defs).map_err(err)
+}
+
+/// Extract isochrone coordinates with [`propagator_geo::extract_isochrone`].
+///
+/// `values` must be a two-dimensional NumPy `float32` or `float64` array.
+/// The affine transform is `(a, b, c, d, e, f)` in GDAL order. The return
+/// value maps each surviving threshold to a nested list of MultiLineString
+/// `[x, y]` coordinates. Filtering, topology, smoothing, omitted-threshold,
+/// and empty-geometry semantics are defined by `propagator-geo`.
+#[pyfunction]
+#[pyo3(signature = (
+    values,
+    transform,
+    thresholds = None,
+    med_filt_val = 9,
+    min_length = 0.0001,
+    smooth_sigma = 0.8,
+    simp_fact = 0.00001,
+))]
+#[allow(clippy::too_many_arguments)]
+fn extract_isochrone<'py>(
+    py: Python<'py>,
+    values: &Bound<'py, PyAny>,
+    transform: (f64, f64, f64, f64, f64, f64),
+    thresholds: Option<Vec<f64>>,
+    med_filt_val: usize,
+    min_length: f64,
+    smooth_sigma: f64,
+    simp_fact: f64,
+) -> PyResult<Bound<'py, PyDict>> {
+    let (values, rows, cols) = if let Ok(array) = values.extract::<PyReadonlyArray2<f64>>() {
+        let view = array.as_array();
+        (
+            view.iter().copied().collect::<Vec<_>>(),
+            view.nrows(),
+            view.ncols(),
+        )
+    } else if let Ok(array) = values.extract::<PyReadonlyArray2<f32>>() {
+        let view = array.as_array();
+        (
+            view.iter()
+                .map(|value| f64::from(*value))
+                .collect::<Vec<_>>(),
+            view.nrows(),
+            view.ncols(),
+        )
+    } else {
+        return Err(PyValueError::new_err(
+            "values must be a 2-D float32 or float64 numpy array",
+        ));
+    };
+    let thresholds = thresholds.unwrap_or_else(|| vec![0.5, 0.75, 0.9]);
+    let transform = [
+        transform.0,
+        transform.1,
+        transform.2,
+        transform.3,
+        transform.4,
+        transform.5,
+    ];
+    let extracted = extract_isochrone_geo(
+        &values,
+        rows,
+        cols,
+        transform,
+        &thresholds,
+        IsochroneOptions {
+            median_kernel: med_filt_val,
+            min_length,
+            smooth_sigma,
+            simplify_factor: simp_fact,
+        },
+    )
+    .map_err(|error| PyValueError::new_err(error.to_string()))?;
+
+    let result = PyDict::new(py);
+    for isochrone in extracted {
+        let lines: Vec<Vec<(f64, f64)>> = isochrone
+            .lines
+            .into_iter()
+            .map(|line| line.into_iter().map(|xy| (xy[0], xy[1])).collect())
+            .collect();
+        result.set_item(isochrone.threshold, lines)?;
+    }
+    Ok(result)
 }
 
 // ---------------------------------------------------------------------------
@@ -466,6 +552,7 @@ impl Propagator {
 #[pymodule]
 fn propagator_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Propagator>()?;
+    m.add_function(wrap_pyfunction!(extract_isochrone, m)?)?;
     m.add(
         "PropagatorOutOfBoundsError",
         m.py().get_type::<PropagatorOutOfBoundsError>(),

@@ -148,6 +148,12 @@ fn boundary_halt_is_resumable_by_expansion() {
     let mut sim = Propagator::new(config).unwrap();
     // ignite near the west edge so the fire hits the boundary quickly
     sim.set_boundary_conditions(basic_conditions((64, 3))).unwrap();
+    sim.step_window(1).unwrap();
+    assert_eq!(
+        sim.boundary_proximity(4),
+        (false, false, true, false),
+        "westward boundary proximity was not detected before propagation",
+    );
 
     let mut hit_boundary = false;
     for _ in 0..200 {

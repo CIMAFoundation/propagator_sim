@@ -15,11 +15,73 @@
 //! shape, exactly as `Grid2` stores them internally.
 
 use propagator_core::{
-    BoundaryConditions, FieldInput, FuelDef, FuelSystem, Grid2, Ignitions, MoistureModel,
-    OobMode, Propagator as CorePropagator, PropagatorConfig, PropagatorError, RosModel,
-    TILE_SIZE,
+    BoundaryConditions, FieldInput, FuelDef, FuelSystem, Grid2, Ignitions, MoistureModel, OobMode,
+    Propagator as CorePropagator, PropagatorConfig, PropagatorError, RosModel, TILE_SIZE,
 };
+use propagator_geo::{extract_isochrone as extract_isochrone_geo, IsochroneOptions};
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
+
+#[derive(Serialize)]
+struct WasmIsochrone {
+    threshold: f64,
+    lines: Vec<Vec<[f64; 2]>>,
+}
+
+/// Extract isochrones through [`propagator_geo::extract_isochrone`].
+///
+/// `values` is a row-major `Float32Array` with exactly `rows * cols` entries.
+/// `transform` is a six-value `Float64Array` in GDAL affine order
+/// `(a, b, c, d, e, f)`. The returned JavaScript array contains
+/// `{ threshold, lines }` objects, where `lines` has GeoJSON MultiLineString
+/// coordinate nesting. Omitted optional arguments use the Python defaults.
+/// Filtering, topology, smoothing, omitted-threshold, and empty-geometry
+/// semantics are defined by `propagator-geo`.
+#[wasm_bindgen]
+#[allow(clippy::too_many_arguments)]
+pub fn extract_isochrone(
+    values: Vec<f32>,
+    rows: usize,
+    cols: usize,
+    transform: Vec<f64>,
+    thresholds: Option<Vec<f64>>,
+    med_filt_val: Option<usize>,
+    min_length: Option<f64>,
+    smooth_sigma: Option<f64>,
+    simp_fact: Option<f64>,
+) -> Result<JsValue, JsValue> {
+    let transform: [f64; 6] = transform.try_into().map_err(|transform: Vec<f64>| {
+        JsValue::from_str(&format!(
+            "transform must contain 6 values, got {}",
+            transform.len()
+        ))
+    })?;
+    let values: Vec<f64> = values.into_iter().map(f64::from).collect();
+    let thresholds = thresholds.unwrap_or_else(|| vec![0.5, 0.75, 0.9]);
+    let extracted = extract_isochrone_geo(
+        &values,
+        rows,
+        cols,
+        transform,
+        &thresholds,
+        IsochroneOptions {
+            median_kernel: med_filt_val.unwrap_or(9),
+            min_length: min_length.unwrap_or(0.0001),
+            smooth_sigma: smooth_sigma.unwrap_or(0.8),
+            simplify_factor: simp_fact.unwrap_or(0.00001),
+        },
+    )
+    .map_err(|error| JsValue::from_str(&error.to_string()))?;
+    let serializable: Vec<WasmIsochrone> = extracted
+        .into_iter()
+        .map(|isochrone| WasmIsochrone {
+            threshold: isochrone.threshold,
+            lines: isochrone.lines,
+        })
+        .collect();
+    serde_wasm_bindgen::to_value(&serializable)
+        .map_err(|error| JsValue::from_str(&error.to_string()))
+}
 
 /// Tile size in cells: north/west domain growth must be a multiple of this.
 #[wasm_bindgen]

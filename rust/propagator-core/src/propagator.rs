@@ -231,6 +231,29 @@ impl Propagator {
         (north, south, west, east)
     }
 
+    /// Which edges have pending front events within `margin` cells.
+    /// Unlike `boundary_pressure`, this is predictive and does not require
+    /// propagation to have halted at the boundary first.
+    pub fn boundary_proximity(&self, margin: usize) -> (bool, bool, bool, bool) {
+        let (n_rows, n_cols) = self.veg.shape();
+        let margin = margin.max(1) as i32;
+        let south_limit = n_rows as i32 - margin;
+        let east_limit = n_cols as i32 - margin;
+        let (mut north, mut south, mut west, mut east) = (false, false, false, false);
+        for real in &self.reals {
+            for (row, col) in real.heap.event_cells() {
+                north |= row < margin;
+                south |= row >= south_limit;
+                west |= col < margin;
+                east |= col >= east_limit;
+                if north && south && west && east {
+                    return (north, south, west, east);
+                }
+            }
+        }
+        (north, south, west, east)
+    }
+
     /// Inclusive world-cell bounds (row0, col0, row1, col1) of the grid.
     pub fn world_bounds(&self) -> (i64, i64, i64, i64) {
         let (rows, cols) = self.veg.shape();

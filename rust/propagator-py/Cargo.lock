@@ -141,11 +141,16 @@ name = "propagator-core"
 version = "0.1.0"
 
 [[package]]
+name = "propagator-geo"
+version = "0.1.0"
+
+[[package]]
 name = "propagator-py"
 version = "0.1.0"
 dependencies = [
  "numpy",
  "propagator-core",
+ "propagator-geo",
  "pyo3",
 ]
 

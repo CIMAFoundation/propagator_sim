@@ -7,37 +7,16 @@ import geopandas as gpd
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+from propagator_rust import extract_isochrone as _extract_isochrone_rust
 from pyproj import CRS
-from rasterio.features import shapes  # type: ignore
 from rasterio.transform import Affine  # type: ignore
-from scipy.ndimage import binary_dilation, binary_erosion, gaussian_filter1d
-from scipy.signal import medfilt2d
-from shapely.geometry import LineString, MultiLineString, shape
+from shapely.geometry import MultiLineString
 
 from propagator.core.models import PropagatorOutput
 from propagator.io.geo import GeographicInfo, reproject
 from propagator.io.writer.protocol import IsochronesWriterProtocol
 
 TIME_TAG = "time"
-
-
-def smooth_linestring(linestring, smooth_sigma):
-    """
-    Uses a gauss filter to smooth out the LineString coordinates.
-    """
-    smooth_x = np.array(gaussian_filter1d(linestring.xy[0], smooth_sigma))  # type: ignore # gaussian_filter1d has None typing in library
-    smooth_y = np.array(gaussian_filter1d(linestring.xy[1], smooth_sigma))  # type: ignore
-
-    # close the linestring
-    smooth_y[-1] = smooth_y[0]
-    smooth_x[-1] = smooth_x[0]
-
-    smoothed_coords = np.hstack((smooth_x, smooth_y))
-    smoothed_coords = zip(smooth_x, smooth_y)
-
-    linestring_smoothed = LineString(smoothed_coords)
-
-    return linestring_smoothed
 
 
 def extract_isochrone(
@@ -49,48 +28,27 @@ def extract_isochrone(
     smooth_sigma=0.8,
     simp_fact=0.00001,
 ) -> dict[float, MultiLineString]:
+    """Extract filtered probability isochrones through ``propagator_rust``.
+
+    ``values`` must be a two-dimensional floating-point array and ``transf``
+    maps pixel-boundary coordinates into the output CRS. The remaining
+    arguments retain the historical Python API; filtering, contour topology,
+    and smoothing are implemented by the mandatory ``propagator-geo`` Rust
+    crate. Thresholds with no surviving pixels are omitted from the mapping.
     """
-    extract isochrone from the propagation probability map values at the probanilities thresholds,
-     applying filtering to smooth out the result
-    :param values:
-    :param transf:
-    :param thresholds:
-    :param med_filt_val:
-    :param min_length:
-    :param smooth_sigma:
-    :param simp_fact:
-    :return:
-    """
-
-    # if the dimension of the burned area is low, we do not filter it
-    if np.sum(values > 0) <= 100:
-        filt_values = values
-    else:
-        filt_values = medfilt2d(values, med_filt_val)  # type: ignore # medfilt2d has None typing in library
-    results = {}
-
-    for t in thresholds:
-        over_t_ = (filt_values >= t).astype("uint8")
-        over_t = binary_dilation(
-            binary_erosion(over_t_).astype("uint8")  # type: ignore #binary_erosion has None typing in library
-        ).astype(  # type: ignore #binary_erosion has None typing in library
-            "uint8"
-        )
-        if np.any(over_t):
-            for s, v in shapes(over_t, transform=transf):
-                sh = shape(s)
-
-                ml = [
-                    smooth_linestring(
-                        interior_line, smooth_sigma
-                    )  # .simplify(simp_fact)
-                    for interior_line in sh.interiors  # type: ignore # sh.interiors is missing in typing
-                    if interior_line.length > min_length
-                ]
-
-                results[t] = MultiLineString(ml)
-
-    return results
+    coords = _extract_isochrone_rust(
+        np.ascontiguousarray(values),
+        (transf.a, transf.b, transf.c, transf.d, transf.e, transf.f),
+        thresholds=[float(threshold) for threshold in thresholds],
+        med_filt_val=int(med_filt_val),
+        min_length=float(min_length),
+        smooth_sigma=float(smooth_sigma),
+        simp_fact=float(simp_fact),
+    )
+    return {
+        float(threshold): MultiLineString(lines)
+        for threshold, lines in coords.items()
+    }
 
 
 @dataclass

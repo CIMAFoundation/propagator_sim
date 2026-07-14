@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 propagator-core = { path = "../propagator-core" }
+propagator-geo = { path = "../propagator-geo" }
 pyo3 = { version = "0.25", features = ["abi3-py311", "extension-module"] }
 numpy = "0.25"
 
