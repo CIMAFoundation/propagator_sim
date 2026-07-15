@@ -324,8 +324,8 @@ fn compute_spotting(
             SPOTTING_TIME_TO_PROPAGATION_LOG_SIGMA,
         );
 
-        let landing_time = (landing_time_s as i64).max(1);
-        let time_to_propagation = (time_to_propagation as i64).max(1);
+        let landing_time = (landing_time_s.ceil() as i64).max(1);
+        let time_to_propagation = (time_to_propagation.ceil() as i64).max(1);
 
         let propagation_time = landing_time + time_to_propagation;
 
