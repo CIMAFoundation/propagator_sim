@@ -12,8 +12,8 @@ use crate::front::FrontHeap;
 use crate::fuels::{FuelSystem, NO_FUEL};
 use crate::grid::Grid2;
 use crate::models::{
-    fireline_intensity, lhv_fuel, p_time, probability_to_neighbour,
-    MoistureModel, RosModel, FIRE_SPOTTING_DISTANCE_COEFFICIENT,
+    fireline_intensity, lhv_fuel, p_time, probability_to_neighbour, MoistureModel, RosModel,
+    FIRE_SPOTTING_DISTANCE_COEFFICIENT,
 };
 use crate::rng::Rng;
 use crate::tiles::{local_index, TileGrid, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV};
@@ -39,6 +39,11 @@ const LAMBDA_SPOTTING: f64 = 2.0;
 /// mean/std of the normal "thrust" that sets each ember's flight distance
 const SPOTTING_RN_MEAN: f64 = 100.0;
 const SPOTTING_RN_STD: f64 = 25.0;
+
+/// The following constants are used in the Fire-Spotting model to assess the delay between ember landing and the development of a fire capable of propagation.
+const SPOTTING_TIME_TO_PROPAGATION_MEDIAN: f64 = 600.0;
+const SPOTTING_TIME_TO_PROPAGATION_LOG_SIGMA: f64 = 0.4;
+
 /// hard cap on embers per cell, bounding worst-case work per ignition
 pub const MAX_SPOTTING_EMBERS: u32 = 32;
 
@@ -123,11 +128,7 @@ pub fn advance_front_until(
         if halt_on_boundary {
             let (peek_row, peek_col) = real.heap.peek_cell().unwrap();
             if on_boundary_ring(peek_row as i64, peek_col as i64, n_rows, n_cols)
-                && real
-                    .tiles
-                    .read_flags(peek_row as usize, peek_col as usize)
-                    & FLAG_FIRE
-                    == 0
+                && real.tiles.read_flags(peek_row as usize, peek_col as usize) & FLAG_FIRE == 0
             {
                 real.out_of_bounds = true;
                 real.halted_on_boundary = true;
@@ -284,9 +285,7 @@ fn compute_spotting(
             (0.0, 1.0)
         } else {
             let distance = thrust
-                * (w_speed_ms
-                    * FIRE_SPOTTING_DISTANCE_COEFFICIENT
-                    * ((w_dir - angle).cos() - 1.0))
+                * (w_speed_ms * FIRE_SPOTTING_DISTANCE_COEFFICIENT * ((w_dir - angle).cos() - 1.0))
                     .exp();
             (distance, distance / w_speed_ms)
         };
@@ -320,16 +319,28 @@ fn compute_spotting(
             continue;
         }
 
+        let time_to_propagation = real.rng.lognormal(
+            SPOTTING_TIME_TO_PROPAGATION_MEDIAN.ln(),
+            SPOTTING_TIME_TO_PROPAGATION_LOG_SIGMA,
+        );
+
         let landing_time = (landing_time_s as i64).max(1);
+        let time_to_propagation = (time_to_propagation as i64).max(1);
+
+        let propagation_time = landing_time + time_to_propagation;
 
         // tracking flags
         real.tiles.tile_mut(source_slot).flags[source_local] |= FLAG_SPOT_GEN;
         let recv_slot = real.tiles.ensure_slot(row_to, col_to);
-        real.tiles.tile_mut(recv_slot).flags[local_index(row_to, col_to)] |=
-            FLAG_SPOT_RECV;
+        real.tiles.tile_mut(recv_slot).flags[local_index(row_to, col_to)] |= FLAG_SPOT_RECV;
 
-        real.heap
-            .push(time + landing_time, row_to as i32, col_to as i32, 0.0, 0.0);
+        real.heap.push(
+            time + propagation_time,
+            row_to as i32,
+            col_to as i32,
+            0.0,
+            0.0,
+        );
     }
 }
 

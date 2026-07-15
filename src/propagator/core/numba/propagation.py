@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 from numba import jit  # type: ignore
-from numpy.random import normal, poisson, random, uniform
+from numpy.random import lognormal, normal, poisson, random, uniform
 
 from propagator.core.constants import NO_FUEL
 from propagator.core.numba.functions import FIRE_SPOTTING_DISTANCE_COEFFICIENT
@@ -32,6 +32,11 @@ P_C0 = 0.6
 LAMBDA_SPOTTING = 2.0
 SPOTTING_RN_MEAN = 100
 SPOTTING_RN_STD = 25
+
+# The following constants are used in the Fire-Spotting model to assess the delay between ember landing and the development of a fire capable of propagation.
+SPOTTING_TIME_TO_PROPAGATION_MEDIAN = 600.0
+SPOTTING_TIME_TO_PROPAGATION_LOG_SIGMA = 0.4
+
 # Hard cap on embers per emission so the per-cell number of front events is
 # bounded (P[Poisson(2) > 32] ~ 1e-27, so the cap never binds in practice).
 MAX_SPOTTING_EMBERS = 32
@@ -207,9 +212,26 @@ def compute_spotting(
         if uniform() > P_c:
             continue
 
-        ember_landing_time = max(int(ember_landing_time), 1)
+        # Sample the delay between ember landing and the development of
+        # a fire capable of propagation using a lognormal distribution:
+        time_to_propagation = lognormal(
+            np.log(SPOTTING_TIME_TO_PROPAGATION_MEDIAN),
+            SPOTTING_TIME_TO_PROPAGATION_LOG_SIGMA,
+        )
 
-        spotting_update = (ember_landing_time, row_to, col_to, 0.0, 0.0, True)
+        ember_landing_time = max(
+            int(np.ceil(ember_landing_time)),
+            1,
+        )
+
+        time_to_propagation = max(
+            int(np.ceil(time_to_propagation)),
+            1,
+        )
+
+        propagation_time = ember_landing_time + time_to_propagation
+
+        spotting_update = (propagation_time, row_to, col_to, 0.0, 0.0, True)
         spotting_updates.append(spotting_update)
 
     return spotting_updates
