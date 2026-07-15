@@ -93,6 +93,12 @@ impl Rng {
         mean + std * radius * theta.cos()
     }
 
+    /// Lognormal sample: `exp(normal(log_mean, log_std))`. Parameters are
+    /// the mean and std of the underlying normal (i.e. in log-space).
+    pub fn lognormal(&mut self, log_mean: f64, log_std: f64) -> f64 {
+        self.normal(log_mean, log_std).exp()
+    }
+
     /// Poisson sample (Knuth's algorithm; fine for the small lambdas the
     /// spotting model uses).
     pub fn poisson(&mut self, lambda: f64) -> u32 {
