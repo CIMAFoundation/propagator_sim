@@ -4303,14 +4303,18 @@ including ember spotting and cell updates.</p>
 
 
 <h3 id="propagator.core.numba.propagation.fire_spotting" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">fire_spotting</span><span class="p">(</span><span class="n">angle</span><span class="p">,</span> <span class="n">w_dir</span><span class="p">,</span> <span class="n">w_speed</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">fire_spotting</span><span class="p">(</span><span class="n">angle</span><span class="p">,</span> <span class="n">w_dir</span><span class="p">,</span> <span class="n">w_speed</span><span class="p">,</span> <span class="n">fireline_intensity_value</span><span class="p">)</span></code>
 
 </h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Evaluate spotting distance using Alexandridis' formulation.</p>
+        <p>Sample the landing distance and travel time of a single ember.</p>
+<p>The landing distance is drawn from a lognormal distribution (Sardoy et
+al. 2008) whose median scales linearly with wind speed and sub-linearly
+with the source cell's fireline intensity, and whose central value is
+concentrated downwind. See <code>docs/spotting.md</code> for the full rationale.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4372,6 +4376,22 @@ including ember spotting and cell updates.</p>
                 <em>required</em>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fireline_intensity_value</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fireline intensity of the source (emitting) cell (kW/m)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -4407,7 +4427,7 @@ including ember spotting and cell updates.</p>
 
 
 <h3 id="propagator.core.numba.propagation.compute_spotting" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">compute_spotting</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">fire</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">fuels</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">compute_spotting</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">fire</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">fireline_intensity_value</span><span class="p">,</span> <span class="n">fuels</span><span class="p">)</span></code>
 
 </h3>
 
@@ -4534,6 +4554,22 @@ including ember spotting and cell updates.</p>
             <td>
               <div class="doc-md-description">
                 <p>The wind speed (km/h)</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fireline_intensity_value</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fireline intensity of the source (emitting) cell (kW/m)</p>
               </div>
             </td>
             <td>
@@ -4794,7 +4830,7 @@ is_spotting)</p>
 
 
 <h3 id="propagator.core.numba.propagation.single_cell_updates" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">single_cell_updates</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">fire</span><span class="p">,</span> <span class="n">moisture</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">fuels</span><span class="p">,</span> <span class="n">p_time_fn</span><span class="p">,</span> <span class="n">p_moist_fn</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">single_cell_updates</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">fire</span><span class="p">,</span> <span class="n">moisture</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">fuels</span><span class="p">,</span> <span class="n">p_time_fn</span><span class="p">,</span> <span class="n">p_moist_fn</span><span class="p">,</span> <span class="n">fireline_intensity_value</span><span class="p">)</span></code>
 
 </h3>
 
@@ -5003,6 +5039,23 @@ is_spotting)</p>
               <div class="doc-md-description">
                 <p>The function to compute the moisture probability (must be jit-compiled). Units are compliant with other functions.
     signature: (moist: float) -&gt; float</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fireline_intensity_value</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fireline intensity of this (source/emitting) cell (kW/m), used to
+scale the ember spotting distance.</p>
               </div>
             </td>
             <td>
