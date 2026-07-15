@@ -153,6 +153,19 @@ export class Propagator {
 }
 
 /**
+ * Extract isochrones through [`propagator_geo::extract_isochrone`].
+ *
+ * `values` is a row-major `Float32Array` with exactly `rows * cols` entries.
+ * `transform` is a six-value `Float64Array` in GDAL affine order
+ * `(a, b, c, d, e, f)`. The returned JavaScript array contains
+ * `{ threshold, lines }` objects, where `lines` has GeoJSON MultiLineString
+ * coordinate nesting. Omitted optional arguments use the Python defaults.
+ * Filtering, topology, smoothing, omitted-threshold, and empty-geometry
+ * semantics are defined by `propagator-geo`.
+ */
+export function extract_isochrone(values: Float32Array, rows: number, cols: number, transform: Float64Array, thresholds?: Float64Array | null, med_filt_val?: number | null, min_length?: number | null, smooth_sigma?: number | null, simp_fact?: number | null): any;
+
+/**
  * Number of per-cell variables packed by [`Propagator::output_snapshot`].
  */
 export function output_variable_count(): number;
@@ -168,6 +181,7 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_fuelsystembuilder_free: (a: number, b: number) => void;
     readonly __wbg_propagator_free: (a: number, b: number) => void;
+    readonly extract_isochrone: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number) => [number, number, number];
     readonly fuelsystembuilder_add_fuel: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number) => [number, number];
     readonly fuelsystembuilder_new: () => number;
     readonly output_variable_count: () => number;
@@ -189,9 +203,9 @@ export interface InitOutput {
     readonly propagator_step: (a: number, b: bigint) => [number, number, number];
     readonly propagator_time: (a: number) => bigint;
     readonly tile_size: () => number;
-    readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+    readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
     readonly __wbindgen_start: () => void;

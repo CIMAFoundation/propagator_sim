@@ -340,6 +340,41 @@ export class Propagator {
 if (Symbol.dispose) Propagator.prototype[Symbol.dispose] = Propagator.prototype.free;
 
 /**
+ * Extract isochrones through [`propagator_geo::extract_isochrone`].
+ *
+ * `values` is a row-major `Float32Array` with exactly `rows * cols` entries.
+ * `transform` is a six-value `Float64Array` in GDAL affine order
+ * `(a, b, c, d, e, f)`. The returned JavaScript array contains
+ * `{ threshold, lines }` objects, where `lines` has GeoJSON MultiLineString
+ * coordinate nesting. Omitted optional arguments use the Python defaults.
+ * Filtering, topology, smoothing, omitted-threshold, and empty-geometry
+ * semantics are defined by `propagator-geo`.
+ * @param {Float32Array} values
+ * @param {number} rows
+ * @param {number} cols
+ * @param {Float64Array} transform
+ * @param {Float64Array | null} [thresholds]
+ * @param {number | null} [med_filt_val]
+ * @param {number | null} [min_length]
+ * @param {number | null} [smooth_sigma]
+ * @param {number | null} [simp_fact]
+ * @returns {any}
+ */
+export function extract_isochrone(values, rows, cols, transform, thresholds, med_filt_val, min_length, smooth_sigma, simp_fact) {
+    const ptr0 = passArrayF32ToWasm0(values, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF64ToWasm0(transform, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    var ptr2 = isLikeNone(thresholds) ? 0 : passArrayF64ToWasm0(thresholds, wasm.__wbindgen_malloc);
+    var len2 = WASM_VECTOR_LEN;
+    const ret = wasm.extract_isochrone(ptr0, len0, rows, cols, ptr1, len1, ptr2, len2, isLikeNone(med_filt_val) ? Number.MAX_SAFE_INTEGER : (med_filt_val) >>> 0, !isLikeNone(min_length), isLikeNone(min_length) ? 0 : min_length, !isLikeNone(smooth_sigma), isLikeNone(smooth_sigma) ? 0 : smooth_sigma, !isLikeNone(simp_fact), isLikeNone(simp_fact) ? 0 : simp_fact);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
  * Number of per-cell variables packed by [`Propagator::output_snapshot`].
  * @returns {number}
  */
@@ -359,10 +394,36 @@ export function tile_size() {
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
+        __wbg_String_8564e559799eccda: function(arg0, arg1) {
+            const ret = String(arg1);
+            const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            const len1 = WASM_VECTOR_LEN;
+            getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
+            getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
+        },
         __wbg___wbindgen_throw_344f42d3211c4765: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
-        __wbindgen_cast_0000000000000001: function(arg0, arg1) {
+        __wbg_new_32b398fb48b6d94a: function() {
+            const ret = new Array();
+            return ret;
+        },
+        __wbg_new_da52cf8fe3429cb2: function() {
+            const ret = new Object();
+            return ret;
+        },
+        __wbg_set_6be42768c690e380: function(arg0, arg1, arg2) {
+            arg0[arg1] = arg2;
+        },
+        __wbg_set_8a16b38e4805b298: function(arg0, arg1, arg2) {
+            arg0[arg1 >>> 0] = arg2;
+        },
+        __wbindgen_cast_0000000000000001: function(arg0) {
+            // Cast intrinsic for `F64 -> Externref`.
+            const ret = arg0;
+            return ret;
+        },
+        __wbindgen_cast_0000000000000002: function(arg0, arg1) {
             // Cast intrinsic for `Ref(String) -> Externref`.
             const ret = getStringFromWasm0(arg0, arg1);
             return ret;
@@ -399,6 +460,14 @@ function _assertClass(instance, klass) {
 function getArrayF32FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return getFloat32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
+}
+
+let cachedDataViewMemory0 = null;
+function getDataViewMemory0() {
+    if (cachedDataViewMemory0 === null || cachedDataViewMemory0.buffer.detached === true || (cachedDataViewMemory0.buffer.detached === undefined && cachedDataViewMemory0.buffer !== wasm.memory.buffer)) {
+        cachedDataViewMemory0 = new DataView(wasm.memory.buffer);
+    }
+    return cachedDataViewMemory0;
 }
 
 let cachedFloat32ArrayMemory0 = null;
@@ -539,6 +608,7 @@ function __wbg_finalize_init(instance, module) {
     wasmInstance = instance;
     wasm = instance.exports;
     wasmModule = module;
+    cachedDataViewMemory0 = null;
     cachedFloat32ArrayMemory0 = null;
     cachedFloat64ArrayMemory0 = null;
     cachedUint32ArrayMemory0 = null;

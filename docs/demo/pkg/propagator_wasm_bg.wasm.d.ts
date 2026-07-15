@@ -3,6 +3,7 @@
 export const memory: WebAssembly.Memory;
 export const __wbg_fuelsystembuilder_free: (a: number, b: number) => void;
 export const __wbg_propagator_free: (a: number, b: number) => void;
+export const extract_isochrone: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number) => [number, number, number];
 export const fuelsystembuilder_add_fuel: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number) => [number, number];
 export const fuelsystembuilder_new: () => number;
 export const output_variable_count: () => number;
@@ -24,9 +25,9 @@ export const propagator_set_boundary_conditions: (a: number, b: bigint, c: numbe
 export const propagator_step: (a: number, b: bigint) => [number, number, number];
 export const propagator_time: (a: number) => bigint;
 export const tile_size: () => number;
-export const __wbindgen_externrefs: WebAssembly.Table;
 export const __wbindgen_malloc: (a: number, b: number) => number;
 export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_externrefs: WebAssembly.Table;
 export const __externref_table_dealloc: (a: number) => void;
 export const __wbindgen_free: (a: number, b: number, c: number) => void;
 export const __wbindgen_start: () => void;
