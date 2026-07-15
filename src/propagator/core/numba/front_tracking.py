@@ -303,6 +303,7 @@ def advance_front_until(
                     tile_flags_r,
                     w_dir_r,
                     w_speed_r,  # type: ignore
+                    fli_value,
                     fuels,
                 )
                 for update in spotting_updates:

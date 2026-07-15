@@ -37,6 +37,11 @@ nav:
   - Bibliography: bibliography.md
 
 
+hooks:
+  # Regenerates the fire-spotting figures and injects live constant values into
+  # docs/spotting.md on every build, so the page never drifts from the code.
+  - docs_hooks/spotting.py
+
 plugins:
   - search
   - mkdocstrings:

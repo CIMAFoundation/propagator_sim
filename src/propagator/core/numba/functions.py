@@ -18,9 +18,6 @@ D4 = 2.0
 D5 = 50.0
 A = 1 - ((D1 * (D2 * np.tanh((0 / D3) - D4))) + (0 / D5))
 
-# Fire-spotting distance coefficient
-FIRE_SPOTTING_DISTANCE_COEFFICIENT = 0.191
-
 # Rothermel parameters
 ROTHERMEL_ALPHA1 = 0.0693
 ROTHERMEL_ALPHA2 = 0.0576

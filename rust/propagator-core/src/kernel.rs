@@ -13,7 +13,6 @@ use crate::fuels::{FuelSystem, NO_FUEL};
 use crate::grid::Grid2;
 use crate::models::{
     fireline_intensity, lhv_fuel, p_time, probability_to_neighbour, MoistureModel, RosModel,
-    FIRE_SPOTTING_DISTANCE_COEFFICIENT,
 };
 use crate::rng::Rng;
 use crate::tiles::{local_index, TileGrid, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV};
@@ -31,14 +30,35 @@ const NEIGHBOURS: [(i64, i64); N_NEIGHBOURS] = [
     (1, 1),
 ];
 
-// spotting model constants (Alexandridis et al.)
+// spotting model constants
 /// baseline per-ember ignition probability (before the fuel embers bonus)
 const P_C0: f64 = 0.6;
 /// Poisson mean number of embers emitted by a burning spotting cell
+/// (Alexandridis et al. 2009, 2011)
 const LAMBDA_SPOTTING: f64 = 2.0;
-/// mean/std of the normal "thrust" that sets each ember's flight distance
-const SPOTTING_RN_MEAN: f64 = 100.0;
-const SPOTTING_RN_STD: f64 = 25.0;
+
+// Wind- and intensity-scaled landing-distance model (see docs/spotting.md).
+// The median landing distance is
+//     d_median = SPOTTING_DISTANCE_REF
+//              * (U / SPOTTING_WIND_REF)
+//              * (I / SPOTTING_FLI_REF).powf(SPOTTING_FLI_EXPONENT)
+// so distance -> 0 as wind -> 0, and grows with the source cell's fireline
+// intensity through plume lofting.
+/// median landing distance at the reference state [m]
+const SPOTTING_DISTANCE_REF: f64 = 100.0;
+/// reference wind speed [km/h]
+const SPOTTING_WIND_REF: f64 = 20.0;
+/// reference fireline intensity [kW/m]
+const SPOTTING_FLI_REF: f64 = 10000.0;
+/// loft chaining: H ~ I^(2/3), d ~ U*sqrt(H) ~ U*I^(1/3)
+const SPOTTING_FLI_EXPONENT: f64 = 1.0 / 3.0;
+/// downwind concentration, a wind-INDEPENDENT shape factor (= 1 downwind)
+const SPOTTING_ANISOTROPY: f64 = 5.0;
+/// lognormal spread of the landing distance about its median (Sardoy et al. 2008)
+const SPOTTING_DISTANCE_LOG_SIGMA: f64 = 0.5;
+/// floor on the along-trajectory wind fraction cos(w_dir - angle) used for the
+/// ember travel time, so near-crosswind embers do not get an unbounded time
+const SPOTTING_MIN_ALIGNMENT: f64 = 0.2;
 
 /// The following constants are used in the Fire-Spotting model to assess the delay between ember landing and the development of a fire capable of propagation.
 const SPOTTING_TIME_TO_PROPAGATION_MEDIAN: f64 = 600.0;
@@ -218,7 +238,18 @@ pub fn advance_front_until(
 
         // ember spotting
         if shared.do_spotting && shared.fuels.spotting[idx_from] {
-            compute_spotting(real, shared, time, row, col, slot, local, w_dir, w_speed);
+            compute_spotting(
+                real,
+                shared,
+                time,
+                row,
+                col,
+                slot,
+                local,
+                w_dir,
+                w_speed,
+                fli_value as f64,
+            );
         }
     }
 }
@@ -274,20 +305,34 @@ fn compute_spotting(
     source_local: usize,
     w_dir: f64,
     w_speed: f64,
+    fireline_intensity: f64,
 ) {
     let num_embers = real.rng.poisson(LAMBDA_SPOTTING).min(MAX_SPOTTING_EMBERS);
     let w_speed_ms = w_speed / 3.6;
 
     for _ in 0..num_embers {
         let angle = real.rng.uniform_range(0.0, 2.0 * std::f64::consts::PI);
-        let thrust = real.rng.normal(SPOTTING_RN_MEAN, SPOTTING_RN_STD);
-        let (distance, landing_time_s) = if w_speed_ms <= 0.0 {
+        // Embers are wind-carried and lofted by the fire's own plume: with no
+        // wind or no fire intensity there is no transport, hence no spotting.
+        let (distance, landing_time_s) = if w_speed_ms <= 0.0 || fireline_intensity <= 0.0 {
             (0.0, 1.0)
         } else {
-            let distance = thrust
-                * (w_speed_ms * FIRE_SPOTTING_DISTANCE_COEFFICIENT * ((w_dir - angle).cos() - 1.0))
-                    .exp();
-            (distance, distance / w_speed_ms)
+            // Median landing distance: linear in wind (collapses to zero as
+            // the wind dies) and ~I^(1/3) in fireline intensity via lofting.
+            let d_median = SPOTTING_DISTANCE_REF
+                * (w_speed / SPOTTING_WIND_REF)
+                * (fireline_intensity / SPOTTING_FLI_REF).powf(SPOTTING_FLI_EXPONENT);
+            // Downwind concentration: a wind-independent shape factor.
+            let alignment = (w_dir - angle).cos();
+            let directional = (SPOTTING_ANISOTROPY * (alignment - 1.0)).exp();
+            // Lognormal landing distance about the (directional) median.
+            let median = d_median * directional;
+            let distance = real.rng.lognormal(median.ln(), SPOTTING_DISTANCE_LOG_SIGMA);
+            // Travel time uses the wind component along the ember trajectory
+            // (U * cos(w_dir - angle)), floored to avoid a singularity for
+            // near-crosswind embers.
+            let transport_speed = w_speed_ms * alignment.max(SPOTTING_MIN_ALIGNMENT);
+            (distance, distance / transport_speed)
         };
 
         // short embers behave like normal contact spread

@@ -9,10 +9,9 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 from numba import jit  # type: ignore
-from numpy.random import lognormal, normal, poisson, random, uniform
+from numpy.random import lognormal, poisson, random, uniform
 
 from propagator.core.constants import NO_FUEL
-from propagator.core.numba.functions import FIRE_SPOTTING_DISTANCE_COEFFICIENT
 
 from .functions import (
     fireline_intensity,
@@ -27,13 +26,37 @@ from .tiles import FLAG_FIRE, read_flags
 # depends on vegetation type and density...
 P_C0 = 0.6
 
-# The following constants are used in the Fire-Spotting model.
-# Alexandridis et al. (2009,2011)
+# Poisson mean number of embers emitted by a burning spotting-prone cell.
+# Alexandridis et al. (2009, 2011)
 LAMBDA_SPOTTING = 2.0
-SPOTTING_RN_MEAN = 100
-SPOTTING_RN_STD = 25
 
-# The following constants are used in the Fire-Spotting model to assess the delay between ember landing and the development of a fire capable of propagation.
+# Wind- and intensity-scaled landing-distance model (see docs/spotting.md).
+# The median landing distance is
+#     d_median = SPOTTING_DISTANCE_REF
+#              * (U / SPOTTING_WIND_REF)
+#              * (I / SPOTTING_FLI_REF) ** SPOTTING_FLI_EXPONENT
+# so distance -> 0 as wind -> 0 (spotting is a wind-driven phenomenon) and
+# grows with the source cell's fireline intensity through plume lofting.
+SPOTTING_DISTANCE_REF = (
+    100.0  # m,    median landing distance at the reference state
+)
+SPOTTING_WIND_REF = 20.0  # km/h, reference wind speed
+SPOTTING_FLI_REF = 10000.0  # kW/m, reference fireline intensity
+SPOTTING_FLI_EXPONENT = (
+    1.0 / 3.0
+)  # loft chaining: H ~ I^(2/3), d ~ U*sqrt(H) ~ U*I^(1/3)
+# Downwind concentration: a wind-INDEPENDENT shape factor that shortens embers
+# thrown across/against the wind (= 1 downwind). Keeping it decoupled from wind
+# speed is the key fix for spurious isotropic spotting at very low wind.
+SPOTTING_ANISOTROPY = 5.0
+# Lognormal spread of the landing distance about its median (Sardoy et al. 2008).
+SPOTTING_DISTANCE_LOG_SIGMA = 0.5
+# Floor on the along-trajectory wind fraction cos(w_dir - angle) used for the
+# ember travel time, so near-crosswind embers do not get an unbounded time.
+SPOTTING_MIN_ALIGNMENT = 0.2
+
+# Delay between ember landing and the development of a fire capable of
+# propagation, sampled from a lognormal distribution.
 SPOTTING_TIME_TO_PROPAGATION_MEDIAN = 600.0
 SPOTTING_TIME_TO_PROPAGATION_LOG_SIGMA = 0.4
 
@@ -68,8 +91,14 @@ def fire_spotting(
     angle: float,
     w_dir: float,
     w_speed: float,
+    fireline_intensity_value: float,
 ) -> tuple[float, float]:
-    """Evaluate spotting distance using Alexandridis' formulation.
+    """Sample the landing distance and travel time of a single ember.
+
+    The landing distance is drawn from a lognormal distribution (Sardoy et
+    al. 2008) whose median scales linearly with wind speed and sub-linearly
+    with the source cell's fireline intensity, and whose central value is
+    concentrated downwind. See ``docs/spotting.md`` for the full rationale.
 
     Parameters
     ----------
@@ -79,26 +108,43 @@ def fire_spotting(
         The wind direction (clockwise radians, 0 is north -> south)
     w_speed : float
         The wind speed (km/h)
+    fireline_intensity_value : float
+        The fireline intensity of the source (emitting) cell (kW/m)
 
     Returns
     -------
     tuple[float, float]
         The spotting distance (meters) and the landing time (seconds)
     """
-    r_n = normal(
-        SPOTTING_RN_MEAN, SPOTTING_RN_STD
-    )  # main thrust of the ember: sampled from a
-    # Gaussian Distribution (Alexandridis et al, 2008 and 2011)
     w_speed_ms = w_speed / 3.6  # wind speed [m/s]
-    if w_speed_ms <= 0:
+    # Embers are wind-carried and lofted by the fire's own plume: with no
+    # wind or no fire intensity there is no transport, hence no spotting.
+    if w_speed_ms <= 0.0 or fireline_intensity_value <= 0.0:
         return 0.0, 1.0
-    # Alexandridis' formulation for spotting distance
-    ember_distance = r_n * np.exp(
-        w_speed_ms
-        * FIRE_SPOTTING_DISTANCE_COEFFICIENT
-        * (np.cos(w_dir - angle) - 1)
+
+    # Median landing distance: linear in wind speed (so it collapses to zero
+    # as the wind dies) and ~I^(1/3) in fireline intensity through lofting.
+    d_median = (
+        SPOTTING_DISTANCE_REF
+        * (w_speed / SPOTTING_WIND_REF)
+        * (fireline_intensity_value / SPOTTING_FLI_REF)
+        ** SPOTTING_FLI_EXPONENT
     )
-    ember_landing_time_sec = ember_distance / w_speed_ms
+
+    # Downwind concentration: shortens embers thrown across/against the wind.
+    # This is a pure shape factor, decoupled from wind magnitude.
+    alignment = np.cos(w_dir - angle)
+    directional = np.exp(SPOTTING_ANISOTROPY * (alignment - 1.0))
+
+    # Lognormal landing distance about the (directional) median.
+    median = d_median * directional
+    ember_distance = lognormal(np.log(median), SPOTTING_DISTANCE_LOG_SIGMA)
+
+    # Travel time uses the wind component along the ember trajectory
+    # (U * cos(w_dir - angle)); the alignment is floored to avoid a
+    # singularity for near-crosswind embers.
+    transport_speed = w_speed_ms * max(alignment, SPOTTING_MIN_ALIGNMENT)
+    ember_landing_time_sec = ember_distance / transport_speed
     return ember_distance, ember_landing_time_sec
 
 
@@ -113,6 +159,7 @@ def compute_spotting(
     tile_flags_r: npt.NDArray[np.uint8],
     wind_dir: float,
     wind_speed: float,
+    fireline_intensity_value: float,
     fuels: FuelSystem,
 ) -> list[tuple[int, int, int, float, float, bool]]:
     """
@@ -138,6 +185,8 @@ def compute_spotting(
         The wind direction (clockwise radians, 0 is north -> south)
     wind_speed : float
         The wind speed (km/h)
+    fireline_intensity_value : float
+        The fireline intensity of the source (emitting) cell (kW/m)
     fuels : FuelSystem
         The fuel system object
 
@@ -168,6 +217,7 @@ def compute_spotting(
             ember_angle,
             wind_dir,
             wind_speed,
+            fireline_intensity_value,
         )
 
         # filter out short embers

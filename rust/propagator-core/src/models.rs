@@ -37,9 +37,6 @@ const Q: f64 = 2442.0;
 /// Trucchia moisture polynomial.
 pub const MOISTURE_OF_EXTINCTION: f64 = 0.3;
 
-/// Fire-spotting distance coefficient (Alexandridis).
-pub const FIRE_SPOTTING_DISTANCE_COEFFICIENT: f64 = 0.191;
-
 /// Rate-of-spread model selecting how wind and slope scale the base ROS.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum RosModel {
