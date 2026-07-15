@@ -769,6 +769,12 @@ sim = Propagator(
 <li>The ember lands after a travel time proportional to distance over wind
   speed, and ignites the landing cell with a constant base probability
   corrected by the receiving cell's vegetation.</li>
+<li>Once an ember successfully ignites a cell,
+  the model adds a <strong>delay before the spot fire becomes capable of
+  propagation</strong>, to represent the time an ember needs to smoulder and develop
+  into a spreading fire. This delay is sampled per ember from a lognormal
+  distribution (median 600 s, log-scale standard deviation 0.4) and added to
+  the ember travel time. The cell only starts spreading once this combined time has elapsed.</li>
 </ul>
 <p>With no wind, embers travel a negligible distance: spotting is effectively a
 strong-wind phenomenon in this formulation.</p>
