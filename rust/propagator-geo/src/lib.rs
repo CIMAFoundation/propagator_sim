@@ -286,7 +286,7 @@ pub fn extract_isochrone(
 }
 
 fn median_filter(values: &[f64], rows: usize, cols: usize, kernel: usize) -> Result<Vec<f64>> {
-    if kernel == 0 || kernel.is_multiple_of(2) {
+    if kernel == 0 || kernel % 2 == 0 {
         return Err(IsochroneError::InvalidMedianKernel { kernel });
     }
     let radius = kernel / 2;
