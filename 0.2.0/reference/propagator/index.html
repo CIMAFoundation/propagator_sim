@@ -1,0 +1,4833 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="PROPAGATOR: An Operational Cellular-Automata Based Wildfire Simulator">
+      
+      
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../io/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Core - PROPAGATOR Sim</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/cima-theme.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#propagatorcore" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="PROPAGATOR Sim" class="md-header__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
+      
+  <img src="../../img/cima.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            PROPAGATOR Sim
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Core
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="PROPAGATOR Sim" class="md-nav__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
+      
+  <img src="../../img/cima.png" alt="logo">
+
+    </a>
+    PROPAGATOR Sim
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../programmatic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programmatic Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../outputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulation Outputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../spotting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fire Spotting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#public-facade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public Facade
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        core
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="core">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.BoundaryConditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BoundaryConditions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.PropagatorStats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PropagatorStats
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PropagatorStats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.PropagatorStats.to_dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Propagator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Propagator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_fire_probability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_fire_probability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_spotting_generation_probability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_spotting_generation_probability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_spotting_receiving_probability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_spotting_receiving_probability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_ros_max" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_ros_max
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_arrival_time_min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_arrival_time_min
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_arrival_time_mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_arrival_time_mean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_ros_mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_ros_mean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_fireline_int_max" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_fireline_int_max
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_fireline_int_mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_fireline_int_mean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.set_boundary_conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        set_boundary_conditions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        step
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.get_output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.next_time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        next_time
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.PropagatorOutOfBoundsError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PropagatorOutOfBoundsError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.get_p_moisture_fn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_p_moisture_fn
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.get_p_time_fn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_p_time_fn
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Models
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.core.models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        models
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.UpdateBatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UpdateBatch
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UpdateBatch">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.UpdateBatch.get_bbox" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_bbox
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.UpdateBatch.extend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extend
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.UpdateBatchWithTime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UpdateBatchWithTime
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UpdateBatchWithTime">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.UpdateBatchWithTime.split_by_time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        split_by_time
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.PropagatorError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PropagatorError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.BoundaryConditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BoundaryConditions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.PropagatorStats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PropagatorStats
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PropagatorStats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.PropagatorStats.to_dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.PropagatorOutput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PropagatorOutput
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#simulator-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simulator Implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.core.propagator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        propagator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="propagator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.PropagatorOutOfBoundsError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PropagatorOutOfBoundsError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Propagator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Propagator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_fire_probability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_fire_probability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_spotting_generation_probability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_spotting_generation_probability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_spotting_receiving_probability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_spotting_receiving_probability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_ros_max" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_ros_max
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_arrival_time_min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_arrival_time_min
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_arrival_time_mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_arrival_time_mean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_ros_mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_ros_mean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_fireline_int_max" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_fireline_int_max
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_fireline_int_mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_fireline_int_mean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.set_boundary_conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        set_boundary_conditions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        step
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.get_output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.next_time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        next_time
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scheduler-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduler Helpers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.core.scheduler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scheduler
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="scheduler">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.scheduler.SchedulerEvent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SchedulerEvent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.scheduler.SortedDict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SortedDict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.scheduler.Scheduler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduler
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scheduler">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.scheduler.Scheduler.push_updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        push_updates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.scheduler.Scheduler.add_event" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        add_event
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../numba/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Numba Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../bibliography/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bibliography
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#public-facade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public Facade
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        core
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="core">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.BoundaryConditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BoundaryConditions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.PropagatorStats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PropagatorStats
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PropagatorStats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.PropagatorStats.to_dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Propagator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Propagator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_fire_probability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_fire_probability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_spotting_generation_probability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_spotting_generation_probability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_spotting_receiving_probability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_spotting_receiving_probability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_ros_max" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_ros_max
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_arrival_time_min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_arrival_time_min
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_arrival_time_mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_arrival_time_mean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_ros_mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_ros_mean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_fireline_int_max" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_fireline_int_max
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_fireline_int_mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_fireline_int_mean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.compute_stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.set_boundary_conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        set_boundary_conditions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        step
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.get_output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.next_time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        next_time
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.PropagatorOutOfBoundsError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PropagatorOutOfBoundsError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.get_p_moisture_fn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_p_moisture_fn
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.get_p_time_fn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_p_time_fn
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Models
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.core.models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        models
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.UpdateBatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UpdateBatch
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UpdateBatch">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.UpdateBatch.get_bbox" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_bbox
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.UpdateBatch.extend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extend
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.UpdateBatchWithTime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UpdateBatchWithTime
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UpdateBatchWithTime">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.UpdateBatchWithTime.split_by_time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        split_by_time
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.PropagatorError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PropagatorError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.BoundaryConditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BoundaryConditions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.PropagatorStats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PropagatorStats
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PropagatorStats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.PropagatorStats.to_dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.models.PropagatorOutput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PropagatorOutput
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#simulator-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Simulator Implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.core.propagator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        propagator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="propagator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.PropagatorOutOfBoundsError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PropagatorOutOfBoundsError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Propagator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Propagator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_fire_probability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_fire_probability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_spotting_generation_probability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_spotting_generation_probability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_spotting_receiving_probability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_spotting_receiving_probability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_ros_max" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_ros_max
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_arrival_time_min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_arrival_time_min
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_arrival_time_mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_arrival_time_mean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_ros_mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_ros_mean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_fireline_int_max" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_fireline_int_max
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_fireline_int_mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_fireline_int_mean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.compute_stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        compute_stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.set_boundary_conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        set_boundary_conditions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        step
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.get_output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.next_time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        next_time
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scheduler-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduler Helpers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.core.scheduler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scheduler
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="scheduler">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.scheduler.SchedulerEvent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SchedulerEvent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.scheduler.SortedDict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SortedDict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.scheduler.Scheduler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scheduler
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scheduler">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.scheduler.Scheduler.push_updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        push_updates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.scheduler.Scheduler.add_event" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        add_event
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="propagatorcore">propagator.core</h1>
+<p>High-level simulation primitives and facades for running PROPAGATOR from Python.
+The sections below cover the public API exposed by <code>propagator.core</code> along with
+the supporting data models and scheduling helpers.</p>
+<h2 id="public-facade">Public Facade</h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="propagator.core" class="doc doc-heading">
+            <code>propagator.core</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Package init for the wildfire propagator core.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.BoundaryConditions" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">BoundaryConditions</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">moisture</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">wind_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">wind_speed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ignitions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">additional_moisture</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vegetation_changes</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Boundary conditions applied at or after a given simulation time.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.BoundaryConditions.time">time</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Simulation time the conditions refer to (seconds from simulation start).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.BoundaryConditions.moisture">moisture</span></code></td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fuel moisture map (%).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.BoundaryConditions.wind_dir">wind_dir</span></code></td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Wind direction map (weather convention, degrees clockwise, north is 0).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.BoundaryConditions.wind_speed">wind_speed</span></code></td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Wind speed map (km/h).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.BoundaryConditions.ignitions">ignitions</span></code></td>
+            <td>
+                  <code>Optional[</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>npt.NDArray[np.bool_]
+| list[tuple[int, int] | tuple[int, int, int]]</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.BoundaryConditions.]">]</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Ignitions to enqueue. Accepts either a boolean raster (2D applies to
+every realization; 3D maps explicit <code>realization</code> planes) or a list of
+<code>(row, col)</code> / <code>(row, col, realization)</code> tuples.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.BoundaryConditions.additional_moisture">additional_moisture</span></code></td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Extra moisture to add to fuel (%), can be sparse.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.BoundaryConditions.vegetation_changes">vegetation_changes</span></code></td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Raster of vegetation type overrides (NaN to skip).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.PropagatorStats" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">PropagatorStats</span><span class="p">(</span><span class="n">n_active</span><span class="p">,</span> <span class="n">area_mean</span><span class="p">,</span> <span class="n">area_50</span><span class="p">,</span> <span class="n">area_75</span><span class="p">,</span> <span class="n">area_90</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Summary statistics for the current simulation state.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.PropagatorStats.to_dict" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">to_dict</span><span class="p">(</span><span class="n">c_time</span><span class="p">,</span> <span class="n">ref_date</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Serialize stats with the current simulation time expressed in seconds.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.Propagator" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">Propagator</span><span class="p">(</span><span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">fuels</span><span class="o">=</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">FUEL_SYSTEM_LEGACY</span><span class="p">)(),</span> <span class="n">cellsize</span><span class="o">=</span><span class="n">CELLSIZE</span><span class="p">,</span> <span class="n">do_spotting</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">realizations</span><span class="o">=</span><span class="n">REALIZATIONS</span><span class="p">,</span> <span class="n">p_time_fn</span><span class="o">=</span><span class="n">get_p_time_fn</span><span class="p">(</span><span class="n">ROS_DEFAULT</span><span class="p">),</span> <span class="n">p_moist_fn</span><span class="o">=</span><span class="n">get_p_moisture_fn</span><span class="p">(</span><span class="n">MOISTURE_MODEL_DEFAULT</span><span class="p">),</span> <span class="n">out_of_bounds_mode</span><span class="o">=</span><span class="s1">&#39;raise&#39;</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Stochastic cellular wildfire spread simulator.</p>
+<p>PROPAGATOR evolves a binary fire state over a regular grid for a
+configurable number of realizations.
+Spread depends on vegetation, topography and environmental drivers
+(wind, moisture) through pluggable probability and travel-time functions.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.Propagator.veg">veg</span></code></td>
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>2D array of vegetation codes as defined in the provided FuelSystem</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.Propagator.dem">dem</span></code></td>
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>2D array of elevation values (meters above sea level).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.Propagator.fuels">fuels</span></code></td>
+            <td>
+                  <code>(<a class="autorefs autorefs-internal" title="FuelSystem(n_fuels) (propagator.core.numba.FuelSystem)" href="../numba/#propagator.core.numba.FuelSystem">FuelSystem</a>, <span title="optional">optional</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Object defining fuels types and fire propagation
+probability between fuel types</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.Propagator.cellsize">cellsize</span></code></td>
+            <td>
+                  <code>(<span title="float">float</span>, <span title="optional">optional</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The size of lattice (meters).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.Propagator.do_spotting">do_spotting</span></code></td>
+            <td>
+                  <code>(<span title="bool">bool</span>, <span title="optional">optional</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to enable fire-spotting in the model.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.Propagator.realizations">realizations</span></code></td>
+            <td>
+                  <code>(<span title="int">int</span>, <span title="optional">optional</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of stochastic realizations to simulate.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.Propagator.p_time_fn">p_time_fn</span></code></td>
+            <td>
+                  <code>(<span title="typing.Any">Any</span>, <span title="optional">optional</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The function to compute the spread time (must be jit-compiled).
+Units are compliant with other functions.
+    signature: (v0: float, dh: float, angle_to: float, dist: float,
+    moist: float, w_dir: float, w_speed: float) -&gt; tuple[float, float]</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.Propagator.p_moist_fn">p_moist_fn</span></code></td>
+            <td>
+                  <code>(<span title="typing.Any">Any</span>, <span title="optional">optional</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The function to compute the moisture probability (must be jit-compiled)
+Units are compliant with other functions.
+    signature: (moist: float) -&gt; float</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.Propagator.out_of_bounds_mode">out_of_bounds_mode</span></code></td>
+            <td>
+                  <code>(<span title="typing.Literal">Literal</span>[&#39;ignore&#39;, &#39;error&#39;], <span title="optional">optional</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to raise an error if out-of-bounds updates are detected.
+Default is "error".</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.Propagator.compute_fire_probability" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_fire_probability</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return mean burn probability across realizations for each cell.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>2D array with values in [0, 1].</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.Propagator.compute_spotting_generation_probability" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_spotting_generation_probability</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell spotting generation probability.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.Propagator.compute_spotting_receiving_probability" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_spotting_receiving_probability</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell spotting receiving probability.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.Propagator.compute_ros_max" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_ros_max</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell maximum Rate of Spread across realizations.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>2D array with max RoS per cell.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.Propagator.compute_arrival_time_min" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_arrival_time_min</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell minimum arrival time across realizations.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.Propagator.compute_arrival_time_mean" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_arrival_time_mean</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell mean arrival time across realizations where burned.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.Propagator.compute_ros_mean" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_ros_mean</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell mean Rate of Spread, ignoring zeros as no-spread.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>2D array with mean RoS per cell.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.Propagator.compute_fireline_int_max" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_fireline_int_max</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell maximum fireline intensity across realizations.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>2D array of max intensity values.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.Propagator.compute_fireline_int_mean" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_fireline_int_mean</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell mean fireline intensity,
+ignoring zeros as no-spread.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>2D array of mean intensity values.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.Propagator.compute_stats" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_stats</span><span class="p">(</span><span class="n">values</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute simple area-based stats and number of active cells.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>values</code>
+            </td>
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fire probability map in [0, 1].</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="PropagatorStats(n_active, area_mean, area_50, area_75, area_90)
+
+  
+      dataclass
+   (propagator.core.models.PropagatorStats)" href="#propagator.core.models.PropagatorStats">PropagatorStats</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Dataclass with counters and area summaries.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.Propagator.set_boundary_conditions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">set_boundary_conditions</span><span class="p">(</span><span class="n">boundary_condition</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Externally set boundary conditions at desired time in the scheduler.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>boundary_condition</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="BoundaryConditions(time, moisture=None, wind_dir=None, wind_speed=None, ignitions=None, additional_moisture=None, vegetation_changes=None)
+
+  
+      dataclass
+   (propagator.core.models.BoundaryConditions)" href="#propagator.core.models.BoundaryConditions">BoundaryConditions</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Conditions to apply.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.Propagator.step" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">step</span><span class="p">(</span><span class="n">seconds</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">until</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Advance the simulation to the next scheduled
+time and update state.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.Propagator.get_output" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_output</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Assemble the current outputs and summary stats into a dataclass.</p>
+<p>Returns:
+    PropagatorOutput: Snapshot of fire probability,
+        RoS, intensity, stats.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.Propagator.next_time" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">next_time</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Get the next time step.</p>
+<p>Returns:
+    int | None: 0 at initialization; None if no more events; otherwise
+    the next scheduled simulation time.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.PropagatorOutOfBoundsError" class="doc doc-heading">
+            <code>PropagatorOutOfBoundsError</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="Exception">Exception</span></code></p>
+
+
+
+        <p>Custom error for out-of-bounds updates in the Propagator.</p>
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="propagator.core.get_p_moisture_fn" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_p_moisture_fn</span><span class="p">(</span><span class="n">moist_model_code</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Select a moisture probability correction by code.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>moist_model_code</code>
+            </td>
+            <td>
+                  <code><span title="propagator.core.numba.functions.MoistureModel">MoistureModel</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The code of the moisture model to select.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>    function with signature</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(moist: float) -&gt; float</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="propagator.core.get_p_time_fn" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_p_time_fn</span><span class="p">(</span><span class="n">ros_model_code</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Select a rate-of-spread model by code.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>ros_model_code</code>
+            </td>
+            <td>
+                  <code><span title="propagator.core.numba.functions.RateOfSpreadModel">RateOfSpreadModel</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The code of the rate-of-spread model to select.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code>    function with signature</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(v0, dem_from, dem_to, angle_to, dist, moist, w_dir, w_speed) -&gt; (time_seconds, ros)</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="data-models">Data Models</h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="propagator.core.models" class="doc doc-heading">
+            <code>propagator.core.models</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Core wildfire propagation engine.</p>
+<p>This module defines the main simulation primitives and the <code>Propagator</code> class
+that evolves a fire state over a grid using wind, slope, vegetation, and
+moisture inputs. Public dataclasses capture boundary conditions, actions,
+summary statistics, and output snapshots suitable for CLI and IO layers.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.models.UpdateBatch" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">UpdateBatch</span><span class="p">(</span><span class="n">rows</span><span class="o">=</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)))(),</span> <span class="n">cols</span><span class="o">=</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)))(),</span> <span class="n">realizations</span><span class="o">=</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)))(),</span> <span class="n">rates_of_spread</span><span class="o">=</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)))(),</span> <span class="n">fireline_intensities</span><span class="o">=</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)))())</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.models.UpdateBatch.get_bbox" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_bbox</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Get bounding box, computing lazily if not yet calculated.</p>
+<p>External code should use this instead of accessing .bbox directly
+to ensure the bbox is computed when needed.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.models.UpdateBatch.extend" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">extend</span><span class="p">(</span><span class="n">other</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Merge another UpdateBatch into this one.</p>
+<p>Concatenates all arrays and invalidates the cached bounding box.</p>
+<p>OPTIMIZATION: Previously had complex logic to merge bboxes, checking
+if either was None, then computing min/max of merged bounds. This was
+wasteful because:
+1. Often the merged bbox is never used
+2. If it is used, we can compute it directly from the merged arrays</p>
+<p>New approach: Simply invalidate the bbox cache. If someone needs it
+later via get_bbox(), it will be computed fresh from all data.</p>
+<p>Performance: Avoids 8 min/max operations per extend call in the
+common case where bbox isn't needed afterward.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.models.UpdateBatchWithTime" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">UpdateBatchWithTime</span><span class="p">(</span><span class="n">times</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">cols</span><span class="p">,</span> <span class="n">realizations</span><span class="p">,</span> <span class="n">rates_of_spread</span><span class="p">,</span> <span class="n">fireline_intensities</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.models.UpdateBatchWithTime.split_by_time" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">split_by_time</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Split updates into separate batches grouped by time.</p>
+<p>OPTIMIZATION: This function is called in the hot path (Scheduler.push_updates)
+and was identified as a major bottleneck. Several optimizations:</p>
+<ol>
+<li>
+<p>FAST PATH: Check if all updates are at the same time (common case).
+   If so, avoid array indexing and just wrap the existing arrays.
+   This happens frequently when processing a batch of cells that all
+   spread to neighbors at the same relative time.</p>
+</li>
+<li>
+<p>REDUCED OBJECT CREATION: Eliminated intermediate variables that
+   were created just to pass to UpdateBatch constructor. Now pass
+   sliced arrays directly.</p>
+</li>
+<li>
+<p>TYPE CONVERSION: Move int() conversion outside the inner operations
+   to reduce redundant type checking.</p>
+</li>
+</ol>
+<p>Note: Each UpdateBatch created here will have _bbox_computed=False,
+deferring expensive min/max calculations until/unless needed.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.models.PropagatorError" class="doc doc-heading">
+            <code>PropagatorError</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="Exception">Exception</span></code></p>
+
+
+
+        <p>Domain-specific error raised by PROPAGATOR.</p>
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.models.BoundaryConditions" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">BoundaryConditions</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">moisture</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">wind_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">wind_speed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ignitions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">additional_moisture</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vegetation_changes</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Boundary conditions applied at or after a given simulation time.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.models.BoundaryConditions.time">time</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Simulation time the conditions refer to (seconds from simulation start).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.models.BoundaryConditions.moisture">moisture</span></code></td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fuel moisture map (%).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.models.BoundaryConditions.wind_dir">wind_dir</span></code></td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Wind direction map (weather convention, degrees clockwise, north is 0).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.models.BoundaryConditions.wind_speed">wind_speed</span></code></td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Wind speed map (km/h).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.models.BoundaryConditions.ignitions">ignitions</span></code></td>
+            <td>
+                  <code>Optional[</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>npt.NDArray[np.bool_]
+| list[tuple[int, int] | tuple[int, int, int]]</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.models.BoundaryConditions.]">]</span></code></td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Ignitions to enqueue. Accepts either a boolean raster (2D applies to
+every realization; 3D maps explicit <code>realization</code> planes) or a list of
+<code>(row, col)</code> / <code>(row, col, realization)</code> tuples.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.models.BoundaryConditions.additional_moisture">additional_moisture</span></code></td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Extra moisture to add to fuel (%), can be sparse.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.models.BoundaryConditions.vegetation_changes">vegetation_changes</span></code></td>
+            <td>
+                  <code><span title="typing.Optional">Optional</span>[<span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Raster of vegetation type overrides (NaN to skip).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.models.PropagatorStats" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">PropagatorStats</span><span class="p">(</span><span class="n">n_active</span><span class="p">,</span> <span class="n">area_mean</span><span class="p">,</span> <span class="n">area_50</span><span class="p">,</span> <span class="n">area_75</span><span class="p">,</span> <span class="n">area_90</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Summary statistics for the current simulation state.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.models.PropagatorStats.to_dict" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">to_dict</span><span class="p">(</span><span class="n">c_time</span><span class="p">,</span> <span class="n">ref_date</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Serialize stats with the current simulation time expressed in seconds.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.models.PropagatorOutput" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">PropagatorOutput</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">fire_probability</span><span class="p">,</span> <span class="n">spotting_generation_probability</span><span class="p">,</span> <span class="n">spotting_receiving_probability</span><span class="p">,</span> <span class="n">mean_arrival_time</span><span class="p">,</span> <span class="n">min_arrival_time</span><span class="p">,</span> <span class="n">ros_mean</span><span class="p">,</span> <span class="n">ros_max</span><span class="p">,</span> <span class="n">fli_mean</span><span class="p">,</span> <span class="n">fli_max</span><span class="p">,</span> <span class="n">stats</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Snapshot of simulation outputs at a given time step.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="simulator-implementation">Simulator Implementation</h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="propagator.core.propagator" class="doc doc-heading">
+            <code>propagator.core.propagator</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Core wildfire propagation engine.</p>
+<p>This module defines the main simulation primitives and the <code>Propagator</code> class
+that evolves a fire state over a grid using wind, slope, vegetation, and
+moisture inputs. Public dataclasses capture boundary conditions, actions,
+summary statistics, and output snapshots suitable for CLI and IO layers.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.propagator.PropagatorOutOfBoundsError" class="doc doc-heading">
+            <code>PropagatorOutOfBoundsError</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="Exception">Exception</span></code></p>
+
+
+
+        <p>Custom error for out-of-bounds updates in the Propagator.</p>
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.propagator.Propagator" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">Propagator</span><span class="p">(</span><span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">fuels</span><span class="o">=</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">FUEL_SYSTEM_LEGACY</span><span class="p">)(),</span> <span class="n">cellsize</span><span class="o">=</span><span class="n">CELLSIZE</span><span class="p">,</span> <span class="n">do_spotting</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">realizations</span><span class="o">=</span><span class="n">REALIZATIONS</span><span class="p">,</span> <span class="n">p_time_fn</span><span class="o">=</span><span class="n">get_p_time_fn</span><span class="p">(</span><span class="n">ROS_DEFAULT</span><span class="p">),</span> <span class="n">p_moist_fn</span><span class="o">=</span><span class="n">get_p_moisture_fn</span><span class="p">(</span><span class="n">MOISTURE_MODEL_DEFAULT</span><span class="p">),</span> <span class="n">out_of_bounds_mode</span><span class="o">=</span><span class="s1">&#39;raise&#39;</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Stochastic cellular wildfire spread simulator.</p>
+<p>PROPAGATOR evolves a binary fire state over a regular grid for a
+configurable number of realizations.
+Spread depends on vegetation, topography and environmental drivers
+(wind, moisture) through pluggable probability and travel-time functions.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.propagator.Propagator.veg">veg</span></code></td>
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>2D array of vegetation codes as defined in the provided FuelSystem</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.propagator.Propagator.dem">dem</span></code></td>
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>2D array of elevation values (meters above sea level).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.propagator.Propagator.fuels">fuels</span></code></td>
+            <td>
+                  <code>(<a class="autorefs autorefs-internal" title="FuelSystem(n_fuels) (propagator.core.numba.FuelSystem)" href="../numba/#propagator.core.numba.FuelSystem">FuelSystem</a>, <span title="optional">optional</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Object defining fuels types and fire propagation
+probability between fuel types</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.propagator.Propagator.cellsize">cellsize</span></code></td>
+            <td>
+                  <code>(<span title="float">float</span>, <span title="optional">optional</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The size of lattice (meters).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.propagator.Propagator.do_spotting">do_spotting</span></code></td>
+            <td>
+                  <code>(<span title="bool">bool</span>, <span title="optional">optional</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to enable fire-spotting in the model.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.propagator.Propagator.realizations">realizations</span></code></td>
+            <td>
+                  <code>(<span title="int">int</span>, <span title="optional">optional</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of stochastic realizations to simulate.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.propagator.Propagator.p_time_fn">p_time_fn</span></code></td>
+            <td>
+                  <code>(<span title="typing.Any">Any</span>, <span title="optional">optional</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The function to compute the spread time (must be jit-compiled).
+Units are compliant with other functions.
+    signature: (v0: float, dh: float, angle_to: float, dist: float,
+    moist: float, w_dir: float, w_speed: float) -&gt; tuple[float, float]</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.propagator.Propagator.p_moist_fn">p_moist_fn</span></code></td>
+            <td>
+                  <code>(<span title="typing.Any">Any</span>, <span title="optional">optional</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The function to compute the moisture probability (must be jit-compiled)
+Units are compliant with other functions.
+    signature: (moist: float) -&gt; float</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="propagator.core.propagator.Propagator.out_of_bounds_mode">out_of_bounds_mode</span></code></td>
+            <td>
+                  <code>(<span title="typing.Literal">Literal</span>[&#39;ignore&#39;, &#39;error&#39;], <span title="optional">optional</span>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to raise an error if out-of-bounds updates are detected.
+Default is "error".</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.propagator.Propagator.compute_fire_probability" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_fire_probability</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return mean burn probability across realizations for each cell.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>2D array with values in [0, 1].</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.propagator.Propagator.compute_spotting_generation_probability" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_spotting_generation_probability</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell spotting generation probability.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.propagator.Propagator.compute_spotting_receiving_probability" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_spotting_receiving_probability</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell spotting receiving probability.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.propagator.Propagator.compute_ros_max" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_ros_max</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell maximum Rate of Spread across realizations.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>2D array with max RoS per cell.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.propagator.Propagator.compute_arrival_time_min" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_arrival_time_min</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell minimum arrival time across realizations.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.propagator.Propagator.compute_arrival_time_mean" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_arrival_time_mean</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell mean arrival time across realizations where burned.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.propagator.Propagator.compute_ros_mean" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_ros_mean</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell mean Rate of Spread, ignoring zeros as no-spread.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>2D array with mean RoS per cell.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.propagator.Propagator.compute_fireline_int_max" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_fireline_int_max</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell maximum fireline intensity across realizations.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>2D array of max intensity values.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.propagator.Propagator.compute_fireline_int_mean" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_fireline_int_mean</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return per-cell mean fireline intensity,
+ignoring zeros as no-spread.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>2D array of mean intensity values.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.propagator.Propagator.compute_stats" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compute_stats</span><span class="p">(</span><span class="n">values</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute simple area-based stats and number of active cells.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>values</code>
+            </td>
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fire probability map in [0, 1].</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="PropagatorStats(n_active, area_mean, area_50, area_75, area_90)
+
+  
+      dataclass
+   (propagator.core.models.PropagatorStats)" href="#propagator.core.models.PropagatorStats">PropagatorStats</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Dataclass with counters and area summaries.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.propagator.Propagator.set_boundary_conditions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">set_boundary_conditions</span><span class="p">(</span><span class="n">boundary_condition</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Externally set boundary conditions at desired time in the scheduler.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>boundary_condition</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="BoundaryConditions(time, moisture=None, wind_dir=None, wind_speed=None, ignitions=None, additional_moisture=None, vegetation_changes=None)
+
+  
+      dataclass
+   (propagator.core.models.BoundaryConditions)" href="#propagator.core.models.BoundaryConditions">BoundaryConditions</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Conditions to apply.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.propagator.Propagator.step" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">step</span><span class="p">(</span><span class="n">seconds</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">until</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Advance the simulation to the next scheduled
+time and update state.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.propagator.Propagator.get_output" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_output</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Assemble the current outputs and summary stats into a dataclass.</p>
+<p>Returns:
+    PropagatorOutput: Snapshot of fire probability,
+        RoS, intensity, stats.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.propagator.Propagator.next_time" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">next_time</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Get the next time step.</p>
+<p>Returns:
+    int | None: 0 at initialization; None if no more events; otherwise
+    the next scheduled simulation time.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="scheduler-helpers">Scheduler Helpers</h2>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="propagator.core.scheduler" class="doc doc-heading">
+            <code>propagator.core.scheduler</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Lightweight event scheduler for propagation updates.</p>
+<p>Stores future updates grouped by simulation time and exposes utilities to push
+events, pop the earliest batch, and inspect active realizations.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.scheduler.SchedulerEvent" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">SchedulerEvent</span><span class="p">(</span><span class="n">updates</span><span class="o">=</span><span class="n">UpdateBatch</span><span class="p">(),</span> <span class="n">moisture</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">wind_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">wind_speed</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">additional_moisture</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">vegetation_changes</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Represents a scheduled event in the simulation.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.scheduler.SortedDict" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">SortedDict</span><span class="p">()</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Sorted dictionary optimized for time-ordered event scheduling.</p>
+<p>This data structure maintains events in sorted order by time (key) while
+allowing O(1) lookup and efficient insertion. It's specifically optimized
+for the common pattern of:
+1. Inserting events at various future times
+2. Always popping the earliest (minimum) event</p>
+<p>Performance characteristics:
+- Insertion: O(n) with bisect.insort vs O(n log n) with naive sort
+- Lookup: O(1) via dict
+- Pop earliest: O(1) via list indexing
+- Memory: O(n) for both dict and sorted list</p>
+<p>The frozen=True decorator prevents accidental modification of the
+data structure internals, enforcing use through the defined interface.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="propagator.core.scheduler.Scheduler" class="doc doc-heading">
+              <code class="highlight language-python"><span class="n">Scheduler</span><span class="p">(</span><span class="n">realizations</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Lightweight event scheduler for propagation updates.</p>
+<p>Generic over the time key type (int or float), so your inputs and outputs
+stay consistent.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.scheduler.Scheduler.push_updates" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">push_updates</span><span class="p">(</span><span class="n">updates</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Add a batch of time-stamped updates to the scheduler.</p>
+<p>This is the HOT PATH of the simulation - called once per step with
+all new fire spread updates. Optimizations here have outsized impact.</p>
+<p>OPTIMIZATION NOTES:
+1. split_by_time() creates separate UpdateBatch per time value
+   - Fast path when all updates at same time (common case)
+   - Lazy bbox calculation avoids min/max overhead</p>
+<ol>
+<li>SortedDict uses bisect.insort() for O(n) insertion vs O(n log n)</li>
+<li>
+<p>Critical because we insert many events per step</p>
+</li>
+<li>
+<p>extend() merges updates efficiently without redundant bbox calculation</p>
+</li>
+</ol>
+<p>The flow is:
+UpdateBatchWithTime -&gt; split by time -&gt; UpdateBatch per time slot
+                    -&gt; merge into existing events or create new ones
+                    -&gt; bisect.insort into sorted event queue</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>updates</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="UpdateBatchWithTime(times, rows, cols, realizations, rates_of_spread, fireline_intensities)
+
+  
+      dataclass
+   (propagator.core.models.UpdateBatchWithTime)" href="#propagator.core.models.UpdateBatchWithTime">UpdateBatchWithTime</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Batch of updates with associated ignition times</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.scheduler.Scheduler.add_event" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">add_event</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Adds an event to the scheduler.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>time</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Time for the event</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>event</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="SchedulerEvent(updates=UpdateBatch(), moisture=None, wind_dir=None, wind_speed=None, additional_moisture=None, vegetation_changes=None)
+
+  
+      dataclass
+   (propagator.core.scheduler.SchedulerEvent)" href="#propagator.core.scheduler.SchedulerEvent">SchedulerEvent</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>New event structure</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/cima-brand.js"></script>
+      
+    
+  </body>
+</html>

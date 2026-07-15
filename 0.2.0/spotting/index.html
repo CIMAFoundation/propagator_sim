@@ -1,0 +1,1278 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="PROPAGATOR: An Operational Cellular-Automata Based Wildfire Simulator">
+      
+      
+      
+      
+        <link rel="prev" href="../outputs/">
+      
+      
+        <link rel="next" href="../reference/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Fire Spotting - PROPAGATOR Sim</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../stylesheets/cima-theme.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#fire-spotting" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="PROPAGATOR Sim" class="md-header__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
+      
+  <img src="../img/cima.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            PROPAGATOR Sim
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Fire Spotting
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="PROPAGATOR Sim" class="md-nav__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
+      
+  <img src="../img/cima.png" alt="logo">
+
+    </a>
+    PROPAGATOR Sim
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../programmatic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programmatic Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../outputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulation Outputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fire Spotting
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fire Spotting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#enabling-spotting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Spotting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#landing-distance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Landing distance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#landing-and-ignition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Landing and ignition
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rationale-for-the-non-obvious-parametrizations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rationale for the non-obvious parametrizations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Rationale for the non-obvious parametrizations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-median-linear-in-wind-speed-u-wind_ref" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Median linear in wind speed — (U / WIND_REF)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-intensity-exponent-of-13-i-fli_ref13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Intensity exponent of 1/3 — (I / FLI_REF)^(1/3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-anisotropy-decoupled-from-wind-speed-anisotropy-cos-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Anisotropy decoupled from wind speed — ANISOTROPY · (cos Δθ − 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-lognormal-landing-distance-lognormallnmedian-log_sigma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Lognormal landing distance — LogNormal(ln(median), LOG_SIGMA)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-direction-aware-landing-time-distance-u-maxcos-min_alignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Direction-aware landing time — distance / (U · max(cos Δθ, MIN_ALIGNMENT))
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration-and-tuning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calibration and tuning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../reference/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/propagator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/numba/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Numba Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bibliography/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bibliography
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#enabling-spotting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling Spotting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#landing-distance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Landing distance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#landing-and-ignition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Landing and ignition
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rationale-for-the-non-obvious-parametrizations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rationale for the non-obvious parametrizations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Rationale for the non-obvious parametrizations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-median-linear-in-wind-speed-u-wind_ref" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Median linear in wind speed — (U / WIND_REF)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-intensity-exponent-of-13-i-fli_ref13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Intensity exponent of 1/3 — (I / FLI_REF)^(1/3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-anisotropy-decoupled-from-wind-speed-anisotropy-cos-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Anisotropy decoupled from wind speed — ANISOTROPY · (cos Δθ − 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-lognormal-landing-distance-lognormallnmedian-log_sigma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Lognormal landing distance — LogNormal(ln(median), LOG_SIGMA)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-direction-aware-landing-time-distance-u-maxcos-min_alignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Direction-aware landing time — distance / (U · max(cos Δθ, MIN_ALIGNMENT))
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#calibration-and-tuning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Calibration and tuning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="fire-spotting">Fire Spotting</h1>
+<p>Fire spotting is the ignition of new fires ahead of the main front by
+wind-carried embers. PROPAGATOR launches embers from burning, spotting-prone
+cells, transports them downwind, and tracks where they are generated and where
+they land in every realization.</p>
+<h2 id="enabling-spotting">Enabling Spotting</h2>
+<p>Spotting is controlled by two switches:</p>
+<ol>
+<li><strong>The simulation flag.</strong> Set <code>"do_spotting": true</code> in the JSON
+   configuration (CLI runs), or pass <code>do_spotting=True</code> when constructing the
+   <code>Propagator</code> programmatically. When the flag is off, spotting is disabled
+   for every fuel regardless of the fuel definitions.</li>
+<li><strong>The per-fuel flag.</strong> Each fuel type in the fuel system declares whether
+   it is prone to spotting. In YAML fuel definitions this is the optional
+   <code>spotting: true</code> attribute; the legacy fuel system enables it for the
+   <code>conifers</code> fuel only. Fuels can also tune the ignition probability of
+   landing embers with the <code>prob_ign_by_embers</code> attribute. Only burning cells
+   whose fuel has <code>spotting: true</code> can launch embers.</li>
+</ol>
+<pre><code class="language-python">from propagator.core import FUEL_SYSTEM_LEGACY, Propagator
+
+sim = Propagator(
+    dem=dem,
+    veg=veg,
+    fuels=FUEL_SYSTEM_LEGACY,
+    do_spotting=True,
+    realizations=100,
+)
+</code></pre>
+<h2 id="model">Model</h2>
+<p>When a spotting-prone cell burns, it emits a Poisson-distributed number of
+embers (mean <code>LAMBDA_SPOTTING = 2</code>). Each ember is thrown at a
+uniformly random azimuth <code>θ</code>, lands some distance away, and — if it clears the
+landing-cell checks — ignites a new fire after a delay. The landing distance is
+the heart of the model and is documented in full below.</p>
+<h3 id="landing-distance">Landing distance</h3>
+<p>Each ember's landing distance is drawn from a <strong>lognormal distribution</strong> whose
+median scales with wind speed and with the source cell's fireline intensity,
+and is concentrated downwind:</p>
+<pre><code class="language-text">alignment    = cos(w_dir − θ)
+d_median     = DISTANCE_REF · (U / WIND_REF) · (I / FLI_REF)^FLI_EXP
+directional  = exp( ANISOTROPY · (alignment − 1) )
+distance     = LogNormal( ln(d_median · directional), LOG_SIGMA )
+landing_time = distance / ( U · max(alignment, MIN_ALIGNMENT) )    # seconds
+</code></pre>
+<p>with <code>θ</code> the ember's trajectory angle (uniform in <code>[0, 2π)</code>), <code>U</code> the source
+cell's wind speed, and <code>I</code> the source cell's fireline intensity (kW/m, carried
+on the propagation front from when the source cell ignited). If <code>U ≤ 0</code> or
+<code>I ≤ 0</code> the ember travels no distance (no transport medium / no fire to loft
+it). The model lives in <code>fire_spotting</code> / <code>compute_spotting</code> in
+<code>propagator.core.numba.propagation</code>.</p>
+<p>Reference values (the values below are injected from the code at docs-build
+time, so they always match the running constants):</p>
+<!-- markdownlint-disable MD060 -->
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SPOTTING_DISTANCE_REF</code></td>
+<td>100 m</td>
+<td>median landing distance at the reference state</td>
+</tr>
+<tr>
+<td><code>SPOTTING_WIND_REF</code></td>
+<td>20 km/h</td>
+<td>reference wind speed</td>
+</tr>
+<tr>
+<td><code>SPOTTING_FLI_REF</code></td>
+<td>10 000 kW/m</td>
+<td>reference fireline intensity</td>
+</tr>
+<tr>
+<td><code>SPOTTING_FLI_EXPONENT</code></td>
+<td>0.333</td>
+<td>intensity → distance exponent (see below)</td>
+</tr>
+<tr>
+<td><code>SPOTTING_ANISOTROPY</code></td>
+<td>5</td>
+<td>downwind concentration (shape only)</td>
+</tr>
+<tr>
+<td><code>SPOTTING_DISTANCE_LOG_SIGMA</code></td>
+<td>0.5</td>
+<td>lognormal spread of the landing distance</td>
+</tr>
+<tr>
+<td><code>SPOTTING_MIN_ALIGNMENT</code></td>
+<td>0.2</td>
+<td>floor on the along-wind fraction for travel time</td>
+</tr>
+</tbody>
+</table>
+<!-- markdownlint-enable MD060 -->
+
+<p>At the reference state (<code>U = 20 km/h</code>,
+<code>I = 10 000 kW/m</code>) the median landing distance is exactly
+<code>DISTANCE_REF = 100 m</code>.</p>
+<p>The figure below shows how the median landing distance grows with wind speed
+(linearly) and with fireline intensity, and how it is concentrated downwind.
+Embers whose distance falls below <code>2·cellsize</code> are filtered out and behave like
+ordinary contact spread, so at light winds no long-range spotting occurs.</p>
+<p><img alt="Median spotting distance vs wind and intensity, and its downwind
+concentration" src="../img/spotting_distance.png" /></p>
+<p>Because the distance is <em>sampled</em> from a lognormal, each panel above is only
+the median; individual embers scatter around it, with a right-skewed tail that
+occasionally seeds distant spot fires:</p>
+<p><img alt="Lognormal landing-distance distributions for representative wind and
+intensity combinations" src="../img/spotting_distribution.png" /></p>
+<h3 id="landing-and-ignition">Landing and ignition</h3>
+<p>Once the landing cell is chosen it must pass a few checks before a spot fire is
+scheduled:</p>
+<ul>
+<li>the cell must be in-grid, not already burning, and not a <code>NO_FUEL</code> cell;</li>
+<li>ignition succeeds with probability <code>P_c = P_C0 · (1 + prob_ign_by_embers)</code>
+  (<code>P_C0 = 0.6</code>), i.e. a constant base probability corrected by
+  the receiving cell's vegetation.</li>
+</ul>
+<p>Ignition is <strong>not instantaneous</strong>. Once an ember successfully ignites a cell,
+the model adds a <strong>delay before the spot fire becomes capable of propagation</strong>,
+sampled from a lognormal distribution (median 600 s), and
+added to the ember travel time. The cell only starts spreading — and only counts
+as a received-ember ignition — once this combined time has elapsed.</p>
+<h2 id="rationale-for-the-non-obvious-parametrizations">Rationale for the non-obvious parametrizations</h2>
+<p>This formulation replaces an earlier Alexandridis-style distance formula
+(<code>distance = r_n · exp(U · k · (cos Δθ − 1))</code> with <code>r_n ~ N(100 m, 25 m)</code>). That
+form had a wind-<em>independent</em> ~100 m base that the exponential could only
+attenuate, and it scaled the anisotropy by wind speed — so at low wind the
+directional term collapsed and embers landed ~100 m away <strong>isotropically</strong>,
+producing strong omnidirectional spotting even at 0.1 km/h. The current model
+puts the wind dependence in the distance <strong>magnitude</strong> instead.</p>
+<h3 id="1-median-linear-in-wind-speed-u-wind_ref">1. Median linear in wind speed — <code>(U / WIND_REF)</code></h3>
+<p>Embers are transported horizontally by the wind, so their travel distance must
+grow with wind speed and <strong>vanish as the wind dies</strong>. Making the median
+proportional to <code>U</code> gives exactly that: at <code>U → 0</code>, <code>d_median → 0</code>
+<em>continuously</em>, and every ember falls inside <code>2·cellsize</code> and is filtered out.
+Spotting becomes a genuinely wind-driven phenomenon. With the legacy conifer
+fuel (<code>I ≈ 30 000 kW/m</code>) the median landing distance is
+≈ 360.6 m at 50 km/h but only ≈ 36.1 m at 5 km/h
+(below the <code>2·cellsize = 40 m</code> filter for 20 m
+cells), and ≈ 0.7 m at 0.1 km/h — so all spotting disappears at
+0.1 km/h while long-range spotting survives in strong wind.</p>
+<h3 id="2-intensity-exponent-of-13-i-fli_ref13">2. Intensity exponent of 1/3 — <code>(I / FLI_REF)^(1/3)</code></h3>
+<p>Stronger fires loft embers higher, and higher embers ride the wind for longer
+before landing. Two physically-motivated steps chain into the 1/3 exponent:</p>
+<ul>
+<li><strong>Loft height ∝ I^(2/3).</strong> The buoyant-plume length scale of a line fire (the
+  height to which the convective column carries firebrands) scales as
+  <code>H ∝ I^(2/3)</code> — the standard Byram/plume result also used to define the Froude
+  number in the fire-spotting literature (Sardoy et al. 2008; Kaur et al. 2019).</li>
+<li><strong>Distance ∝ U·√H</strong> (ballistic advection). An ember released at height <code>H</code>
+  into a horizontal wind <code>U</code> travels a downwind distance proportional to
+  <code>U · √(H/g)</code> (free-fall time <code>√(2H/g)</code> × horizontal speed <code>U</code>).</li>
+</ul>
+<p>Chaining them: <code>d ∝ U · √H ∝ U · √(I^(2/3)) = U · I^(1/3)</code>. The dependence on
+intensity is deliberately weak — a 10× more intense fire spots only
+~2.15× farther — which matches the observation that wind,
+not intensity, is the dominant control on spotting range.</p>
+<p>Because the median uses the <strong>source cell's</strong> fireline intensity, a freshly
+seeded ignition (which carries <code>I = 0</code> until the fire develops) emits no embers
+on its first burn step; spotting begins once the fire has spread and real
+fireline intensities are established. This is intentional: an incipient
+ignition point is not a developed fire capable of lofting firebrands.</p>
+<h3 id="3-anisotropy-decoupled-from-wind-speed-anisotropy-cos-1">3. Anisotropy decoupled from wind speed — <code>ANISOTROPY · (cos Δθ − 1)</code></h3>
+<p>Firebrand landing is concentrated <strong>downwind</strong> (Sardoy et al. found a downwind
+lognormal and a crosswind normal). We keep a downwind-concentration factor,
+but — crucially — its strength <code>ANISOTROPY</code> is a <strong>pure shape constant</strong>, not
+multiplied by <code>U</code>. This is the direct fix for the isotropy problem above: the
+downwind bias is always present, independent of wind magnitude, so the model
+never degenerates into an isotropic spray at low wind. With
+<code>ANISOTROPY = 5</code>, an ember thrown directly upwind
+(<code>Δθ = π</code>) has its median scaled by <code>exp(−2·ANISOTROPY) ≈ 4.5×10⁻⁵</code>,
+i.e. it lands ~22 026× closer than a downwind ember — the
+lobes in panel (b) above.</p>
+<h3 id="4-lognormal-landing-distance-lognormallnmedian-log_sigma">4. Lognormal landing distance — <code>LogNormal(ln(median), LOG_SIGMA)</code></h3>
+<p>Sardoy et al. (2008) showed, from CFD/combustion simulations of line fires,
+that short-range firebrand landing distances (up to ~1 km) are <strong>lognormally
+distributed</strong> in the downwind direction. The lognormal is strictly positive and
+right-skewed, so it naturally produces occasional long-range embers (the heavy
+tail that seeds distant spot fires) while keeping the bulk near the median.
+<code>LOG_SIGMA = 0.5</code> gives a moderately broad spread (the
+5th–95th percentiles span roughly <code>0.44×</code> to <code>2.28×</code>
+the median) without an unrealistically fat tail.</p>
+<h3 id="5-direction-aware-landing-time-distance-u-maxcos-min_alignment">5. Direction-aware landing time — <code>distance / (U · max(cos Δθ, MIN_ALIGNMENT))</code></h3>
+<p>The flight time is the landing distance divided by the horizontal transport
+speed <em>along the ember's own trajectory</em>. Wind blows at speed <code>U</code> in direction
+<code>w_dir</code>, so the component that carries an ember heading at angle <code>θ</code> is
+<code>U · cos(w_dir − θ)</code> — the along-trajectory projection, not the full wind
+magnitude. Downwind embers (<code>cos ≈ 1</code>) are carried at nearly full wind speed;
+off-axis embers move downrange more slowly and take longer to land. The
+projection is floored at <code>SPOTTING_MIN_ALIGNMENT = 0.2</code> to
+remove the <code>cos → 0</code> singularity for near-crosswind embers and to prevent
+implausibly long flight times; because the <code>directional</code> factor and the
+<code>2·cellsize</code> filter already suppress off-axis throws, this floor affects only a
+small tail of embers.</p>
+<h2 id="calibration-and-tuning">Calibration and tuning</h2>
+<p>All behaviour is controlled by the reference constants. To recalibrate:</p>
+<ul>
+<li><strong>Overall reach:</strong> <code>SPOTTING_DISTANCE_REF</code> (linear scaling of all distances).</li>
+<li><strong>Which wind counts as "strong":</strong> <code>SPOTTING_WIND_REF</code> — the wind speed at
+  which the median equals <code>DISTANCE_REF</code>.</li>
+<li><strong>Sensitivity to fire intensity:</strong> <code>SPOTTING_FLI_REF</code> (pivot) and
+  <code>SPOTTING_FLI_EXPONENT</code> (steepness).</li>
+<li><strong>Downwind focus:</strong> <code>SPOTTING_ANISOTROPY</code> (larger → tighter downwind cone).</li>
+<li><strong>Tail heaviness / variability:</strong> <code>SPOTTING_DISTANCE_LOG_SIGMA</code>.</li>
+<li><strong>Off-axis travel time:</strong> <code>SPOTTING_MIN_ALIGNMENT</code> (floor on the along-wind
+  speed fraction; smaller → longer flight times for near-crosswind embers).</li>
+</ul>
+<h2 id="outputs">Outputs</h2>
+<p>When spotting is enabled, two additional per-cell fields are tracked per
+realization and aggregated in every <code>PropagatorOutput</code> snapshot (and written
+as GeoTIFFs by the CLI):</p>
+<ul>
+<li><code>spotting_generation_probability</code> — fraction of realizations in which the
+  cell launched at least one ember.</li>
+<li><code>spotting_receiving_probability</code> — fraction of realizations in which the
+  cell was hit by an ember.</li>
+</ul>
+<p>These let you separate fire spread driven by surface contagion from spread
+driven by ember transport. See <a href="../outputs/">Simulation Outputs</a> for the full
+list of output fields.</p>
+<h2 id="example">Example</h2>
+<p>A complete runnable scenario, including visualization of the generation and
+receiving probability maps, is available in the repository at
+<code>example/example_spotting_dynamics.py</code>.</p>
+<h2 id="references">References</h2>
+<ul>
+<li>Alexandridis, A. et al. (2008, 2011) — cellular-automata fire spread and
+  spotting (superseded distance formula; still the basis for the Poisson ember
+  count <code>LAMBDA_SPOTTING</code> and the ignition probability <code>P_c</code>).</li>
+<li>Sardoy, N. et al. (2008) — <em>Numerical study of ground-level distribution of
+  firebrands generated by line fires</em>, Combustion and Flame. Lognormal downwind
+  landing distance; dependence on wind and fireline intensity.</li>
+<li>Kaur, I., Mentrelli, A., Pagnini, G. et al. (2019) — <em>RandomFront 2.3</em>,
+  Geosci. Model Dev. 12, 69–87. Physical parameterisation of the lognormal
+  landing distance via a plume length scale and a Froude number.</li>
+</ul>
+<p>See also the <a href="../bibliography/">Bibliography</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../javascripts/cima-brand.js"></script>
+      
+    
+  </body>
+</html>
