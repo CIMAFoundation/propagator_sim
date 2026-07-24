@@ -43,6 +43,10 @@ io = [
     "geopandas>=1.1.1",
 ]
 
+ff = [
+    "netCDF4>=1.7.2",
+]
+
 [dependency-groups]
 dev = [
     "ipykernel>=7.1.0",
@@ -98,6 +102,7 @@ ignore = ["E203", "E501"]
 
 [project.scripts]
 propagator = "propagator.cli.main:main"
+propagator-ff = "propagator.cli.ff_main:main"
 
 [project.urls]
 Homepage = "https://github.com/CIMAFoundation/propagator_sim"

@@ -26,6 +26,7 @@ from propagator.core.numba import (
     fuelsystem_from_dict,
 )
 from propagator.core.numba.models import FuelSystem
+from propagator.core.runner import SimulationRunner
 from propagator.io.configuration import PropagatorConfigurationLegacy
 from propagator.io.loader.cog import PropagatorDataFromCogs
 from propagator.io.loader.geotiff import PropagatorDataFromGeotiffs
@@ -452,74 +453,30 @@ def main() -> None:
     if cli.verbose:
         print_boundary_conditions_table(cfg.boundary_conditions)
 
-    def grow_domain() -> None:
-        """Enlarge the domain by grow_margin cells, but only on the side(s)
-        the fire actually reached (reported by the core), loading the wider
-        window from the COGs (in-place, nothing is lost)."""
+    def _on_domain_grow(new_geo_info) -> None:
         nonlocal writer
-        assert cog_loader is not None
-        margin = cli.grow_margin
-        north, south, west, east = simulator.boundary_pressure()
-        if not (north or south or west or east):
-            # no edge reported (shouldn't happen right after a halt): grow
-            # every side so the run can still make progress
-            north = south = west = east = True
-
-        grow_n = margin if north else 0
-        grow_s = margin if south else 0
-        grow_w = margin if west else 0
-        grow_e = margin if east else 0
-
-        row0, col0 = simulator.origin
-        rows, cols = simulator.veg.shape
-        # north/west growth shifts the origin; the shift stays a multiple of
-        # TILE_SIZE because grow_margin is, which the core's expand requires
-        new_origin = (row0 - grow_n, col0 - grow_w)
-        new_shape = (rows + grow_n + grow_s, cols + grow_w + grow_e)
-
-        new_dem, new_veg, new_geo_info = cog_loader.load_window(
-            new_origin, new_shape
-        )
-        simulator.expand(new_veg, new_dem, new_origin)
         writer = build_writer(new_geo_info)
-        if cli.verbose:
-            grew = [
-                name
-                for name, flag in (
-                    ("N", north),
-                    ("S", south),
-                    ("W", west),
-                    ("E", east),
-                )
-                if flag
-            ]
-            info_msg(
-                f"Fire reached the boundary ({'+'.join(grew)}): domain grown "
-                f"to {new_shape[0]}x{new_shape[1]} cells (origin {new_origin})"
-            )
 
-    stopped = False
-    while not stopped:
+    runner = SimulationRunner(
+        simulator=simulator,
+        cog_loader=cog_loader,
+        grow_margin=cli.grow_margin,
+        freeze_dir=cli.freeze_dir,
+        on_domain_grow=_on_domain_grow,
+        verbose=cli.verbose,
+    )
+
+    while True:
         next_time = simulator.next_time()
         if next_time is None:
             break
 
         target_time = simulator.time + cfg.time_resolution
-        while True:
-            try:
-                simulator.step(seconds=target_time - simulator.time)
-                break
-            except PropagatorOutOfBoundsError as e:
-                if cog_loader is None:
-                    warn(
-                        "Simulation stopped due to "
-                        f"PropagatorOutOfBoundsError: {e}"
-                    )
-                    stopped = True
-                    break
-                grow_domain()
-
-        output = simulator.get_output()
+        try:
+            output = runner.advance_to(target_time)
+        except PropagatorOutOfBoundsError as e:
+            warn(f"Simulation stopped due to PropagatorOutOfBoundsError: {e}")
+            break
 
         status_propagator_msg(
             cfg.init_date,
@@ -529,9 +486,6 @@ def main() -> None:
         )
 
         writer.write_output(output)
-
-        if cli.freeze_dir is not None:
-            simulator.freeze_inactive_tiles()
 
         if simulator.time > cfg.time_limit:
             break
