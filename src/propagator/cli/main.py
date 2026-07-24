@@ -19,10 +19,9 @@ from propagator.cli.console import (
     status_propagator_msg,
 )
 from propagator.core import Propagator, PropagatorOutOfBoundsError
-from propagator.core.constants import FUEL_SYSTEM_LEGACY_DICT
+from propagator.core.constants import FUEL_SYSTEM_LEGACY_DICT, TILE_SIZE
 from propagator.core.numba import (
     FUEL_SYSTEM_LEGACY,
-    TILE_SIZE,
     fuelsystem_from_dict,
 )
 from propagator.core.numba.models import FuelSystem

@@ -4,6 +4,15 @@ TICK_PRECISION = 10
 CELLSIZE = 20  # [m]
 REALIZATIONS = 100
 
+# Tile size shared by the tiled (numba) storage and the Rust core's
+# growth/checkpoint machinery: domain growth (`SimulationRunner.grow_domain`,
+# the Rust `Propagator.expand`) requires north/west shifts to be a multiple
+# of this many cells. Defined here (no heavy deps) so it can be imported
+# without pulling in `propagator.core.numba` (and therefore numba/llvmlite).
+TILE_SHIFT = 5
+TILE_SIZE = 1 << TILE_SHIFT
+TILE_MASK = TILE_SIZE - 1
+
 # --- DEFAULT MODELS ---
 ROS_DEFAULT: Literal["wang", "rothermel"] = "wang"
 MOISTURE_MODEL_DEFAULT: Literal["trucchia", "baghino"] = "trucchia"

@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Explicit initial window for `PropagatorDataFromCogs`: besides the
+  default `mid_lon`/`mid_lat` + `grid_dim` square, the loader now
+  accepts `initial_bounds` (a `(minx, miny, maxx, maxy)` box in any
+  `initial_bounds_epsg`, reprojected and snapped outward to whole
+  pixels on the selected COG's grid) or an explicit
+  `initial_pixel_origin` + `initial_pixel_shape` window already given
+  in the COG's own pixel coordinates, used verbatim. An optional
+  `snap_shape_to` rounds an `initial_bounds`-derived shape up to a
+  tile-size multiple for callers that find that convenient (not
+  required for correctness). This lets callers that already work with
+  an explicit bounding box (e.g. a REST API) or pre-computed pixel
+  window (e.g. a browser/WASM client) drive `PropagatorDataFromCogs`
+  directly, instead of pre-clipping COGs to static rasters that cannot
+  be grown.
+- `SimulationRunner` now validates `grow_margin % TILE_SIZE == 0` in
+  `__post_init__`, instead of relying on the CLI to catch it, so any
+  library caller gets a clear `ValueError` up front rather than a
+  confusing failure out of the Rust/numba core's `expand()`.
+- `TILE_SIZE`/`TILE_SHIFT`/`TILE_MASK` moved to
+  `propagator.core.constants` (previously only defined in
+  `propagator.core.numba.tiles`, which still re-exports them
+  unchanged) and are now also re-exported from `propagator.core` and
+  `propagator.rust_core`, so downstream code can validate
+  `grow_margin % TILE_SIZE` without importing the CLI or the numba
+  submodule.
 - State persistence and rollback: `Propagator.checkpoint()` snapshots the
   full dynamic state (front heaps, tiled state, weather, vegetation and the
   pending boundary-condition queue) into an immutable

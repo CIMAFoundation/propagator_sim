@@ -15,9 +15,7 @@ import numpy as np
 import numpy.typing as npt
 from numba import njit, prange  # type: ignore
 
-TILE_SHIFT = 5
-TILE_SIZE = 1 << TILE_SHIFT
-TILE_MASK = TILE_SIZE - 1
+from propagator.core.constants import TILE_MASK, TILE_SHIFT, TILE_SIZE
 
 # Bitfield flags stored in the per-cell uint8 tile pool.
 FLAG_FIRE = np.uint8(1)

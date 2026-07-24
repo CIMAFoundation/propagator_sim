@@ -1,6 +1,7 @@
 """Package init for the wildfire propagator core."""
 
 from .checkpoint import PropagatorCheckpoint
+from .constants import TILE_SIZE
 from .models import (
     BoundaryConditions,
     PropagatorStats,
@@ -27,6 +28,7 @@ __all__ = [
     "PropagatorCheckpoint",
     "PropagatorOutOfBoundsError",
     "PropagatorStats",
+    "TILE_SIZE",
     "FUEL_SYSTEM_LEGACY",
     "fuelsystem_from_dict",
     "get_p_moisture_fn",

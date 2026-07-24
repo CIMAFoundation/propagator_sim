@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Optional, Protocol
 
+from propagator.core.constants import TILE_SIZE
 from propagator.core.models import PropagatorOutput
 from propagator.io.geo import GeographicInfo
 from propagator.io.loader.cog import PropagatorDataFromCogs
@@ -34,6 +35,17 @@ class SimulationRunner:
     freeze_dir: object | None = None
     on_domain_grow: Optional[Callable[[GeographicInfo], None]] = None
     verbose: bool = False
+
+    def __post_init__(self) -> None:
+        # The Rust core's `expand()` requires north/west growth to be a
+        # multiple of TILE_SIZE; validate here rather than relying on the
+        # CLI (`cli/main.py`) so any caller of this library gets a clear
+        # error instead of a confusing core-level failure mid-run.
+        if self.grow_margin % TILE_SIZE:
+            raise ValueError(
+                f"grow_margin must be a multiple of TILE_SIZE ({TILE_SIZE}) "
+                f"cells; got {self.grow_margin}"
+            )
 
     def grow_domain(self) -> None:
         """Enlarge the domain by grow_margin cells, but only on the side(s)

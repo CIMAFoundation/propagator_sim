@@ -19,12 +19,18 @@ from typing import Any, Optional
 
 import numpy as np
 
+from propagator.core.constants import TILE_SIZE
 from propagator.core.models import (
     BoundaryConditions,
     PropagatorOutput,
     PropagatorStats,
 )
 from propagator.core.propagator import PropagatorOutOfBoundsError
+
+__all__ = [
+    "Propagator",
+    "TILE_SIZE",
+]
 
 try:
     import propagator_rust as _rust

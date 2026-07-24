@@ -174,3 +174,133 @@ def test_point_outside_all_cogs_raises(tmp_path):
             mid_lat=45.0,
             grid_dim=64,
         )
+
+
+def test_initial_bounds_derives_pixel_aligned_window(tmp_path):
+    dem_29, fuel_29 = make_cog_pair(tmp_path)
+    x, y = zone29_point()
+    # a box not aligned to whole pixels, and deliberately non-square:
+    # ~40 cols wide, ~70 rows tall
+    minx, maxx = x - 13 * 20.0 - 3.0, x + 27 * 20.0 + 4.0
+    miny, maxy = y - 5 * 20.0 - 5.0, y + 65 * 20.0 + 1.0
+
+    loader = PropagatorDataFromCogs(
+        dem_urls=[dem_29],
+        fuel_urls=[fuel_29],
+        initial_bounds=(minx, miny, maxx, maxy),
+        initial_bounds_epsg=32629,
+    )
+    # mid_lon/mid_lat were derived from the bounds centre for COG selection
+    assert loader.mid_lon is not None and loader.mid_lat is not None
+
+    dem = loader.get_dem()
+    veg = loader.get_veg()
+    assert dem.shape == veg.shape == loader.initial_shape
+    # window fully contains the requested box (snapped outward to pixels)
+    west, south, east, north = loader.get_geo_info().bounds
+    assert west <= minx and south <= miny
+    assert east >= maxx and north >= maxy
+    # pixel-aligned: the window is an integer number of 20 m cells wide
+    assert (east - west) == pytest.approx(loader.initial_shape[1] * 20.0)
+    assert (north - south) == pytest.approx(loader.initial_shape[0] * 20.0)
+    # not a square: rows and cols differ (13+27 vs 7+33, before snapping)
+    assert loader.initial_shape[0] != loader.initial_shape[1]
+
+
+def test_initial_bounds_reprojects_from_other_crs(tmp_path):
+    dem_29, fuel_29 = make_cog_pair(tmp_path)
+    from pyproj import Transformer
+
+    x, y = zone29_point()
+    minx, maxx = x - 200.0, x + 200.0
+    miny, maxy = y - 200.0, y + 200.0
+    # same box, expressed in EPSG:4326 instead of the COG's own CRS
+    transformer = Transformer.from_crs(CRS_29, "EPSG:4326", always_xy=True)
+    lons, lats = transformer.transform([minx, maxx], [miny, maxy])
+
+    loader_4326 = PropagatorDataFromCogs(
+        dem_urls=[dem_29],
+        fuel_urls=[fuel_29],
+        initial_bounds=(lons[0], lats[0], lons[1], lats[1]),
+        initial_bounds_epsg=4326,
+    )
+    loader_native = PropagatorDataFromCogs(
+        dem_urls=[dem_29],
+        fuel_urls=[fuel_29],
+        initial_bounds=(minx, miny, maxx, maxy),
+        initial_bounds_epsg=32629,
+    )
+    # allow a 1-pixel tolerance: the lon/lat round trip perturbs coordinates
+    # by sub-millimeter amounts, which can flip the outward-snap of a box
+    # edge that happens to sit extremely close to a pixel boundary
+    for a, b in zip(loader_4326.initial_origin, loader_native.initial_origin):
+        assert abs(a - b) <= 1
+    for a, b in zip(loader_4326.initial_shape, loader_native.initial_shape):
+        assert abs(a - b) <= 1
+
+
+def test_initial_bounds_snap_shape_to_tile_size(tmp_path):
+    dem_29, fuel_29 = make_cog_pair(tmp_path)
+    x, y = zone29_point()
+    minx, maxx = x - 13 * 20.0, x + 27 * 20.0
+    miny, maxy = y - 7 * 20.0, y + 33 * 20.0
+
+    loader = PropagatorDataFromCogs(
+        dem_urls=[dem_29],
+        fuel_urls=[fuel_29],
+        initial_bounds=(minx, miny, maxx, maxy),
+        initial_bounds_epsg=32629,
+        snap_shape_to=32,
+    )
+    rows, cols = loader.initial_shape
+    assert rows % 32 == 0
+    assert cols % 32 == 0
+
+
+def test_initial_pixel_window_used_verbatim(tmp_path):
+    dem_29, fuel_29 = make_cog_pair(tmp_path)
+    loader = PropagatorDataFromCogs(
+        dem_urls=[dem_29],
+        fuel_urls=[fuel_29],
+        mid_lon=LON,
+        mid_lat=LAT,
+        initial_pixel_origin=(10, -5),
+        initial_pixel_shape=(40, 96),
+    )
+    assert loader.initial_origin == (10, -5)
+    assert loader.initial_shape == (40, 96)
+    dem = loader.get_dem()
+    assert dem.shape == (40, 96)
+
+
+def test_initial_window_arg_validation(tmp_path):
+    dem_29, fuel_29 = make_cog_pair(tmp_path)
+    from propagator.io.loader.protocol import PropagatorDataLoaderException
+
+    with pytest.raises(
+        PropagatorDataLoaderException, match="mutually exclusive"
+    ):
+        PropagatorDataFromCogs(
+            dem_urls=[dem_29],
+            fuel_urls=[fuel_29],
+            initial_bounds=(0.0, 0.0, 1.0, 1.0),
+            initial_pixel_origin=(0, 0),
+            initial_pixel_shape=(10, 10),
+        )
+
+    with pytest.raises(PropagatorDataLoaderException, match="given together"):
+        PropagatorDataFromCogs(
+            dem_urls=[dem_29],
+            fuel_urls=[fuel_29],
+            mid_lon=LON,
+            mid_lat=LAT,
+            initial_pixel_origin=(0, 0),
+        )
+
+    with pytest.raises(PropagatorDataLoaderException, match="mid_lon"):
+        PropagatorDataFromCogs(
+            dem_urls=[dem_29],
+            fuel_urls=[fuel_29],
+            initial_pixel_origin=(0, 0),
+            initial_pixel_shape=(10, 10),
+        )

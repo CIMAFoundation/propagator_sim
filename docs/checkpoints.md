@@ -135,7 +135,7 @@ larger grid, and resume.
 ```python
 import numpy as np
 from propagator.core import Propagator, PropagatorOutOfBoundsError
-from propagator.core.numba import TILE_SIZE
+from propagator.core import TILE_SIZE
 
 sim = Propagator(veg=veg, dem=dem, origin=(4096, 4096), realizations=100)
 ...
@@ -177,6 +177,38 @@ During growth:
   replication until fresh boundary conditions are set; action moisture is
   padded with zeros; pending scheduler events are shifted and padded
   automatically.
+
+### `SimulationRunner` and COG-backed growth
+
+`propagator.core.runner.SimulationRunner` wraps the "step, catch
+`PropagatorOutOfBoundsError`, expand, retry" loop above and drives it
+automatically from a `propagator.io.loader.cog.PropagatorDataFromCogs`
+loader (`cog_loader=...`), which is what `--mode cog` in the CLI uses.
+`SimulationRunner(grow_margin=...)` validates
+`grow_margin % TILE_SIZE == 0` itself in `__post_init__` — the same rule
+`expand()` enforces on the growth shift — so misconfiguration fails
+immediately instead of surfacing as a core-level error mid-run.
+
+`PropagatorDataFromCogs`'s initial window can be given three ways: the
+default `mid_lon`/`mid_lat` + `grid_dim` square; an explicit
+`initial_bounds` box (`(minx, miny, maxx, maxy)` in any
+`initial_bounds_epsg`), reprojected and snapped outward to whole pixels
+on the selected COG's own grid; or an explicit `initial_pixel_origin` +
+`initial_pixel_shape` window already expressed in that pixel grid, used
+verbatim. The latter two let a caller that already works with a
+bounding box (e.g. a REST API request) or a pre-computed pixel window
+(e.g. a browser/WASM client) construct the loader directly:
+
+```python
+from propagator.io.loader.cog import PropagatorDataFromCogs
+
+loader = PropagatorDataFromCogs(
+    dem_urls=dem_urls,
+    fuel_urls=fuel_urls,
+    initial_bounds=(minx, miny, maxx, maxy),  # your window_bounds
+    initial_bounds_epsg=32632,                # your EPSG
+)
+```
 
 ## Freezing inactive tiles to disk
 
