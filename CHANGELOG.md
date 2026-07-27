@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Core parity: `boundary_proximity(margin)` — which edges (N/S/W/E) have
+  pending front events within `margin` cells — is now available on the numba
+  core and through the Rust adapter (`propagator.rust_core.Propagator`), not
+  only inside the Rust crate. Unlike `boundary_pressure()` it is predictive
+  and does not require propagation to have halted on the boundary first, so a
+  driver can grow the domain before the front reaches the edge.
+- The `standard` rate-of-spread model (the combined `w_h_effect` wind+slope
+  scaling) is now accepted by the configuration/type surface of the numba
+  path. It was already implemented by `get_p_time_fn` and selectable in the
+  Rust core, but the `RateOfSpreadModel` literal rejected it.
+
 - Explicit initial window for `PropagatorDataFromCogs`: besides the
   default `mid_lon`/`mid_lat` + `grid_dim` square, the loader now
   accepts `initial_bounds` (a `(minx, miny, maxx, maxy)` box in any

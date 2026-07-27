@@ -926,6 +926,44 @@ class Propagator:
             east |= col >= n_cols - 1
         return north, south, west, east
 
+    def boundary_proximity(self, margin: int) -> tuple[bool, bool, bool, bool]:
+        """Which edges have pending front events within ``margin`` cells.
+
+        Unlike :meth:`boundary_pressure`, this is predictive and does not
+        require propagation to have halted at the boundary first, so a caller
+        can grow the domain before the front actually reaches the edge.
+
+        Parameters
+        ----------
+        margin : int
+            Distance from an edge, in cells, that counts as "close". Values
+            below 1 are treated as 1.
+
+        Returns
+        -------
+        tuple[bool, bool, bool, bool]
+            ``(north, south, west, east)`` — north/west are the low-row and
+            low-col edges.
+        """
+        n_rows, n_cols = self.veg.shape
+        margin = max(int(margin), 1)
+        south_limit = n_rows - margin
+        east_limit = n_cols - margin
+        north = south = west = east = False
+        for r in range(self.realizations):
+            size = int(self._front_sizes[r])
+            if size <= 0:
+                continue
+            rows = self._front_rows[r, :size]
+            cols = self._front_cols[r, :size]
+            north = north or bool(np.any(rows < margin))
+            south = south or bool(np.any(rows >= south_limit))
+            west = west or bool(np.any(cols < margin))
+            east = east or bool(np.any(cols >= east_limit))
+            if north and south and west and east:
+                break
+        return north, south, west, east
+
     def step(
         self,
         seconds: int | None = None,

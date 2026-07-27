@@ -290,6 +290,63 @@ def test_compute_stats_counts_active_and_thresholds():
     assert stats.area_90 == 1 * cell_area
 
 
+def make_wide_propagator(realizations: int = 2) -> Propagator:
+    veg = np.full((128, 128), 4, dtype=np.int32)
+    dem = np.zeros_like(veg, dtype=np.float32)
+    propagator = Propagator(
+        veg=veg,
+        dem=dem,
+        realizations=realizations,
+        do_spotting=False,
+        out_of_bounds_mode="ignore",
+    )
+    base = np.full_like(veg, 0.1, dtype=np.float32)
+    propagator.moisture = base.copy()
+    propagator.wind_dir = np.zeros_like(base)
+    propagator.wind_speed = np.full_like(base, 10.0)
+    return propagator
+
+
+def test_boundary_proximity_reports_only_nearby_edges():
+    propagator = make_wide_propagator(realizations=2)
+
+    # a pending event well inside the domain: no edge is close
+    propagator._front_push(0, 10, 64, 64, 0.0, 0.0)
+    assert propagator.boundary_proximity(4) == (False, False, False, False)
+
+    # ... one 3 cells from the west edge: only west is reported
+    propagator._front_push(0, 20, 64, 3, 0.0, 0.0)
+    assert propagator.boundary_proximity(4) == (False, False, True, False)
+
+    # every realization's heap is scanned, and margins accumulate per edge
+    propagator._front_push(1, 20, 125, 64, 0.0, 0.0)
+    assert propagator.boundary_proximity(4) == (False, True, True, False)
+
+    # a margin below 1 is treated as 1: a cell in the boundary ring counts
+    propagator._front_push(1, 30, 0, 64, 0.0, 0.0)
+    assert propagator.boundary_proximity(0) == (True, False, False, False)
+
+
+def test_boundary_proximity_predicts_before_the_front_halts():
+    propagator = make_wide_propagator(realizations=1)
+    # ignite 3 cells from the west edge: the front is close to it from the
+    # start, before propagation ever halts on the boundary
+    propagator.set_boundary_conditions(
+        BoundaryConditions(
+            time=0,
+            moisture=np.full((128, 128), 10.0, dtype=np.float32),
+            wind_dir=np.zeros((128, 128), dtype=np.float32),
+            wind_speed=np.full((128, 128), 10.0, dtype=np.float32),
+            ignitions=[(64, 3)],
+        )
+    )
+    propagator.step(seconds=1)
+
+    assert propagator.boundary_proximity(4) == (False, False, True, False)
+    # nothing halted, so boundary_pressure stays silent
+    assert propagator.boundary_pressure() == (False, False, False, False)
+
+
 def test_set_boundary_conditions_enqueue_event():
     propagator = make_propagator(realizations=1)
 

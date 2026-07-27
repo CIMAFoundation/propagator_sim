@@ -441,6 +441,13 @@ impl Propagator {
         self.inner.boundary_pressure()
     }
 
+    /// `(north, south, west, east)` edges that have pending front events
+    /// within `margin` cells. Predictive: unlike `boundary_pressure` it does
+    /// not require propagation to have halted at the boundary first.
+    fn boundary_proximity(&self, margin: usize) -> (bool, bool, bool, bool) {
+        self.inner.boundary_proximity(margin)
+    }
+
     /// Boundary-hit behaviour, `'ignore'` or `'raise'`.
     #[getter]
     fn out_of_bounds_mode(&self) -> &'static str {

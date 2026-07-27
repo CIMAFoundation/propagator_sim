@@ -146,6 +146,12 @@ class Propagator:
         numba core's method so the CLI is core-agnostic."""
         return self._sim.boundary_pressure()
 
+    def boundary_proximity(self, margin: int) -> tuple[bool, bool, bool, bool]:
+        """(north, south, west, east) edges with pending front events within
+        `margin` cells; matches the numba core's method. Predictive: it does
+        not require the front to have halted at the boundary first."""
+        return self._sim.boundary_proximity(int(margin))
+
     def set_boundary_conditions(self, bc: BoundaryConditions) -> None:
         ignitions = bc.ignitions
         if ignitions is not None and not isinstance(ignitions, np.ndarray):

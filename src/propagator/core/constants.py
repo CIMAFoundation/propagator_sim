@@ -14,7 +14,7 @@ TILE_SIZE = 1 << TILE_SHIFT
 TILE_MASK = TILE_SIZE - 1
 
 # --- DEFAULT MODELS ---
-ROS_DEFAULT: Literal["wang", "rothermel"] = "wang"
+ROS_DEFAULT: Literal["wang", "rothermel", "standard"] = "wang"
 MOISTURE_MODEL_DEFAULT: Literal["trucchia", "baghino"] = "trucchia"
 
 
