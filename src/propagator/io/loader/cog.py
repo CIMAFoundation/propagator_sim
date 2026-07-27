@@ -128,6 +128,7 @@ class PropagatorDataFromCogs(PropagatorInputDataProtocol):
 
     _dem: rio.DatasetReader = field(init=False, repr=False)
     _fuel: rio.DatasetReader = field(init=False, repr=False)
+    _fuel_offset: tuple[int, int] = field(init=False, default=(0, 0))
     _initial_origin: tuple[int, int] = field(init=False)
     _initial_shape: tuple[int, int] = field(init=False)
     _initial: tuple[np.ndarray, np.ndarray, GeographicInfo] | None = field(
@@ -289,19 +290,39 @@ class PropagatorDataFromCogs(PropagatorInputDataProtocol):
         )
 
     def _check_same_grid(self) -> None:
+        """Require a shared cell grid, not identical rasters.
+
+        Window coordinates are expressed in the DEM's pixel grid, so the
+        fuel COG only has to sample the same cells: same CRS, same
+        resolution, and an origin offset by a whole number of cells. Its
+        extent may differ (the published pairs routinely cover different
+        areas); `_fuel_offset` shifts the window into the fuel's own grid
+        and `boundless` reads fill whatever falls outside.
+        """
         if self._dem.crs != self._fuel.crs:
             raise PropagatorDataLoaderException(
                 "DEM and fuel COGs have different CRS"
             )
-        if self._dem.shape != self._fuel.shape or not np.allclose(
-            tuple(self._dem.transform)[:6],
-            tuple(self._fuel.transform)[:6],
-            rtol=1e-9,
-            atol=1e-6,
+        if not np.allclose(
+            self._dem.res, self._fuel.res, rtol=1e-9, atol=1e-6
+        ):
+            raise PropagatorDataLoaderException(
+                "DEM and fuel COGs have different resolution"
+            )
+        row_off = (
+            self._dem.transform.f - self._fuel.transform.f
+        ) / self._fuel.transform.e
+        col_off = (
+            self._dem.transform.c - self._fuel.transform.c
+        ) / self._fuel.transform.a
+        if (
+            abs(row_off - round(row_off)) > 1e-6
+            or abs(col_off - round(col_off)) > 1e-6
         ):
             raise PropagatorDataLoaderException(
                 "DEM and fuel COGs are not pixel-aligned"
             )
+        self._fuel_offset = (int(round(row_off)), int(round(col_off)))
 
     # --- windowed access ----------------------------------------------------
 
@@ -332,11 +353,23 @@ class PropagatorDataFromCogs(PropagatorInputDataProtocol):
             dem = np.where(dem == self._dem.nodata, 0.0, dem)
         dem = dem.astype(np.float32)
 
+        # The window is in DEM pixel coordinates; shift it into the fuel's
+        # own grid, which may have a different origin (see _check_same_grid).
+        fuel_window = Window(
+            origin[1] + self._fuel_offset[1],
+            origin[0] + self._fuel_offset[0],
+            shape[1],
+            shape[0],
+        )
         veg = self._fuel.read(
-            1, window=window, boundless=True, fill_value=NO_FUEL
+            1, window=fuel_window, boundless=True, fill_value=NO_FUEL
         ).astype(np.int8)
         if self._fuel.nodata is not None and self._fuel.nodata != NO_FUEL:
-            veg[veg == np.int8(self._fuel.nodata)] = NO_FUEL
+            # The published fuel COGs declare nodata=255, which is out of
+            # int8 range: NumPy 2 raises on the scalar cast, so wrap the
+            # value the same way `astype` wrapped the band itself (-> -1).
+            nodata = np.array(self._fuel.nodata).astype(np.int8)
+            veg[veg == nodata] = NO_FUEL
 
         trans = window_transform(window, self._dem.transform)
         bounds = rio.windows.bounds(window, self._dem.transform)
