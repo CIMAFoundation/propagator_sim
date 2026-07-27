@@ -208,6 +208,24 @@ impl Propagator {
         &self.veg
     }
 
+    /// Current boundary-hit behaviour.
+    pub fn oob_mode(&self) -> OobMode {
+        self.oob_mode
+    }
+
+    /// Change the boundary-hit behaviour mid-run.
+    ///
+    /// The point of this is to give up on growing: a caller that can no
+    /// longer supply a larger grid switches to [`OobMode::Ignore`], and the
+    /// next `step` pops the boundary events it had been suspending, so the
+    /// fire clips at the edge and the rest of the front keeps burning.
+    /// Without it a run built with [`OobMode::Raise`] whose growth stops is
+    /// stuck forever: a suspended boundary event is the earliest event in its
+    /// realization's heap, so nothing in that realization advances again.
+    pub fn set_oob_mode(&mut self, mode: OobMode) {
+        self.oob_mode = mode;
+    }
+
     /// Which domain edges the front is pressing against, as
     /// `(north, south, west, east)` — north/west are the low-row/low-col
     /// edges. A flag is set when some realization halted on that edge in

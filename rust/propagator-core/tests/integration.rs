@@ -188,6 +188,57 @@ fn boundary_halt_is_resumable_by_expansion() {
 }
 
 #[test]
+fn giving_up_on_growth_clips_instead_of_freezing() {
+    let (veg, dem) = flat_grass();
+    let mut config = PropagatorConfig::new(veg, dem);
+    config.realizations = 10;
+    config.seed = Some(5);
+    config.oob_mode = OobMode::Raise;
+    let mut sim = Propagator::new(config).unwrap();
+    // ignite near the west edge so the fire halts on the boundary quickly
+    sim.set_boundary_conditions(basic_conditions((64, 3))).unwrap();
+
+    let mut hit_boundary = false;
+    for _ in 0..200 {
+        match sim.step_window(600) {
+            Ok(()) => {}
+            Err(PropagatorError::OutOfBounds) => {
+                hit_boundary = true;
+                break;
+            }
+            Err(err) => panic!("unexpected error: {err}"),
+        }
+    }
+    assert!(hit_boundary, "fire never reached the boundary");
+    let burnt_at_halt: f32 = sim
+        .get_output()
+        .unwrap()
+        .fire_probability
+        .as_slice()
+        .iter()
+        .sum();
+
+    // No larger grid is coming: clip at the edge rather than suspending the
+    // front forever. Stepping must now succeed and keep burning inwards.
+    sim.set_oob_mode(OobMode::Ignore);
+    assert_eq!(sim.oob_mode(), OobMode::Ignore);
+    for _ in 0..6 {
+        sim.step_window(600).expect("a clipping run must not halt");
+    }
+    let burnt_after: f32 = sim
+        .get_output()
+        .unwrap()
+        .fire_probability
+        .as_slice()
+        .iter()
+        .sum();
+    assert!(
+        burnt_after > burnt_at_halt,
+        "front stayed frozen after growth was given up ({burnt_after} <= {burnt_at_halt})"
+    );
+}
+
+#[test]
 fn checkpoint_restore_roundtrip() {
     let mut sim = new_sim(11);
     sim.set_boundary_conditions(basic_conditions((64, 64))).unwrap();

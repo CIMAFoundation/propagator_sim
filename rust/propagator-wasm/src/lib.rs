@@ -426,6 +426,22 @@ impl Propagator {
         self.inner.origin().1
     }
 
+    /// Turn boundary halting on or off mid-run.
+    ///
+    /// Call with `false` when the domain can no longer grow (a cap reached, a
+    /// failed fetch): the boundary events the core has been suspending are
+    /// popped on the next [`Propagator::step`], so the fire clips at the edge
+    /// and the rest of the front keeps burning. Leaving it on instead freezes
+    /// the realization, because a suspended boundary event is the earliest
+    /// event in its heap and nothing behind it can advance.
+    pub fn set_halt_on_boundary(&mut self, halt: bool) {
+        self.inner.set_oob_mode(if halt {
+            OobMode::Raise
+        } else {
+            OobMode::Ignore
+        });
+    }
+
     /// Sides currently pressuring the domain boundary, encoded as a bitmask:
     /// north=1, south=2, west=4, east=8. A zero mask means that no specific
     /// side was recorded, in which case callers should grow every side.

@@ -119,6 +119,21 @@ class Propagator:
     def veg(self) -> np.ndarray:
         return self._sim.veg
 
+    @property
+    def out_of_bounds_mode(self) -> str:
+        """Boundary-hit behaviour, ``'ignore'`` or ``'raise'``.
+
+        Mirrors the numba core's mutable ``out_of_bounds_mode`` field: can be
+        changed mid-run (e.g. from ``'raise'`` to ``'ignore'`` once a caller
+        can no longer supply a larger grid) so the next `step` clips the
+        front at the edge instead of leaving it suspended forever.
+        """
+        return self._sim.out_of_bounds_mode
+
+    @out_of_bounds_mode.setter
+    def out_of_bounds_mode(self, mode: str) -> None:
+        self._sim.out_of_bounds_mode = mode
+
     def realizations(self) -> int:
         return self._sim.realizations
 

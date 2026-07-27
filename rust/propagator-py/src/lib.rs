@@ -441,6 +441,37 @@ impl Propagator {
         self.inner.boundary_pressure()
     }
 
+    /// Boundary-hit behaviour, `'ignore'` or `'raise'`.
+    #[getter]
+    fn out_of_bounds_mode(&self) -> &'static str {
+        match self.inner.oob_mode() {
+            OobMode::Ignore => "ignore",
+            OobMode::Raise => "raise",
+        }
+    }
+
+    /// Change the boundary-hit behaviour mid-run.
+    ///
+    /// Switch to `'ignore'` when the domain can no longer grow: the boundary
+    /// events the core has been suspending are popped on the next `step`, so
+    /// the fire clips at the edge and the rest of the front keeps burning.
+    /// Staying in `'raise'` freezes the realization instead, because a
+    /// suspended boundary event is the earliest event in its heap and nothing
+    /// behind it can advance.
+    #[setter]
+    fn set_out_of_bounds_mode(&mut self, mode: &str) -> PyResult<()> {
+        self.inner.set_oob_mode(match mode {
+            "ignore" => OobMode::Ignore,
+            "raise" => OobMode::Raise,
+            other => {
+                return Err(PyValueError::new_err(format!(
+                    "out_of_bounds_mode must be 'ignore' or 'raise', got {other:?}"
+                )))
+            }
+        });
+        Ok(())
+    }
+
     #[pyo3(signature = (
         time,
         moisture = None,
