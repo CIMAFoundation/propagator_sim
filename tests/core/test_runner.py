@@ -154,3 +154,57 @@ def test_grow_margin_not_multiple_of_tile_size_raises():
     )
     with pytest.raises(ValueError, match="multiple of"):
         SimulationRunner(simulator=simulator, grow_margin=TILE_SIZE + 1)
+
+
+def test_grow_to_cover_reaches_bounds_outside_the_domain(tmp_path):
+    """A boundary condition placed away from the fire has to be reached
+    deliberately: the fire never pressures that edge, so `grow_domain` would
+    never go there."""
+    runner, cog_loader = make_runner(tmp_path)
+    simulator = runner.simulator
+    old_shape = simulator.veg.shape
+    old_origin = simulator.origin
+
+    west, south, east, north = cog_loader.get_geo_info().bounds
+    # a point off the north-east corner, well outside the current window
+    target = (east + 400.0, north + 300.0, east + 420.0, north + 320.0)
+
+    new_geo_info = runner.grow_to_cover(target)
+
+    assert new_geo_info is not None
+    rows, cols = simulator.veg.shape
+    assert (rows, cols) != old_shape
+    # the target is now inside the domain
+    g_west, g_south, g_east, g_north = new_geo_info.bounds
+    assert g_east >= target[2] and g_north >= target[3]
+    # and it did not grow the sides that were already far enough away
+    assert g_west == west and g_south == south
+    # the origin shift stays tile-aligned for expand()
+    assert (old_origin[0] - simulator.origin[0]) % TILE_SIZE == 0
+    assert (old_origin[1] - simulator.origin[1]) % TILE_SIZE == 0
+
+
+def test_grow_to_cover_is_a_noop_when_bounds_already_inside(tmp_path):
+    runner, cog_loader = make_runner(tmp_path)
+    old_shape = runner.simulator.veg.shape
+
+    west, south, east, north = cog_loader.get_geo_info().bounds
+    inside = (west + 100.0, south + 100.0, east - 100.0, north - 100.0)
+
+    assert runner.grow_to_cover(inside) is None
+    assert runner.simulator.veg.shape == old_shape
+
+
+def test_grow_to_cover_refuses_to_pass_the_domain_cap(tmp_path):
+    """Past the cap the run carries on clipped rather than growing until the
+    process is killed."""
+    runner, cog_loader = make_runner(tmp_path)
+    rows, cols = runner.simulator.veg.shape
+    runner.max_domain_cells = rows * cols  # no room for any growth
+    old_shape = runner.simulator.veg.shape
+
+    _, _, east, north = cog_loader.get_geo_info().bounds
+    target = (east + 400.0, north + 300.0, east + 420.0, north + 320.0)
+
+    assert runner.grow_to_cover(target) is None
+    assert runner.simulator.veg.shape == old_shape
