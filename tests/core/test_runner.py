@@ -208,3 +208,23 @@ def test_grow_to_cover_refuses_to_pass_the_domain_cap(tmp_path):
 
     assert runner.grow_to_cover(target) is None
     assert runner.simulator.veg.shape == old_shape
+
+
+def test_grow_to_cover_is_a_noop_once_an_earlier_growth_covered_it(tmp_path):
+    """The shortfall is measured against the domain the run is on now.
+
+    Measuring it against the initial window instead made every later call
+    grow again for ground the domain already held — enough repetitions and
+    the run hits `max_domain_cells` without the condition ever landing.
+    """
+    runner, cog_loader = make_runner(tmp_path)
+
+    _, _, east, north = cog_loader.get_geo_info().bounds
+    target = (east + 400.0, north + 300.0, east + 420.0, north + 320.0)
+
+    assert runner.grow_to_cover(target) is not None
+    grown_shape = runner.simulator.veg.shape
+
+    # the same target is inside now, so nothing more is needed
+    assert runner.grow_to_cover(target) is None
+    assert runner.simulator.veg.shape == grown_shape

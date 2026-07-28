@@ -134,6 +134,11 @@ class PropagatorDataFromCogs(PropagatorInputDataProtocol):
     _initial: tuple[np.ndarray, np.ndarray, GeographicInfo] | None = field(
         init=False, default=None, repr=False
     )
+    #: Geometry of the window `load_window` served last, which is the domain
+    #: the simulation is on once it has grown. See `get_geo_info`.
+    _current_geo_info: GeographicInfo | None = field(
+        init=False, default=None, repr=False
+    )
 
     def __post_init__(self):
         self._validate_init_args()
@@ -379,6 +384,7 @@ class PropagatorDataFromCogs(PropagatorInputDataProtocol):
             bounds=bounds,
             shape=shape,
         )
+        self._current_geo_info = geo_info
         return dem, veg, geo_info
 
     def _load_initial(self):
@@ -397,7 +403,22 @@ class PropagatorDataFromCogs(PropagatorInputDataProtocol):
         return self._load_initial()[1]
 
     def get_geo_info(self) -> GeographicInfo:
-        return self._load_initial()[2]
+        """Geometry of the window `load_window` served last.
+
+        Growth serves wider windows through `load_window`, and a caller that
+        places geometry on the grid — `SimulationRunner.grow_to_cover`, and
+        the services above it — needs the domain the simulation is on *now*.
+        Reporting the initial window forever made `grow_to_cover` measure its
+        shortfall against a domain the run had already left behind: it grew
+        by more than it had to, and could reach `max_domain_cells` without
+        ever covering the bounds it was called for.
+
+        Before any window is served this is the initial one, which is what
+        every caller reading it at start-up sees.
+        """
+        self._load_initial()
+        assert self._current_geo_info is not None
+        return self._current_geo_info
 
     def close(self) -> None:
         self._dem.close()

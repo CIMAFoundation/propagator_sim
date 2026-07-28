@@ -149,6 +149,9 @@ def test_grown_window_is_consistent_with_initial(tmp_path):
     )
     origin = loader.initial_origin
     initial_dem = loader.get_dem()
+    # captured before the growth: `get_geo_info` follows the last window
+    # served, so afterwards it reports the grown one
+    initial_west = loader.get_geo_info().trans.c
 
     margin = 32
     grown_dem, grown_veg, grown_geo = loader.load_window(
@@ -157,9 +160,7 @@ def test_grown_window_is_consistent_with_initial(tmp_path):
     np.testing.assert_array_equal(
         grown_dem[margin : margin + 64, margin : margin + 64], initial_dem
     )
-    assert grown_geo.trans.c == pytest.approx(
-        loader.get_geo_info().trans.c - margin * 20.0
-    )
+    assert grown_geo.trans.c == pytest.approx(initial_west - margin * 20.0)
 
 
 def test_point_outside_all_cogs_raises(tmp_path):
@@ -304,3 +305,34 @@ def test_initial_window_arg_validation(tmp_path):
             initial_pixel_origin=(0, 0),
             initial_pixel_shape=(10, 10),
         )
+
+
+def test_get_geo_info_follows_the_last_window_served(tmp_path):
+    """Growth serves wider windows through `load_window`, and callers that
+    place geometry on the grid need the domain the run is on now — not the
+    one it started with."""
+    dem_29, fuel_29 = make_cog_pair(tmp_path)
+    loader = PropagatorDataFromCogs(
+        dem_urls=[dem_29],
+        fuel_urls=[fuel_29],
+        mid_lon=LON,
+        mid_lat=LAT,
+        grid_dim=64,
+    )
+
+    initial = loader.get_geo_info()
+    assert initial.shape == (64, 64)
+
+    row0, col0 = loader.initial_origin
+    _, _, grown = loader.load_window((row0 - 32, col0 - 32), (128, 128))
+
+    current = loader.get_geo_info()
+    assert current.shape == (128, 128)
+    assert current.bounds == grown.bounds
+    # and it grew outwards from the initial window rather than replacing it
+    assert current.bounds[0] < initial.bounds[0]
+    assert current.bounds[3] > initial.bounds[3]
+
+    # the initial dem/veg are still the initial window's: only the reported
+    # geometry follows growth, since the core owns the grown rasters.
+    assert loader.get_dem().shape == (64, 64)
