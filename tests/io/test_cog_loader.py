@@ -336,3 +336,60 @@ def test_get_geo_info_follows_the_last_window_served(tmp_path):
     # the initial dem/veg are still the initial window's: only the reported
     # geometry follows growth, since the core owns the grown rasters.
     assert loader.get_dem().shape == (64, 64)
+
+
+def test_window_composed_from_blocks_matches_a_direct_read(tmp_path):
+    """Composition is exact, including across block seams and off the raster."""
+    dem_29, fuel_29 = make_cog_pair(tmp_path)
+    loader = PropagatorDataFromCogs(
+        dem_urls=[dem_29],
+        fuel_urls=[fuel_29],
+        mid_lon=LON,
+        mid_lat=LAT,
+        grid_dim=64,
+        block_size=32,
+    )
+    row0, col0 = loader.initial_origin
+    # deliberately unaligned to the block lattice, and reaching outside it
+    origin = (row0 - 17, col0 - 5)
+    shape = (100, 83)
+
+    dem, veg, _ = loader.load_window(origin, shape)
+    expected_dem, expected_veg = loader._read_window(origin, shape)
+
+    np.testing.assert_array_equal(dem, expected_dem)
+    np.testing.assert_array_equal(veg, expected_veg)
+
+
+def test_growth_only_reads_the_new_ring(tmp_path):
+    """The point of the block cache: the interior of a grown window is the
+    ground the run is already on, and must not be read from the COGs again."""
+    dem_29, fuel_29 = make_cog_pair(tmp_path)
+    loader = PropagatorDataFromCogs(
+        dem_urls=[dem_29],
+        fuel_urls=[fuel_29],
+        mid_lon=LON,
+        mid_lat=LAT,
+        grid_dim=64,
+        block_size=32,
+    )
+    row0, col0 = loader.initial_origin
+
+    reads = []
+    original = loader._read_window
+
+    def counting_read(origin, shape):
+        reads.append(origin)
+        return original(origin, shape)
+
+    loader._read_window = counting_read  # type: ignore[method-assign]
+
+    loader.load_window((row0, col0), (64, 64))
+    first = len(reads)
+    assert first == 4  # a 64-cell window spans 2x2 blocks of 32
+
+    # grow by one block on every side: the original 2x2 is already cached, so
+    # only the ring around it is read
+    loader.load_window((row0 - 32, col0 - 32), (128, 128))
+    ring = len(reads) - first
+    assert ring == 4 * 4 - 2 * 2

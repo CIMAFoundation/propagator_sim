@@ -26,6 +26,7 @@ from __future__ import annotations
 import logging
 import math
 import re
+from collections import OrderedDict
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -86,6 +87,11 @@ class PropagatorDataFromCogs(PropagatorInputDataProtocol):
     are boundless: cells outside the raster fill with 0 elevation and
     NO_FUEL vegetation.
 
+    Windows are composed from `block_size`-square blocks on a fixed
+    lattice, of which the last `block_cache_size` are kept. Growth then
+    re-reads only the ring of new ground around the domain rather than
+    the whole window, the interior being blocks the run is already on.
+
     The initial window is chosen by exactly one of three mutually
     exclusive means:
 
@@ -125,6 +131,8 @@ class PropagatorDataFromCogs(PropagatorInputDataProtocol):
     initial_pixel_origin: tuple[int, int] | None = None
     initial_pixel_shape: tuple[int, int] | None = None
     snap_shape_to: int | None = None
+    block_size: int = 512
+    block_cache_size: int = 32
 
     _dem: rio.DatasetReader = field(init=False, repr=False)
     _fuel: rio.DatasetReader = field(init=False, repr=False)
@@ -138,6 +146,12 @@ class PropagatorDataFromCogs(PropagatorInputDataProtocol):
     #: the simulation is on once it has grown. See `get_geo_info`.
     _current_geo_info: GeographicInfo | None = field(
         init=False, default=None, repr=False
+    )
+    #: LRU of `block_size`-square blocks, keyed by lattice position. At the
+    #: default 512 a block is about 1.3 MB across the two bands, and a
+    #: 2000x2000 domain spans 16 of them.
+    _blocks: "OrderedDict[tuple[int, int], tuple[npt.NDArray[np.float32], npt.NDArray[np.int8]]]" = field(
+        init=False, default_factory=OrderedDict, repr=False
     )
 
     def __post_init__(self):
@@ -348,7 +362,83 @@ class PropagatorDataFromCogs(PropagatorInputDataProtocol):
     def load_window(
         self, origin: tuple[int, int], shape: tuple[int, int]
     ) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.int8], GeographicInfo]:
-        """Read (dem, veg, geo_info) for a window in world pixel coords."""
+        """Read (dem, veg, geo_info) for a window in world pixel coords.
+
+        Composed from cached square blocks on a fixed lattice, so growth
+        re-reads only the ring of new ground around the domain instead of the
+        whole window: the interior is the same blocks the run is already on.
+        """
+        rows, cols = shape
+        row0, col0 = origin
+        dem = np.empty((rows, cols), dtype=np.float32)
+        veg = np.empty((rows, cols), dtype=np.int8)
+
+        size = self.block_size
+        for block_row in range(row0 // size, -(-(row0 + rows) // size)):
+            for block_col in range(col0 // size, -(-(col0 + cols) // size)):
+                block_dem, block_veg = self._block(block_row, block_col)
+                pixel_row, pixel_col = block_row * size, block_col * size
+
+                from_row = max(row0, pixel_row)
+                to_row = min(row0 + rows, pixel_row + size)
+                from_col = max(col0, pixel_col)
+                to_col = min(col0 + cols, pixel_col + size)
+
+                target = (
+                    slice(from_row - row0, to_row - row0),
+                    slice(from_col - col0, to_col - col0),
+                )
+                source = (
+                    slice(from_row - pixel_row, to_row - pixel_row),
+                    slice(from_col - pixel_col, to_col - pixel_col),
+                )
+                dem[target] = block_dem[source]
+                veg[target] = block_veg[source]
+
+        window = Window(col0, row0, cols, rows)
+        trans = window_transform(window, self._dem.transform)
+        bounds = rio.windows.bounds(window, self._dem.transform)
+        geo_info = GeographicInfo(
+            crs=self._dem.crs,
+            trans=trans,
+            bounds=bounds,
+            shape=shape,
+        )
+        self._current_geo_info = geo_info
+        return dem, veg, geo_info
+
+    def _block(
+        self, block_row: int, block_col: int
+    ) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.int8]]:
+        """One block of the lattice, read through an LRU cache.
+
+        Blocks are keyed by lattice position alone: their content depends only
+        on the rasters, which do not change under a running simulation.
+        """
+        key = (block_row, block_col)
+        cached = self._blocks.get(key)
+        if cached is not None:
+            self._blocks.move_to_end(key)
+            return cached
+
+        block = self._read_window(
+            (block_row * self.block_size, block_col * self.block_size),
+            (self.block_size, self.block_size),
+        )
+        self._blocks[key] = block
+        while len(self._blocks) > self.block_cache_size:
+            self._blocks.popitem(last=False)
+        return block
+
+    def _read_window(
+        self, origin: tuple[int, int], shape: tuple[int, int]
+    ) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.int8]]:
+        """Read DEM and fuel for a window, straight from the COGs.
+
+        Reads are boundless: a window past the raster's edge comes back filled
+        with 0 elevation and NO_FUEL vegetation rather than failing, which is
+        what lets a domain grow off the edge of the data.
+        """
         window = Window(origin[1], origin[0], shape[1], shape[0])
 
         dem = self._dem.read(
@@ -376,16 +466,7 @@ class PropagatorDataFromCogs(PropagatorInputDataProtocol):
             nodata = np.array(self._fuel.nodata).astype(np.int8)
             veg[veg == nodata] = NO_FUEL
 
-        trans = window_transform(window, self._dem.transform)
-        bounds = rio.windows.bounds(window, self._dem.transform)
-        geo_info = GeographicInfo(
-            crs=self._dem.crs,
-            trans=trans,
-            bounds=bounds,
-            shape=shape,
-        )
-        self._current_geo_info = geo_info
-        return dem, veg, geo_info
+        return dem, veg
 
     def _load_initial(self):
         if self._initial is None:
