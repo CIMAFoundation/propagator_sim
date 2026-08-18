@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title>PROPAGATOR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>PROPAGATOR</h1>
+    <span class="subtitle">simulazione incendio interattiva &mdash; solo locale</span>
+  </header>
+
+  <div id="sidebar">
+    <fieldset>
+      <legend>Area</legend>
+      <div class="pick-buttons">
+        <button type="button" id="pick-center" class="active">1. Scegli centro</button>
+        <button type="button" id="pick-ignition">2. Scegli innesco</button>
+      </div>
+      <label>Raggio <span class="value" id="radius-value">15 km</span></label>
+      <input type="range" id="radius" min="1" max="50" step="1" value="15">
+      <label>Cellsize <span class="value" id="cellsize-value">30 m</span></label>
+      <input type="range" id="cellsize" min="20" max="100" step="5" value="30">
+    </fieldset>
+
+    <fieldset>
+      <legend>Meteo</legend>
+      <label>Direzione vento <span class="value" id="wind-dir-value">0&deg;</span></label>
+      <input type="range" id="wind-dir" min="0" max="359" step="1" value="0">
+      <label>Velocit&agrave; vento <span class="value" id="wind-speed-value">20 km/h</span></label>
+      <input type="range" id="wind-speed" min="0" max="80" step="1" value="20">
+      <label>Umidit&agrave; <span class="value" id="moisture-value">10%</span></label>
+      <input type="range" id="moisture" min="0" max="100" step="1" value="10">
+    </fieldset>
+
+    <fieldset>
+      <legend>Simulazione</legend>
+      <label>Durata <span class="value" id="duration-value">6 h</span></label>
+      <input type="range" id="duration" min="1" max="48" step="1" value="6">
+      <label>Realizzazioni <span class="value" id="realizations-value">10</span></label>
+      <input type="range" id="realizations" min="1" max="50" step="1" value="10">
+    </fieldset>
+
+    <button type="button" id="run-button" disabled>Avvia simulazione</button>
+
+    <div class="warning" id="warning-banner"></div>
+
+    <div id="status-panel">
+      <div id="status-text">In corso&hellip;</div>
+      <div class="progress-bar"><div id="progress-fill"></div></div>
+    </div>
+
+    <div id="result-panel">
+      <label>Ora <span class="value" id="frame-value">&mdash;</span></label>
+      <input type="range" id="frame-slider" min="0" max="0" step="1" value="0">
+      <div class="stat-grid">
+        <div class="stat"><div class="stat-value" id="stat-area-mean">&mdash;</div><div class="stat-label">Area media (ha)</div></div>
+        <div class="stat"><div class="stat-value" id="stat-area-50">&mdash;</div><div class="stat-label">Area prob&ge;50%</div></div>
+        <div class="stat"><div class="stat-value" id="stat-n-active">&mdash;</div><div class="stat-label">Realizzazioni attive</div></div>
+        <div class="stat"><div class="stat-value" id="stat-frame-count">&mdash;</div><div class="stat-label">Frame disponibili</div></div>
+      </div>
+      <svg id="chart" viewBox="0 0 320 140"></svg>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
