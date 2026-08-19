@@ -32,6 +32,7 @@
     actions: [],
     drawingLayer: null,
     drawingPoints: null,
+    _fitted: false,
   };
 
   const map = L.map("map").setView([42.5, 12.5], 6);
@@ -297,6 +298,7 @@
     state.frameTimes = [];
     state.statsByTime = {};
     state.bounds = null;
+    state._fitted = false;
   }
 
   async function loadResults() {

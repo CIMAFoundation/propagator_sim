@@ -68,6 +68,11 @@ class SimulateRequest(BaseModel):
             )
         if self.time_resolution_h > self.time_limit_h:
             raise ValueError("time_resolution_h must not exceed time_limit_h")
+        if self.time_resolution_s < 1:
+            raise ValueError(
+                "time_resolution_h too small: must resolve to at least 1 "
+                "second, or the simulation loop never advances"
+            )
         for action in self.actions:
             if action.time_h > self.time_limit_h:
                 raise ValueError(

@@ -49,6 +49,13 @@ def test_rejects_zero_realizations():
         SimulateRequest(**base_kwargs(realizations=0))
 
 
+def test_rejects_time_resolution_that_rounds_to_zero_seconds():
+    # a time_resolution_h this small would round to time_resolution_s=0,
+    # which never advances the simulation loop (see web/runner.py::run_loop)
+    with pytest.raises(ValidationError):
+        SimulateRequest(**base_kwargs(time_limit_h=1.0, time_resolution_h=0.0001))
+
+
 def test_action_request_accepts_valid_line():
     action = ActionRequest(
         action_type="canadair", time_h=2.0, line=[(42.4, 12.1), (42.45, 12.15)]

@@ -62,6 +62,23 @@ def test_run_loop_produces_frames_with_consistent_shape_and_growing_area():
     assert area_history == sorted(area_history)
 
 
+def test_run_loop_does_not_overshoot_time_limit_s():
+    # time_limit_h isn't a multiple of time_resolution_h, so the last
+    # window must be truncated rather than always advancing by a full
+    # time_resolution_h past the requested limit.
+    request = make_request(time_limit_h=2.5, time_resolution_h=1.0)
+    veg = np.full((20, 20), 4, dtype=np.int32)  # all grassland: burns
+    dem = np.zeros((20, 20), dtype=np.float32)
+    job = make_job(request)
+
+    simulator = build_simulator(veg, dem, request, ign_row=10, ign_col=10)
+    run_loop(simulator, job)
+
+    assert job.status == JobStatus.DONE
+    assert job.frame_times[-1] == request.time_limit_s
+    assert all(t <= request.time_limit_s for t in job.frame_times)
+
+
 def test_run_loop_stops_when_cancelled():
     request = make_request(time_limit_h=48.0, time_resolution_h=1.0)
     veg = np.full((40, 40), 4, dtype=np.int32)

@@ -178,6 +178,14 @@ class HeavyAction(Action):
         return fuel_action
 
 
+ACTION_CLASSES: dict[str, type[Action]] = {
+    ActionType.WATERLINE_ACTION.value: WaterlineAction,
+    ActionType.CANADAIR.value: CanadairAction,
+    ActionType.HELICOPTER.value: HelicopterAction,
+    ActionType.HEAVY_ACTION.value: HeavyAction,
+}
+
+
 def parse_actions(
     data: dict[str, Any],
     epsg: int,

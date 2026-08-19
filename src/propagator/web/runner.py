@@ -10,6 +10,7 @@ cropping is needed for the map overlay to line up frame to frame).
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import tempfile
@@ -19,12 +20,7 @@ from pathlib import Path
 from shapely import LineString
 
 from propagator.core import FUEL_SYSTEM_LEGACY, BoundaryConditions, Propagator
-from propagator.io.actions import (
-    CanadairAction,
-    HeavyAction,
-    HelicopterAction,
-    WaterlineAction,
-)
+from propagator.io.actions import ACTION_CLASSES
 from propagator.io.boundary_conditions import TimedInput
 from propagator.io.data_prep import (
     AreaDataError,
@@ -36,12 +32,7 @@ from propagator.io.loader.geotiff import load_data_from_files
 from propagator.web.jobs import FrameData, JobManager, JobState, JobStatus
 from propagator.web.schemas import SimulateRequest
 
-ACTION_CLASSES = {
-    "waterline_action": WaterlineAction,
-    "canadair": CanadairAction,
-    "helicopter": HelicopterAction,
-    "heavy_action": HeavyAction,
-}
+logger = logging.getLogger(__name__)
 
 
 def cache_dir() -> Path:
@@ -106,14 +97,18 @@ def run_loop(simulator: Propagator, job: JobState) -> None:
     request = job.request
     ref_date = datetime.now(timezone.utc)
     job.status = JobStatus.RUNNING
-    while True:
+    while simulator.time < request.time_limit_s:
         if job.cancel_requested:
             job.status = JobStatus.CANCELLED
             return
-        next_time = simulator.next_time()
-        if next_time is None:
+        if simulator.next_time() is None:
             break
-        simulator.step(seconds=request.time_resolution_s)
+        # `_step_window` always advances `simulator.time` by exactly the
+        # requested window, so the last step must be clamped to the
+        # remaining budget or the run would always overshoot
+        # time_limit_s by up to one time_resolution_h.
+        step_s = min(request.time_resolution_s, request.time_limit_s - simulator.time)
+        simulator.step(seconds=step_s)
         output = simulator.get_output()
         stats = output.stats.to_dict(output.time, ref_date)
         job.frames[output.time] = FrameData(
@@ -123,8 +118,6 @@ def run_loop(simulator: Propagator, job: JobState) -> None:
         )
         job.frame_times.append(output.time)
         job.current_time_s = output.time
-        if simulator.time > request.time_limit_s:
-            break
     job.status = JobStatus.DONE
 
 
@@ -132,8 +125,9 @@ def run_job(job: JobState, manager: JobManager) -> None:
     """Full job orchestration: download/build area data, run the
     simulation loop, and report status/errors on `job` as it progresses."""
     request = job.request
-    work_dir = Path(tempfile.mkdtemp(prefix="propagator_web_"))
+    work_dir: Path | None = None
     try:
+        work_dir = Path(tempfile.mkdtemp(prefix="propagator_web_"))
         job.status = JobStatus.PREPARING_DATA
         area = prepare_area_data(
             request.center_lat,
@@ -176,5 +170,7 @@ def run_job(job: JobState, manager: JobManager) -> None:
     except Exception as e:
         job.status = JobStatus.FAILED
         job.error = f"{type(e).__name__}: {e}"
+        logger.exception("Unhandled error while running job %s", job.id)
     finally:
-        shutil.rmtree(work_dir, ignore_errors=True)
+        if work_dir is not None:
+            shutil.rmtree(work_dir, ignore_errors=True)

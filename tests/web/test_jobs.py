@@ -107,6 +107,29 @@ def test_delete_removes_job():
     assert manager.delete(job_id) is False
 
 
+def test_delete_cancels_a_still_running_job():
+    manager = JobManager()
+    started = threading.Event()
+    release = threading.Event()
+    runner = blocking_runner_factory(release, started)
+
+    job_id = manager.submit(make_request(), runner)
+    assert started.wait(timeout=5)
+
+    job = manager.get(job_id)
+    assert job is not None
+    assert job.cancel_requested is False
+
+    assert manager.delete(job_id) is True
+    assert manager.get(job_id) is None
+    # the background thread holds its own reference to `job` regardless
+    # of the registry pop above, so it must still see cancel_requested
+    # flip to True instead of running forever unnoticed.
+    assert job.cancel_requested is True
+
+    release.set()
+
+
 def test_failed_job_reports_error():
     manager = JobManager()
     job_id = manager.submit(make_request(), failing_runner)

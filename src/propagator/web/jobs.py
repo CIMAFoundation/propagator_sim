@@ -108,7 +108,16 @@ class JobManager:
 
     def delete(self, job_id: str) -> bool:
         with self._lock:
-            return self._jobs.pop(job_id, None) is not None
+            job = self._jobs.pop(job_id, None)
+            if job is None:
+                return False
+            # If the job's background thread is still running, it holds
+            # its own reference to `job` regardless of the pop above, so
+            # it would otherwise keep occupying the single worker
+            # indefinitely; flagging cancellation here makes it notice
+            # and stop at its next loop iteration.
+            job.cancel_requested = True
+            return True
 
     @property
     def lock(self) -> threading.Lock:
