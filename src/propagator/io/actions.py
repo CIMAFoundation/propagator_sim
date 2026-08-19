@@ -138,7 +138,7 @@ class HelicopterAction(Action):
     def allowed_kinds(cls) -> set[GeometryKind]:
         return {GeometryKind.LINE}
 
-    def rasterize_action(
+    def rasterize_action_moisture(
         self, geo_info: GeographicInfo
     ) -> npt.NDArray[np.floating]:
         mask_action = build_mask(self.geometries, geo_info)

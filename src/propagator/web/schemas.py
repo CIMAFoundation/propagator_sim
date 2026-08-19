@@ -6,6 +6,8 @@ local, single-user machine (see `_check_compute_budget`).
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, model_validator
 
 # Rough compute budget: grid cells (width * height) times realizations.
@@ -13,6 +15,19 @@ from pydantic import BaseModel, Field, model_validator
 # ~1e7 and runs in well under a minute; this caps combinations an order
 # of magnitude above that, which already take several minutes locally.
 CELL_REALIZATION_BUDGET = 2.5e8
+
+
+class ActionRequest(BaseModel):
+    """A firefighting action (see `propagator.io.actions`), drawn as a
+    line on the map and scheduled at `time_h` into the simulation."""
+
+    action_type: Literal[
+        "waterline_action", "canadair", "helicopter", "heavy_action"
+    ]
+    time_h: float = Field(..., ge=0)
+    line: list[tuple[float, float]] = Field(
+        ..., min_length=2, description="[(lat, lon), ...]"
+    )
 
 
 class SimulateRequest(BaseModel):
@@ -36,6 +51,8 @@ class SimulateRequest(BaseModel):
 
     isochrone_thresholds: list[float] = Field(default_factory=lambda: [0.5, 0.75, 0.9])
 
+    actions: list[ActionRequest] = Field(default_factory=list)
+
     @model_validator(mode="after")
     def _check_compute_budget(self) -> "SimulateRequest":
         half_cells = (self.radius_km * 1000.0) / self.cellsize
@@ -51,6 +68,12 @@ class SimulateRequest(BaseModel):
             )
         if self.time_resolution_h > self.time_limit_h:
             raise ValueError("time_resolution_h must not exceed time_limit_h")
+        for action in self.actions:
+            if action.time_h > self.time_limit_h:
+                raise ValueError(
+                    f"action time_h={action.time_h} exceeds time_limit_h="
+                    f"{self.time_limit_h}"
+                )
         return self
 
     @property

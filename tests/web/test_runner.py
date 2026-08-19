@@ -4,11 +4,17 @@ from datetime import datetime
 
 import numpy as np
 import rasterio as rio
+from pyproj import CRS, Transformer
 
 from propagator.io.data_prep import AreaDataResult
 from propagator.io.geo import GeographicInfo
 from propagator.web.jobs import JobManager, JobState, JobStatus
-from propagator.web.runner import build_simulator, run_job, run_loop
+from propagator.web.runner import (
+    build_simulator,
+    run_job,
+    run_loop,
+    schedule_actions,
+)
 from propagator.web.schemas import SimulateRequest
 
 
@@ -67,6 +73,64 @@ def test_run_loop_stops_when_cancelled():
     run_loop(simulator, job)
 
     assert job.status == JobStatus.CANCELLED
+
+
+def _pixel_center_lonlat(transform, crs, row, col):
+    x = transform.c + (col + 0.5) * transform.a
+    y = transform.f + (row + 0.5) * transform.e
+    to_wgs84 = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
+    lon, lat = to_wgs84.transform(x, y)
+    return lat, lon
+
+
+def test_schedule_actions_heavy_action_blocks_ignition_cell():
+    size = 30
+    utm_epsg = "EPSG:32633"
+    transform = rio.Affine(30.0, 0.0, 500000.0, 0.0, -30.0, 4700000.0)
+    geo_info = GeographicInfo(
+        crs=CRS.from_epsg(32633),
+        trans=transform,
+        bounds=(500000.0, 4700000.0 - size * 30, 500000.0 + size * 30, 4700000.0),
+        shape=(size, size),
+    )
+    ign_row, ign_col = 15, 15
+    lat0, lon0 = _pixel_center_lonlat(transform, utm_epsg, ign_row, ign_col)
+    lat1, lon1 = _pixel_center_lonlat(transform, utm_epsg, ign_row, ign_col + 1)
+
+    veg = np.full((size, size), 4, dtype=np.int32)  # all grassland: burns
+    dem = np.zeros((size, size), dtype=np.float32)
+
+    request = make_request(
+        radius_km=1.0,
+        cellsize=30.0,
+        time_limit_h=3.0,
+        time_resolution_h=1.0,
+        actions=[
+            {
+                "action_type": "heavy_action",
+                "time_h": 0.0,
+                "line": [[lat0, lon0], [lat1, lon1]],
+            }
+        ],
+    )
+    job = make_job(request)
+
+    simulator = build_simulator(veg, dem, request, ign_row=ign_row, ign_col=ign_col)
+    schedule_actions(simulator, request, geo_info)
+    run_loop(simulator, job)
+
+    assert job.status == JobStatus.DONE
+    # the ignition cell was neutralized by the heavy_action before the fire
+    # ever started spreading: it registers as burned (ignition forces the
+    # cell alight regardless of fuel) but never propagates beyond it, so
+    # burned area stays pinned at exactly one cell and the front dies
+    # immediately (n_active == 0) instead of growing like in the
+    # unprotected case (test_run_loop_produces_frames_with_consistent_shape_and_growing_area)
+    one_cell_area = request.cellsize**2
+    for t in job.frame_times:
+        stats = job.frames[t].stats
+        assert stats["area_mean"] == one_cell_area
+        assert stats["n_active"] == 0
 
 
 def _write_tiny_geotiff(path, array, transform, crs):

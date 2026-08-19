@@ -11,6 +11,7 @@
   <header>
     <h1>PROPAGATOR</h1>
     <span class="subtitle">simulazione incendio interattiva &mdash; solo locale</span>
+    <a class="manual-link" href="manual.html" target="_blank" rel="noopener" title="Apre il manuale utente in una nuova scheda">&#128214; Manuale</a>
   </header>
 
   <div id="sidebar">
@@ -40,8 +41,36 @@
       <legend>Simulazione</legend>
       <label>Durata <span class="value" id="duration-value">6 h</span></label>
       <input type="range" id="duration" min="1" max="48" step="1" value="6" title="Durata simulata dell'incendio, in ore">
+      <label>Risoluzione temporale <span class="value" id="resolution-value">1 h</span></label>
+      <input type="range" id="resolution" min="0.5" max="6" step="0.5" value="1" title="Ogni quante ore viene salvato un frame dei risultati (mappa, statistiche)">
       <label>Realizzazioni <span class="value" id="realizations-value">10</span></label>
       <input type="range" id="realizations" min="1" max="50" step="1" value="10" title="Numero di simulazioni stocastiche indipendenti eseguite: valori più alti danno stime di probabilità più affidabili ma richiedono più tempo">
+      <label title="Se attivo, il modello genera braci portate dal vento che possono far nascere nuovi focolai davanti al fronte principale">
+        Spotting (braci)
+        <input type="checkbox" id="do-spotting">
+      </label>
+      <label title="Soglie di probabilità (0-1, separate da virgola) per cui vengono tracciate le isocrone sulla mappa">
+        Soglie isocrone
+        <input type="text" id="isochrone-thresholds" value="0.5,0.75,0.9" size="12">
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Azioni antincendio</legend>
+      <label>Tipo <span class="value"></span></label>
+      <select id="action-type" title="Tipo di intervento (l'umidità indicata si somma a quella di base e decade nel tempo, circa -1%/minuto): Canadair +25% sulla linea, +22% nel buffer di una cella; Waterline +27% su linea e buffer; Elicottero +22% su punti sparsi lungo la linea, +20% nel buffer; Mezzi pesanti: non tocca l'umidità, sostituisce il combustibile con una fascia non infiammabile">
+        <option value="canadair" title="Umidità +25% sulla linea, +22% nel buffer di una cella (si somma a quella di base, poi decade nel tempo)">Canadair</option>
+        <option value="helicopter" title="Umidità +22% su punti sparsi lungo la linea, +20% nel buffer di una cella (si somma a quella di base, poi decade nel tempo)">Elicottero</option>
+        <option value="waterline_action" title="Umidità +27% su tutta la linea e il buffer di una cella (si somma a quella di base, poi decade nel tempo)">Waterline</option>
+        <option value="heavy_action" title="Non tocca l'umidità: sostituisce il combustibile lungo la linea (e buffer di una cella) con una fascia non infiammabile, in modo permanente">Mezzi pesanti</option>
+      </select>
+      <label>Tempo azione <span class="value" id="action-time-value">1 h</span></label>
+      <input type="range" id="action-time" min="0" max="48" step="0.5" value="1" title="Ore dall'inizio della simulazione in cui l'azione viene eseguita">
+      <div class="pick-buttons">
+        <button type="button" id="draw-action-line" title="Clicca sulla mappa per aggiungere i punti della linea d'intervento, poi premi Fine disegno">Disegna linea</button>
+        <button type="button" id="finish-action-line" disabled title="Conclude la linea disegnata e aggiunge l'azione alla lista">Fine disegno</button>
+      </div>
+      <ul id="actions-list"></ul>
     </fieldset>
 
     <button type="button" id="run-button" disabled title="Avvia la simulazione con i parametri impostati">Avvia simulazione</button>

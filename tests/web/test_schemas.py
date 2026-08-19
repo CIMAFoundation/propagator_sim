@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from propagator.web.schemas import SimulateRequest
+from propagator.web.schemas import ActionRequest, SimulateRequest
 
 
 def base_kwargs(**overrides):
@@ -47,3 +47,54 @@ def test_rejects_out_of_range_wind_dir():
 def test_rejects_zero_realizations():
     with pytest.raises(ValidationError):
         SimulateRequest(**base_kwargs(realizations=0))
+
+
+def test_action_request_accepts_valid_line():
+    action = ActionRequest(
+        action_type="canadair", time_h=2.0, line=[(42.4, 12.1), (42.45, 12.15)]
+    )
+    assert action.action_type == "canadair"
+
+
+def test_action_request_rejects_invalid_action_type():
+    with pytest.raises(ValidationError):
+        ActionRequest(
+            action_type="bulldozer", time_h=1.0, line=[(42.4, 12.1), (42.45, 12.15)]
+        )
+
+
+def test_action_request_rejects_single_point_line():
+    with pytest.raises(ValidationError):
+        ActionRequest(action_type="canadair", time_h=1.0, line=[(42.4, 12.1)])
+
+
+def test_simulate_request_rejects_action_time_beyond_limit():
+    with pytest.raises(ValidationError):
+        SimulateRequest(
+            **base_kwargs(
+                time_limit_h=2.0,
+                actions=[
+                    {
+                        "action_type": "heavy_action",
+                        "time_h": 5.0,
+                        "line": [[42.4, 12.1], [42.45, 12.15]],
+                    }
+                ],
+            )
+        )
+
+
+def test_simulate_request_accepts_action_within_limit():
+    req = SimulateRequest(
+        **base_kwargs(
+            time_limit_h=6.0,
+            actions=[
+                {
+                    "action_type": "waterline_action",
+                    "time_h": 2.0,
+                    "line": [[42.4, 12.1], [42.45, 12.15]],
+                }
+            ],
+        )
+    )
+    assert len(req.actions) == 1

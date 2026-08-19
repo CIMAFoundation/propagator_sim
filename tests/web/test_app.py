@@ -125,6 +125,16 @@ def test_frames_and_frame_endpoints_after_completion(client):
     assert png_res.content[:8] == b"\x89PNG\r\n\x1a\n"
 
 
+def test_manual_page_is_served(client):
+    http, _ = client
+    res = http.get("/manual.html")
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/html")
+
+    index_res = http.get("/index.html")
+    assert 'href="manual.html"' in index_res.text
+
+
 def test_cancel_and_delete(client):
     http, manager = client
     res = http.post("/api/simulate", json=base_request())

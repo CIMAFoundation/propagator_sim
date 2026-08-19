@@ -13,7 +13,6 @@ from typing import Dict, Iterator, List, Optional, Tuple
 import numpy as np
 import numpy.typing as npt
 
-from propagator.core.constants import NO_FUEL
 from propagator.core.models import (
     UpdateBatch,
     UpdateBatchWithTime,
@@ -60,8 +59,12 @@ class SchedulerEvent:
         if self.vegetation_changes is None:
             self.vegetation_changes = other.vegetation_changes
         elif other.vegetation_changes is not None:
+            # NaN means "no change" for vegetation_changes (see
+            # Propagator._update_vegetation), not NO_FUEL (0, a real fuel
+            # code) — comparing against NO_FUEL here would treat `other`'s
+            # NaN cells as "set", wiping out `self`'s changes there.
             self.vegetation_changes = np.where(
-                other.vegetation_changes == NO_FUEL,
+                np.isnan(other.vegetation_changes),
                 self.vegetation_changes,
                 other.vegetation_changes,
             )

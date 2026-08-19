@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import numpy as np
 
-from propagator.core.constants import NO_FUEL
 from propagator.core.models import UpdateBatch, UpdateBatchWithTime
 from propagator.core.scheduler import Scheduler, SchedulerEvent
 
@@ -70,7 +69,10 @@ def test_add_event_merges_updates_and_actions():
         wind_dir=np.full((1, 1), 0.9, dtype=np.float32),
         wind_speed=np.full((1, 1), 12.0, dtype=np.float32),
         additional_moisture=np.full((1, 1), 0.2, dtype=np.float32),
-        vegetation_changes=np.full((1, 1), NO_FUEL, dtype=np.float32),
+        # NaN means "no change" for vegetation_changes (see
+        # Propagator._update_vegetation) — NOT NO_FUEL (0), which is a
+        # real, meaningful fuel code a caller might explicitly set.
+        vegetation_changes=np.full((1, 1), np.nan, dtype=np.float32),
     )
     scheduler.add_event(4, event_b)
 
@@ -95,6 +97,39 @@ def test_add_event_merges_updates_and_actions():
     np.testing.assert_array_equal(
         merged.vegetation_changes, np.array([[2.0]], dtype=np.float32)
     )
+
+
+def test_scheduler_event_update_preserves_vegetation_changes_on_disjoint_cells():
+    """Regression test: merging two events' vegetation_changes must not let
+    one event's NaN ("no change") cells erase the other event's real
+    changes elsewhere in the grid — this previously happened because the
+    merge compared against NO_FUEL (0, a real fuel code) instead of NaN."""
+    a = SchedulerEvent(updates=UpdateBatch())
+    a.vegetation_changes = np.array([[3.0, np.nan], [np.nan, np.nan]])
+
+    b = SchedulerEvent(updates=UpdateBatch())
+    b.vegetation_changes = np.array([[np.nan, np.nan], [np.nan, 5.0]])
+
+    a.update(b)
+
+    np.testing.assert_array_equal(
+        a.vegetation_changes, np.array([[3.0, np.nan], [np.nan, 5.0]])
+    )
+
+
+def test_scheduler_event_update_lets_later_event_overwrite_same_cell():
+    """Where both events actually set the same cell (not NaN), the later
+    event (`other`) wins, matching the "overwrite if already set" behavior
+    used for moisture/wind_dir/wind_speed above."""
+    a = SchedulerEvent(updates=UpdateBatch())
+    a.vegetation_changes = np.array([[2.0]])
+
+    b = SchedulerEvent(updates=UpdateBatch())
+    b.vegetation_changes = np.array([[0.0]])  # NO_FUEL: a real, explicit value
+
+    a.update(b)
+
+    np.testing.assert_array_equal(a.vegetation_changes, np.array([[0.0]]))
 
 
 def test_active_returns_unique_realizations():

@@ -55,6 +55,30 @@ def test_spotting_state_allocated_only_when_enabled():
     assert with_spotting.spotting_receiving is not None
 
 
+def test_disabling_spotting_does_not_mutate_shared_default_fuel_system():
+    """Regression test: `Propagator(do_spotting=False)` used to call
+    `self.fuels.disable_spotting()` in place on whatever fuel system it
+    was given. Since the default fuel system is `FUEL_SYSTEM_LEGACY`, a
+    single shared module-level instance, this permanently disabled
+    spotting on it — silently breaking spotting for every subsequently
+    created `Propagator(do_spotting=True)` in the same process that also
+    relied on the default fuel system."""
+    from propagator.core import FUEL_SYSTEM_LEGACY
+
+    base_veg = np.array([[5, 5], [5, 5]], dtype=np.int32)  # conifers: spotting-capable
+    base_dem = np.zeros_like(base_veg, dtype=np.float32)
+    spotting_before = list(FUEL_SYSTEM_LEGACY.spotting)
+
+    Propagator(veg=base_veg, dem=base_dem, realizations=1, do_spotting=False)
+
+    assert list(FUEL_SYSTEM_LEGACY.spotting) == spotting_before
+
+    with_spotting = Propagator(
+        veg=base_veg, dem=base_dem, realizations=1, do_spotting=True
+    )
+    assert any(with_spotting.fuels.spotting)
+
+
 def test_compute_fire_probability_and_means():
     propagator = make_propagator(realizations=2)
 

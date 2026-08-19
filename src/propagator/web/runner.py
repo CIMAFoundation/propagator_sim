@@ -16,14 +16,32 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from shapely import LineString
+
 from propagator.core import FUEL_SYSTEM_LEGACY, BoundaryConditions, Propagator
+from propagator.io.actions import (
+    CanadairAction,
+    HeavyAction,
+    HelicopterAction,
+    WaterlineAction,
+)
+from propagator.io.boundary_conditions import TimedInput
 from propagator.io.data_prep import (
     AreaDataError,
     latlon_to_rowcol,
     prepare_area_data,
 )
+from propagator.io.geo import GeographicInfo
 from propagator.io.loader.geotiff import load_data_from_files
 from propagator.web.jobs import FrameData, JobManager, JobState, JobStatus
+from propagator.web.schemas import SimulateRequest
+
+ACTION_CLASSES = {
+    "waterline_action": WaterlineAction,
+    "canadair": CanadairAction,
+    "helicopter": HelicopterAction,
+    "heavy_action": HeavyAction,
+}
 
 
 def cache_dir() -> Path:
@@ -43,6 +61,7 @@ def build_simulator(
         dem=dem,
         realizations=request.realizations,
         fuels=FUEL_SYSTEM_LEGACY,
+        cellsize=request.cellsize,
         do_spotting=request.do_spotting,
         out_of_bounds_mode="ignore",
     )
@@ -56,6 +75,29 @@ def build_simulator(
         )
     )
     return simulator
+
+
+def schedule_actions(
+    simulator: Propagator,
+    request: SimulateRequest,
+    geo_info: GeographicInfo,
+) -> None:
+    """Schedule firefighting actions (canadair/helicopter/waterline/heavy)
+    as future `BoundaryConditions`, reusing `TimedInput.get_boundary_conditions`
+    (the same rasterization the CLI uses) rather than reimplementing it.
+    Must be called before the simulation loop starts stepping."""
+    if not request.actions:
+        return
+    non_vegetated = simulator.fuels.get_non_vegetated()
+    for action_req in request.actions:
+        action_cls = ACTION_CLASSES[action_req.action_type]
+        line = LineString([(lon, lat) for lat, lon in action_req.line])
+        timed_input = TimedInput(
+            time=int(round(action_req.time_h * 3600)),
+            actions=[action_cls(geometries=[line])],
+        )
+        bc = timed_input.get_boundary_conditions(geo_info, non_vegetated)
+        simulator.set_boundary_conditions(bc)
 
 
 def run_loop(simulator: Propagator, job: JobState) -> None:
@@ -126,6 +168,7 @@ def run_job(job: JobState, manager: JobManager) -> None:
         )
 
         simulator = build_simulator(veg, dem, request, ign_row, ign_col)
+        schedule_actions(simulator, request, geo_info)
         run_loop(simulator, job)
     except AreaDataError as e:
         job.status = JobStatus.FAILED

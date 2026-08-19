@@ -172,6 +172,12 @@ class Propagator:
             shape + (self.realizations,), dtype=np.float32
         )
         if not self.do_spotting:
+            # Copy before mutating: `self.fuels` defaults to (or may be
+            # explicitly passed as) the shared `FUEL_SYSTEM_LEGACY`
+            # instance. Disabling spotting in place on that shared object
+            # would silently disable spotting for every other Propagator
+            # in the process that also uses the default/legacy fuels.
+            self.fuels = self.fuels.copy()
             self.fuels.disable_spotting()
 
     def compute_fire_probability(self) -> npt.NDArray[np.floating]:

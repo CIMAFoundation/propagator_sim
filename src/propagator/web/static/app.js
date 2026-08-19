@@ -1,6 +1,19 @@
 (() => {
   "use strict";
 
+  const ACTION_LABELS = {
+    canadair: "Canadair",
+    helicopter: "Elicottero",
+    waterline_action: "Waterline",
+    heavy_action: "Mezzi pesanti",
+  };
+  const ACTION_COLORS = {
+    canadair: "#2b6cb0",
+    helicopter: "#3182ce",
+    waterline_action: "#0e7490",
+    heavy_action: "#7c5a24",
+  };
+
   const state = {
     mode: "center",
     center: null,
@@ -16,6 +29,9 @@
     statsByTime: {},
     isoLayer: null,
     overlayLayer: null,
+    actions: [],
+    drawingLayer: null,
+    drawingPoints: null,
   };
 
   const map = L.map("map").setView([42.5, 12.5], 6);
@@ -43,7 +59,11 @@
   const windSpeedInput = bindRange("wind-speed", "wind-speed-value", (v) => `${v} km/h`);
   const moistureInput = bindRange("moisture", "moisture-value", (v) => `${v}%`);
   const durationInput = bindRange("duration", "duration-value", (v) => `${v} h`);
+  const resolutionInput = bindRange("resolution", "resolution-value", (v) => `${v} h`);
   const realizationsInput = bindRange("realizations", "realizations-value", (v) => v);
+  const actionTimeInput = bindRange("action-time", "action-time-value", (v) => `${v} h`);
+  const spottingInput = $("do-spotting");
+  const isochroneInput = $("isochrone-thresholds");
 
   radiusInput.addEventListener("input", () => {
     state.radiusKm = Number(radiusInput.value);
@@ -57,6 +77,7 @@
     state.mode = mode;
     $("pick-center").classList.toggle("active", mode === "center");
     $("pick-ignition").classList.toggle("active", mode === "ignition");
+    $("draw-action-line").classList.toggle("active", mode === "draw-action");
   }
 
   $("pick-center").addEventListener("click", () => setMode("center"));
@@ -81,7 +102,7 @@
         }).addTo(map);
       }
       setMode("ignition");
-    } else {
+    } else if (state.mode === "ignition") {
       state.ignition = { lat, lon: lng };
       if (state.ignitionMarker) {
         state.ignitionMarker.setLatLng(e.latlng);
@@ -90,12 +111,76 @@
           icon: L.divIcon({ className: "", html: "★", iconSize: [16, 16] }),
         }).addTo(map);
       }
+    } else if (state.mode === "draw-action") {
+      state.drawingPoints.push([lat, lng]);
+      state.drawingLayer.setLatLngs(state.drawingPoints);
+      $("finish-action-line").disabled = state.drawingPoints.length < 2;
     }
     checkReady();
   });
 
   function checkReady() {
     $("run-button").disabled = !(state.center && state.ignition);
+  }
+
+  // --- firefighting actions: draw a line, queue it as an action ---
+
+  $("draw-action-line").addEventListener("click", () => {
+    if (state.drawingLayer) map.removeLayer(state.drawingLayer);
+    state.drawingPoints = [];
+    state.drawingLayer = L.polyline([], { color: "#9c6a0e", dashArray: "5 5", weight: 2 }).addTo(map);
+    $("finish-action-line").disabled = true;
+    setMode("draw-action");
+  });
+
+  $("finish-action-line").addEventListener("click", () => {
+    if (!state.drawingPoints || state.drawingPoints.length < 2) return;
+    const actionType = $("action-type").value;
+    const timeH = Number(actionTimeInput.value);
+    const line = state.drawingPoints.slice();
+    const layer = L.polyline(line, {
+      color: ACTION_COLORS[actionType] || "#9c6a0e",
+      weight: 3,
+    }).addTo(map);
+    const id = `action-${Date.now()}`;
+    state.actions.push({ id, action_type: actionType, time_h: timeH, line, layer });
+    renderActionsList();
+
+    map.removeLayer(state.drawingLayer);
+    state.drawingLayer = null;
+    state.drawingPoints = null;
+    $("finish-action-line").disabled = true;
+    setMode(state.ignition ? "ignition" : "center");
+  });
+
+  function renderActionsList() {
+    const ul = $("actions-list");
+    ul.innerHTML = "";
+    for (const action of state.actions) {
+      const li = document.createElement("li");
+      const label = document.createElement("span");
+      label.textContent = `${ACTION_LABELS[action.action_type]} — ${action.time_h} h`;
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.textContent = "Rimuovi";
+      removeBtn.title = "Rimuove questa azione dalla simulazione";
+      removeBtn.addEventListener("click", () => {
+        map.removeLayer(action.layer);
+        state.actions = state.actions.filter((a) => a.id !== action.id);
+        renderActionsList();
+      });
+      li.appendChild(label);
+      li.appendChild(removeBtn);
+      ul.appendChild(li);
+    }
+  }
+
+  function parseIsochroneThresholds() {
+    const parts = isochroneInput.value
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((v) => Number.isFinite(v) && v > 0 && v < 1);
+    return parts.length > 0 ? parts : [0.5, 0.75, 0.9];
   }
 
   function buildRequest() {
@@ -110,9 +195,34 @@
       wind_speed: Number(windSpeedInput.value),
       moisture: Number(moistureInput.value),
       realizations: Number(realizationsInput.value),
+      do_spotting: spottingInput.checked,
       time_limit_h: Number(durationInput.value),
-      time_resolution_h: 1.0,
+      time_resolution_h: Number(resolutionInput.value),
+      isochrone_thresholds: parseIsochroneThresholds(),
+      actions: state.actions.map((a) => ({
+        action_type: a.action_type,
+        time_h: a.time_h,
+        line: a.line,
+      })),
     };
+  }
+
+  function formatErrorDetail(detail, fallback) {
+    if (!detail) return fallback;
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      // FastAPI/Pydantic validation errors: [{loc, msg, type}, ...]
+      return detail
+        .map((e) => {
+          if (e && typeof e === "object") {
+            const field = Array.isArray(e.loc) ? e.loc.join(".") : e.loc;
+            return field ? `${field}: ${e.msg}` : e.msg || JSON.stringify(e);
+          }
+          return String(e);
+        })
+        .join("; ");
+    }
+    return JSON.stringify(detail);
   }
 
   async function startSimulation() {
@@ -131,7 +241,7 @@
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      $("status-text").textContent = `Errore: ${body.detail || res.statusText}`;
+      $("status-text").textContent = `Errore: ${formatErrorDetail(body.detail, res.statusText)}`;
       $("run-button").disabled = false;
       return;
     }
