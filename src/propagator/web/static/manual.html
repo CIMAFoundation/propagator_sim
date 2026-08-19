@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Manuale &mdash; PROPAGATOR</title>
+  <title>Manual &mdash; PROPAGATOR</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/manual.css">
@@ -10,460 +10,433 @@
 <body class="manual-page">
   <header>
     <h1>PROPAGATOR</h1>
-    <span class="subtitle">manuale utente</span>
-    <a class="back-link" href="/index.html">&larr; Torna alla simulazione</a>
+    <span class="subtitle">user manual</span>
+    <a class="back-link" href="/index.html">&larr; Back to the simulation</a>
   </header>
 
   <main class="manual">
-    <nav class="manual-toc" aria-label="Indice">
-      <strong>Indice</strong>
+    <nav class="manual-toc" aria-label="Table of contents">
+      <strong>Contents</strong>
       <ol>
-        <li><a href="#cos-e">Cos'&egrave; PROPAGATOR</a></li>
-        <li><a href="#fenomeno">Come si comporta un incendio boschivo</a></li>
-        <li><a href="#uso">Guida all'uso della web app</a></li>
-        <li><a href="#input">Le variabili di input, spiegate</a></li>
-        <li><a href="#algoritmo">Come funziona l'algoritmo (in parole semplici)</a></li>
-        <li><a href="#output">Gli output e come interpretarli</a></li>
-        <li><a href="#azioni">Le azioni antincendio</a></li>
-        <li><a href="#limiti">I limiti del modello</a></li>
+        <li><a href="#what-is">What is PROPAGATOR</a></li>
+        <li><a href="#phenomenon">How a wildfire behaves</a></li>
+        <li><a href="#usage">Guide to using the web app</a></li>
+        <li><a href="#inputs">The input variables, explained</a></li>
+        <li><a href="#algorithm">How the algorithm works (in plain terms)</a></li>
+        <li><a href="#outputs">The outputs and how to read them</a></li>
+        <li><a href="#actions">Firefighting actions</a></li>
+        <li><a href="#limits">Limits of the model</a></li>
       </ol>
     </nav>
 
     <article>
-      <section id="cos-e">
-        <h2>1. Cos'&egrave; PROPAGATOR</h2>
+      <section id="what-is">
+        <h2>1. What is PROPAGATOR</h2>
         <p>
-          PROPAGATOR &egrave; un simulatore di propagazione degli incendi
-          boschivi sviluppato dalla Fondazione CIMA. Dato un punto di
-          innesco, una situazione meteorologica e una zona geografica
-          reale (rilievo del terreno e copertura vegetale), PROPAGATOR
-          stima come potrebbe espandersi un incendio nelle ore
-          successive: dove &egrave; pi&ugrave; probabile che il fuoco
-          arrivi, quanto velocemente, e con quale intensit&agrave;.
+          PROPAGATOR is a wildfire spread simulator developed by CIMA
+          Research Foundation. Given an ignition point, a weather
+          scenario, and a real geographic area (terrain relief and
+          vegetation cover), PROPAGATOR estimates how a fire could
+          spread over the following hours: where the fire is most
+          likely to reach, how fast, and with what intensity.
         </p>
         <p>
-          &Egrave; importante avere chiaro fin da subito un punto: il
-          fuoco non si comporta mai in modo perfettamente prevedibile,
-          perch&eacute; dipende da moltissimi fattori piccoli e in
-          parte casuali (una raffica di vento, una tasca di
-          combustibile pi&ugrave; secco, una scintilla portata pi&ugrave;
-          lontano del previsto). Per questo PROPAGATOR non produce
-          "una" previsione secca, ma una <strong>probabilit&agrave;</strong>:
-          simula lo stesso scenario molte volte, lasciando che il caso
-          giochi il suo ruolo ogni volta in modo leggermente diverso, e
-          poi mostra quanto spesso il fuoco &egrave; arrivato in ogni
-          punto della mappa. &Egrave; uno strumento di supporto alle
-          decisioni &mdash; per capire dove concentrare l'attenzione e
-          le risorse &mdash; non una previsione esatta.
+          It's worth being clear about one thing from the start: fire
+          never behaves in a perfectly predictable way, because it
+          depends on many small and partly random factors (a gust of
+          wind, a patch of drier fuel, an ember carried further than
+          expected). This is why PROPAGATOR does not produce a single,
+          fixed forecast, but a <strong>probability</strong>: it runs
+          the same scenario many times, letting chance play a slightly
+          different role each time, and then shows how often the fire
+          reached each point on the map. It is a decision-support tool
+          &mdash; useful for understanding where to focus attention and
+          resources &mdash; not an exact prediction.
         </p>
       </section>
 
-      <section id="fenomeno">
-        <h2>2. Come si comporta un incendio boschivo</h2>
+      <section id="phenomenon">
+        <h2>2. How a wildfire behaves</h2>
         <p>
-          Perch&eacute; un incendio si propaga com'&egrave; noto che si
-          propaga? Quattro fattori principali governano il comportamento
-          del fuoco, e sono esattamente quelli che l'app chiede di
-          impostare prima di avviare una simulazione.
+          Why does a fire spread the way it's known to spread? Four
+          main factors govern fire behavior, and they are exactly the
+          ones the app asks you to set before starting a simulation.
         </p>
-        <h3>Il vento</h3>
+        <h3>Wind</h3>
         <p>
-          Il vento spinge le fiamme e il calore verso il combustibile
-          non ancora bruciato, preriscaldandolo e facendolo prendere
-          fuoco pi&ugrave; in fretta: il fronte del fuoco avanza molto
-          pi&ugrave; velocemente <em>sottovento</em> (nella direzione
-          verso cui soffia il vento) che nelle altre direzioni. Pi&ugrave;
-          il vento &egrave; forte, pi&ugrave; questo effetto si
-          accentua e pi&ugrave; l'incendio assume una forma allungata
-          "a lingua" nella direzione del vento.
+          Wind pushes flames and heat toward the unburned fuel ahead,
+          preheating it and making it catch fire faster: the fire front
+          advances much faster <em>downwind</em> (in the direction the
+          wind is blowing toward) than in other directions. The
+          stronger the wind, the more pronounced this effect becomes,
+          and the more the fire takes on an elongated, "tongue-like"
+          shape in the wind direction.
         </p>
-        <h3>La pendenza del terreno</h3>
+        <h3>Terrain slope</h3>
         <p>
-          Il fuoco sale pi&ugrave; velocemente di quanto scenda. In
-          salita, le fiamme sono pi&ugrave; vicine al combustibile a
-          monte (lo "leccano" e lo preriscaldano prima ancora di
-          raggiungerlo), mentre in discesa le fiamme si allontanano dal
-          pendio e il calore si disperde di pi&ugrave;. Per questo un
-          versante ripido pu&ograve; far correre l'incendio molto pi&ugrave;
-          in fretta verso la cima che verso valle.
+          Fire climbs faster than it descends. Uphill, the flames sit
+          closer to the fuel above them (preheating it before even
+          reaching it), while downhill the flames lean away from the
+          slope and heat disperses more. A steep slope can therefore
+          make a fire run much faster toward a ridge than toward a
+          valley.
         </p>
-        <h3>L'umidit&agrave; del combustibile</h3>
+        <h3>Fuel moisture</h3>
         <p>
-          Legna, erba e arbusti umidi bruciano con pi&ugrave; fatica:
-          parte del calore serve a far evaporare l'acqua contenuta nel
-          combustibile, invece di alimentare la combustione. Un
-          combustibile secco (dopo giorni senza pioggia, con umidit&agrave;
-          bassa) prende fuoco pi&ugrave; facilmente e brucia pi&ugrave;
-          in fretta; un combustibile umido rallenta o pu&ograve; anche
-          arrestare l'avanzata del fronte. Bagnare il combustibile davanti
-          al fuoco (con acqua lanciata da mezzi aerei, per esempio)
-          &egrave; proprio una delle tattiche di lotta simulabili in
-          PROPAGATOR, vedi la sezione sulle azioni antincendio.
+          Damp wood, grass, and shrubs are harder to burn: part of the
+          heat goes into evaporating the water in the fuel instead of
+          feeding the combustion. Dry fuel (after days without rain,
+          with low moisture) catches fire more easily and burns faster;
+          moist fuel slows down or can even stop the front's advance.
+          Wetting the fuel ahead of the fire (for example with water
+          dropped by aircraft) is exactly one of the firefighting
+          tactics you can simulate in PROPAGATOR &mdash; see the
+          section on firefighting actions.
         </p>
-        <h3>Il tipo di vegetazione</h3>
+        <h3>Vegetation type</h3>
         <p>
-          Non tutta la vegetazione brucia allo stesso modo. Un bosco di
-          conifere (pino, abete) contiene resine molto infiammabili e
-          brucia con fiamme alte e intense; un pascolo erboso si
-          incendia facilmente ma brucia in fretta e con meno intensit&agrave;
-          rispetto a un bosco; un'area agricola o non vegetata pu&ograve;
-          non bruciare affatto o rallentare molto il fuoco, agendo quasi
-          come una barriera naturale. PROPAGATOR conosce diverse
-          categorie di vegetazione (boschi di latifoglie, boschi di
-          conifere, arbusteti, aree agricole, pascoli, aree non
-          vegetate...) e assegna a ciascuna un comportamento diverso in
-          termini di velocit&agrave; e probabilit&agrave; di propagazione.
+          Not all vegetation burns the same way. A conifer forest
+          (pine, fir) contains highly flammable resins and burns with
+          tall, intense flames; grassland ignites easily but burns
+          quickly and with less intensity than a forest; farmland or
+          non-vegetated land may not burn at all, or may slow the fire
+          down considerably, acting almost like a natural barrier.
+          PROPAGATOR knows several vegetation categories (broadleaf
+          forests, conifer forests, shrubland, farmland, grassland,
+          non-vegetated areas...) and assigns each one a different
+          behavior in terms of spread speed and probability.
         </p>
-        <h3>Le braci portate dal vento (spotting)</h3>
+        <h3>Wind-carried embers (spotting)</h3>
         <p>
-          Negli incendi pi&ugrave; intensi, soprattutto nei boschi di
-          conifere, il vento pu&ograve; sollevare frammenti incandescenti
-          (braci, aghi di pino accesi, piccoli rametti) e trasportarli
-          anche per centinaia di metri davanti al fronte principale.
-          Se una brace atterra su combustibile secco pu&ograve;
-          innescare un nuovo focolaio isolato, che poi cresce per conto
-          suo e pu&ograve; ricongiungersi con il fronte principale o
-          addirittura anticiparlo. Questo fenomeno si chiama
-          <strong>spotting</strong> ed &egrave; uno dei motivi per cui
-          gli incendi possono "saltare" ostacoli come strade o corsi
-          d'acqua che altrimenti li fermerebbero. PROPAGATOR pu&ograve;
-          simulare anche questo effetto, in modo opzionale.
+          In more intense fires, especially in conifer forests, wind
+          can lift burning fragments (embers, lit pine needles, small
+          twigs) and carry them hundreds of meters ahead of the main
+          front. If an ember lands on dry fuel it can ignite a new,
+          isolated spot fire, which then grows on its own and can merge
+          back with the main front or even outrun it. This phenomenon
+          is called <strong>spotting</strong>, and it's one of the
+          reasons wildfires can "jump" obstacles like roads or streams
+          that would otherwise stop them. PROPAGATOR can optionally
+          simulate this effect too.
         </p>
       </section>
 
-      <section id="uso">
-        <h2>3. Guida all'uso della web app</h2>
+      <section id="usage">
+        <h2>3. Guide to using the web app</h2>
         <p>
-          L'interfaccia &egrave; divisa in un pannello di controllo a
-          sinistra e una mappa a destra. I passi per lanciare una
-          simulazione sono questi:
+          The interface is split into a control panel on the left and
+          a map on the right. The steps to run a simulation are:
         </p>
         <ol>
           <li>
-            <strong>1. Scegli centro</strong> &mdash; clicca sul pulsante
-            e poi sulla mappa, nel punto attorno a cui vuoi analizzare
-            l'area (di solito il paese o la zona a rischio). Regola
-            poi <strong>Raggio</strong> (quanto estesa deve essere
-            l'area scaricata e simulata, fino a 50&nbsp;km) e
-            <strong>Cellsize</strong> (la risoluzione della griglia).
+            <strong>1. Pick center</strong> &mdash; click the button and
+            then click on the map, at the point around which you want
+            to analyze the area (typically the town or at-risk zone).
+            Then adjust <strong>Radius</strong> (how large an area to
+            download and simulate, up to 50&nbsp;km) and
+            <strong>Cellsize</strong> (the grid resolution).
           </li>
           <li>
-            <strong>2. Scegli innesco</strong> &mdash; clicca sul
-            pulsante e poi sulla mappa nel punto in cui l'incendio
-            dovrebbe partire. Deve trovarsi su un'area vegetata (bosco,
-            arbusteto, pascolo...), non su un centro abitato o un'area
-            non infiammabile: se lo &egrave;, l'app mostra un avviso.
+            <strong>2. Pick ignition</strong> &mdash; click the button
+            and then click on the map where the fire should start. It
+            must be on vegetated land (forest, shrubland, grassland...),
+            not on a built-up area or non-flammable land: if it is, the
+            app shows a warning.
           </li>
           <li>
-            <strong>Meteo</strong> &mdash; imposta <strong>Direzione
-            vento</strong>, <strong>Velocit&agrave; vento</strong> e
-            <strong>Umidit&agrave;</strong> del combustibile per lo
-            scenario che vuoi analizzare.
+            <strong>Weather</strong> &mdash; set <strong>Wind
+            direction</strong>, <strong>Wind speed</strong>, and
+            <strong>Moisture</strong> for the fuel, for the scenario
+            you want to analyze.
           </li>
           <li>
-            <strong>Simulazione</strong> &mdash; imposta per quante ore
-            simulare (<strong>Durata</strong>), ogni quanto salvare un
-            risultato (<strong>Risoluzione temporale</strong>), quante
-            volte ripetere la simulazione (<strong>Realizzazioni</strong>),
-            se includere le braci (<strong>Spotting</strong>) e le
-            soglie di probabilit&agrave; da disegnare come linee sulla
-            mappa (<strong>Soglie isocrone</strong>).
+            <strong>Simulation</strong> &mdash; set how many hours to
+            simulate (<strong>Duration</strong>), how often to save a
+            result (<strong>Time resolution</strong>), how many times
+            to repeat the simulation (<strong>Realizations</strong>),
+            whether to include embers (<strong>Spotting</strong>), and
+            the probability thresholds drawn as lines on the map
+            (<strong>Isochrone thresholds</strong>).
           </li>
           <li>
-            <strong>Azioni antincendio</strong> (facoltativo) &mdash;
-            se vuoi simulare un intervento di lotta attiva, scegli il
-            <strong>Tipo</strong> di mezzo, il momento in cui interviene
-            (<strong>Tempo azione</strong>), poi clicca
-            <strong>Disegna linea</strong>, traccia il percorso
-            sulla mappa e premi <strong>Fine disegno</strong>. Puoi
-            aggiungere pi&ugrave; azioni ed eliminarle dalla lista.
+            <strong>Firefighting actions</strong> (optional) &mdash; if
+            you want to simulate an active firefighting intervention,
+            pick the <strong>Type</strong> of asset, when it happens
+            (<strong>Action time</strong>), then click
+            <strong>Draw line</strong>, trace the path on the map, and
+            press <strong>Finish line</strong>. You can queue several
+            actions and remove them from the list.
           </li>
           <li>
-            <strong>Avvia simulazione</strong> &mdash; il pulsante si
-            attiva quando centro e innesco sono stati scelti. Durante
-            l'esecuzione una barra di avanzamento mostra lo stato
-            (download dati, simulazione in corso...).
+            <strong>Run simulation</strong> &mdash; the button becomes
+            active once both center and ignition are set. While the
+            simulation runs, a progress bar shows the current phase
+            (downloading data, running...).
           </li>
           <li>
-            Al termine, la mappa mostra l'incendio simulato e compare
-            un pannello con statistiche, un grafico di crescita
-            dell'area e uno slider <strong>Ora</strong> per scorrere
-            ora per ora i risultati. Vedi la sezione sugli output per
-            come leggerli.
+            Once it's done, the map shows the simulated fire and a
+            panel appears with statistics, an area-growth chart, and a
+            <strong>Time</strong> slider to scrub through the results
+            hour by hour. See the outputs section for how to read them.
           </li>
         </ol>
       </section>
 
-      <section id="input">
-        <h2>4. Le variabili di input, spiegate</h2>
+      <section id="inputs">
+        <h2>4. The input variables, explained</h2>
         <dl>
-          <dt>Raggio</dt>
+          <dt>Radius</dt>
           <dd>
-            Il raggio, in km, dell'area attorno al centro scelto che
-            verr&agrave; scaricata e simulata. Un'area pi&ugrave; grande
-            copre pi&ugrave; territorio ma richiede pi&ugrave; tempo di
-            calcolo e pi&ugrave; dati da scaricare.
+            The radius, in km, of the area around the chosen center
+            that will be downloaded and simulated. A larger area covers
+            more territory but takes longer to compute and more data to
+            download.
           </dd>
           <dt>Cellsize</dt>
           <dd>
-            La dimensione, in metri, di ogni cella della griglia usata
-            per la simulazione: &egrave; il "pixel" con cui viene
-            rappresentato il terreno. Valori pi&ugrave; piccoli (es.
-            20&nbsp;m) danno una mappa pi&ugrave; dettagliata ma
-            richiedono pi&ugrave; tempo di calcolo; valori pi&ugrave;
-            grandi (es. 100&nbsp;m) sono pi&ugrave; veloci ma meno
-            precisi.
+            The size, in meters, of each grid cell used for the
+            simulation: it's the "pixel" the terrain is represented
+            with. Smaller values (e.g. 20&nbsp;m) give a more detailed
+            map but take longer to compute; larger values (e.g.
+            100&nbsp;m) are faster but less precise.
           </dd>
-          <dt>Direzione vento</dt>
+          <dt>Wind direction</dt>
           <dd>
-            Da dove soffia il vento, in gradi rispetto al nord
-            (0&deg;=Nord, 90&deg;=Est, 180&deg;=Sud, 270&deg;=Ovest). Il
-            fuoco tender&agrave; ad avanzare pi&ugrave; velocemente
-            nella direzione opposta, cio&egrave; verso cui il vento
-            soffia.
+            The direction the wind is blowing from, in degrees from
+            north (0&deg;=North, 90&deg;=East, 180&deg;=South,
+            270&deg;=West). The fire will tend to advance fastest in
+            the opposite direction, i.e. the direction the wind is
+            blowing toward.
           </dd>
-          <dt>Velocit&agrave; vento</dt>
+          <dt>Wind speed</dt>
           <dd>
-            L'intensit&agrave; del vento, in km/h. Pi&ugrave; &egrave;
-            alta, pi&ugrave; il fronte sottovento avanza veloce e pi&ugrave;
-            l'incendio assume una forma allungata.
+            Wind intensity, in km/h. The higher it is, the faster the
+            downwind front advances, and the more elongated the fire
+            shape becomes.
           </dd>
-          <dt>Umidit&agrave;</dt>
+          <dt>Moisture</dt>
           <dd>
-            L'umidit&agrave; del combustibile, in percentuale. Valori
-            alti rappresentano un combustibile pi&ugrave; umido
-            (es. dopo la pioggia) e rallentano la propagazione; valori
-            bassi rappresentano combustibile secco e la favoriscono.
+            Fuel moisture, as a percentage. High values represent
+            wetter fuel (e.g. after rain) and slow spread down; low
+            values represent dry fuel and speed it up.
           </dd>
-          <dt>Durata</dt>
+          <dt>Duration</dt>
           <dd>
-            Per quante ore simulare l'evoluzione dell'incendio a
-            partire dall'innesco.
+            How many hours to simulate the fire's evolution from
+            ignition.
           </dd>
-          <dt>Risoluzione temporale</dt>
+          <dt>Time resolution</dt>
           <dd>
-            Ogni quante ore viene salvato un "fotogramma" dei risultati
-            (mappa e statistiche), da poter poi scorrere con lo slider
-            <strong>Ora</strong>. Non influisce sull'accuratezza della
-            simulazione, solo su quanto spesso si vede un aggiornamento.
+            How often, in hours, a results "frame" (map and statistics)
+            is saved, to later scrub through with the <strong>Time</strong>
+            slider. It does not affect simulation accuracy, only how
+            often you see an update.
           </dd>
-          <dt>Realizzazioni</dt>
+          <dt>Realizations</dt>
           <dd>
-            Quante volte viene ripetuta la simulazione dello stesso
-            scenario, lasciando che gli elementi casuali del modello
-            (vedi sezione successiva) diano ogni volta un esito
-            leggermente diverso. Il risultato finale &egrave; la
-            frazione di realizzazioni in cui il fuoco &egrave; arrivato
-            in ogni punto, cio&egrave; una probabilit&agrave;. Pi&ugrave;
-            realizzazioni danno una stima pi&ugrave; affidabile ma
-            richiedono pi&ugrave; tempo di calcolo.
+            How many times the same scenario is simulated, letting the
+            model's random elements (see the next section) give a
+            slightly different outcome each time. The final result is
+            the fraction of realizations in which the fire reached each
+            point, i.e. a probability. More realizations give a more
+            reliable estimate but take longer to compute.
           </dd>
-          <dt>Spotting (braci)</dt>
+          <dt>Spotting (embers)</dt>
           <dd>
-            Se attivo, il modello genera braci portate dal vento (vedi
-            sezione 2) che possono innescare nuovi focolai davanti al
-            fronte principale, in particolare nei boschi di conifere.
+            If enabled, the model generates wind-carried embers (see
+            section 2) that can start new spot fires ahead of the main
+            front, particularly in conifer forests.
           </dd>
-          <dt>Soglie isocrone</dt>
+          <dt>Isochrone thresholds</dt>
           <dd>
-            Una o pi&ugrave; soglie di probabilit&agrave; (tra 0 e 1)
-            per cui disegnare sulla mappa una linea di contorno
-            (isocrona): per esempio "0.5" disegna il confine dell'area
-            in cui il fuoco &egrave; arrivato in almeno met&agrave;
-            delle realizzazioni.
+            One or more probability thresholds (between 0 and 1) for
+            which a contour line (isochrone) is drawn on the map: for
+            example "0.5" draws the boundary of the area where the fire
+            arrived in at least half of the realizations.
           </dd>
         </dl>
       </section>
 
-      <section id="algoritmo">
-        <h2>5. Come funziona l'algoritmo (in parole semplici)</h2>
+      <section id="algorithm">
+        <h2>5. How the algorithm works (in plain terms)</h2>
         <p>
-          PROPAGATOR rappresenta il terreno come una griglia di celle
-          (la dimensione della cella &egrave; il <strong>Cellsize</strong>
-          scelto). All'inizio solo la cella (o le celle) di innesco
-          sono "in fiamme". Da l&igrave;, il fuoco pu&ograve; passare a
-          ciascuna delle celle vicine: per ogni coppia di celle vicine,
-          il modello calcola due cose:
+          PROPAGATOR represents the terrain as a grid of cells (the
+          cell size is the <strong>Cellsize</strong> you chose). At the
+          start, only the ignition cell (or cells) is "on fire". From
+          there, the fire can spread to each neighboring cell: for
+          every pair of neighboring cells, the model computes two
+          things:
         </p>
         <ul>
           <li>
-            <strong>Con che probabilit&agrave;</strong> il fuoco
-            riesce a passare da una cella all'altra;
+            <strong>How likely</strong> it is for the fire to spread
+            from one cell to the other;
           </li>
           <li>
-            <strong>Dopo quanto tempo</strong>, cio&egrave; quanto
-            velocemente si propaga (la cosiddetta velocit&agrave; di
-            propagazione, o ROS, "rate of spread").
+            <strong>How long it takes</strong>, i.e. how fast it
+            spreads (the so-called rate of spread, or ROS).
           </li>
         </ul>
         <p>
-          Entrambi i valori partono da un comportamento base che
-          dipende dal <strong>tipo di vegetazione</strong> delle due
-          celle coinvolte (ogni categoria di vegetazione ha una sua
-          velocit&agrave; e probabilit&agrave; di propagazione tipiche,
-          calibrate su osservazioni reali), e vengono poi corretti in
-          base a <strong>vento</strong>, <strong>pendenza</strong> tra
-          le due celle e <strong>umidit&agrave;</strong> del
-          combustibile, esattamente come descritto nella sezione 2: il
-          passaggio verso una cella sottovento o in salita diventa
-          pi&ugrave; probabile e pi&ugrave; rapido, verso una cella
-          controvento, in discesa o pi&ugrave; umida diventa meno
-          probabile e pi&ugrave; lento.
+          Both values start from a base behavior that depends on the
+          <strong>vegetation type</strong> of the two cells involved
+          (each vegetation category has its own typical spread speed
+          and probability, calibrated on real-world observations), and
+          are then corrected based on <strong>wind</strong>,
+          <strong>slope</strong> between the two cells, and
+          <strong>fuel moisture</strong>, exactly as described in
+          section 2: spreading toward a downwind or uphill cell becomes
+          more likely and faster, spreading toward an upwind, downhill,
+          or wetter cell becomes less likely and slower.
         </p>
         <p>
-          Questo processo si ripete cella dopo cella, seguendo il
-          fronte del fuoco che avanza nel tempo: &egrave; quello che si
-          chiama un <em>automa cellulare</em>. Poich&eacute; probabilit&agrave;
-          e casualit&agrave; sono coinvolte a ogni passo, una singola
-          simulazione &egrave; solo uno dei tanti modi in cui l'incendio
-          potrebbe evolvere. Per questo PROPAGATOR ripete l'intera
-          simulazione tante volte quante sono le <strong>Realizzazioni</strong>
-          scelte (una tecnica chiamata simulazione Monte Carlo), e
-          conta in quante di queste ripetizioni il fuoco &egrave;
-          arrivato in ogni cella. Quel conteggio, diviso per il numero
-          di realizzazioni, &egrave; la mappa di probabilit&agrave; che
-          vedi come risultato finale.
+          This process repeats cell by cell, following the fire front
+          as it advances over time: this is what's called a <em>cellular
+          automaton</em>. Because probability and randomness are
+          involved at every step, a single simulation is just one of
+          the many ways the fire could evolve. This is why PROPAGATOR
+          repeats the whole simulation as many times as the
+          <strong>Realizations</strong> you chose (a technique called
+          Monte Carlo simulation), and counts in how many of these
+          repetitions the fire reached each cell. That count, divided
+          by the number of realizations, is the probability map you
+          see as the final result.
         </p>
         <p>
-          Se lo <strong>spotting</strong> &egrave; attivo, a ogni passo
-          le celle in fiamme di tipo "a rischio brace" (tipicamente le
-          conifere) possono anche generare braci che volano in
-          direzione del vento e, se atterrano su combustibile
-          infiammabile, accendono un nuovo piccolo focolaio indipendente
-          che poi si propaga con le stesse regole del fronte principale.
+          If <strong>spotting</strong> is enabled, at every step the
+          burning cells of "ember-prone" vegetation types (typically
+          conifers) can also generate embers that fly in the wind
+          direction and, if they land on flammable fuel, ignite a new,
+          small, independent spot fire that then spreads under the same
+          rules as the main front.
         </p>
       </section>
 
-      <section id="output">
-        <h2>6. Gli output e come interpretarli</h2>
+      <section id="outputs">
+        <h2>6. The outputs and how to read them</h2>
         <dl>
-          <dt>Mappa di probabilit&agrave;</dt>
+          <dt>Probability map</dt>
           <dd>
-            La colorazione sulla mappa rappresenta, per ogni cella, in
-            quante realizzazioni su quelle simulate il fuoco &egrave;
-            arrivato in quel punto: pi&ugrave; il colore &egrave;
-            intenso, pi&ugrave; &egrave; probabile che l'incendio
-            raggiunga quella zona, dato lo scenario impostato.
+            The coloring on the map represents, for each cell, in how
+            many of the simulated realizations the fire reached that
+            point: the more intense the color, the more likely the
+            fire is to reach that area, given the scenario you set.
           </dd>
-          <dt>Isocrone</dt>
+          <dt>Isochrones</dt>
           <dd>
-            Le linee disegnate sulla mappa in corrispondenza delle
-            <strong>Soglie isocrone</strong> scelte: delimitano l'area
-            in cui la probabilit&agrave; di incendio &egrave; almeno
-            pari alla soglia. Sono utili per individuare rapidamente,
-            per esempio, "l'area a rischio alto" (soglia 0.9) rispetto
-            a "l'area a rischio possibile" (soglia 0.5).
+            The lines drawn on the map at the chosen <strong>Isochrone
+            thresholds</strong>: they outline the area where the fire
+            probability is at least equal to the threshold. Useful for
+            quickly spotting, for example, "the high-risk area"
+            (threshold 0.9) versus "the possible-risk area" (threshold
+            0.5).
           </dd>
-          <dt>Ora / slider dei frame</dt>
+          <dt>Time / frame slider</dt>
           <dd>
-            Scorrendo lo slider si vede come cambiano mappa e
-            statistiche ora per ora, agli istanti salvati secondo la
-            <strong>Risoluzione temporale</strong> scelta: permette di
-            capire non solo dove, ma anche quando il fuoco potrebbe
-            arrivare in un punto.
+            Scrubbing the slider shows how the map and statistics
+            change hour by hour, at the instants saved according to
+            the chosen <strong>Time resolution</strong>: this lets you
+            understand not just where, but also when the fire might
+            reach a given point.
           </dd>
-          <dt>Area media (ha)</dt>
+          <dt>Mean area (ha)</dt>
           <dd>
-            L'area bruciata attesa, in ettari, calcolata sommando la
-            probabilit&agrave; di incendio di ogni cella. &Egrave; una
-            stima "media" che tiene conto dell'incertezza: non l'area
-            di un singolo scenario, ma quella attesa considerando tutte
-            le realizzazioni.
+            The expected burned area, in hectares, computed by summing
+            the fire probability of every cell. It's an "average"
+            estimate that accounts for uncertainty: not the area of a
+            single scenario, but the area expected across all
+            realizations.
           </dd>
           <dt>Area prob&ge;50%</dt>
           <dd>
-            L'area, in ettari, in cui il fuoco &egrave; arrivato in
-            almeno met&agrave; delle realizzazioni simulate: una stima
-            pi&ugrave; "prudente" e concreta di dove il fuoco &egrave;
-            pi&ugrave; probabile che sia davvero passato.
+            The area, in hectares, where the fire reached at least half
+            of the simulated realizations: a more "conservative" and
+            concrete estimate of where the fire is most likely to have
+            actually passed.
           </dd>
-          <dt>Realizzazioni attive</dt>
+          <dt>Active realizations</dt>
           <dd>
-            Quante delle simulazioni ripetute hanno ancora un fronte di
-            fuoco in movimento in quell'istante (le altre si sono gi&agrave;
-            fermate, per esempio perch&eacute; il fuoco ha esaurito il
-            combustibile raggiungibile).
+            How many of the repeated simulations still have a fire
+            front moving at that instant (the others have already
+            stopped, for example because the fire ran out of reachable
+            fuel).
           </dd>
-          <dt>Frame disponibili</dt>
+          <dt>Available frames</dt>
           <dd>
-            Quanti istanti temporali sono stati salvati e sono
-            disponibili da scorrere con lo slider.
+            How many time instants were saved and are available to
+            scrub through with the slider.
           </dd>
-          <dt>Grafico di crescita dell'area</dt>
+          <dt>Area-growth chart</dt>
           <dd>
-            Mostra come crescono nel tempo l'area media attesa (linea
-            piena) e l'area con probabilit&agrave; almeno del 50%
-            (linea tratteggiata): utile per farsi un'idea della
-            velocit&agrave; con cui l'incendio si espande nello
-            scenario impostato.
+            Shows how the expected mean area (solid line) and the area
+            with at least 50% probability (dashed line) grow over time:
+            useful for getting a sense of how fast the fire expands in
+            the scenario you set.
           </dd>
         </dl>
       </section>
 
-      <section id="azioni">
-        <h2>7. Le azioni antincendio</h2>
+      <section id="actions">
+        <h2>7. Firefighting actions</h2>
         <p>
-          PROPAGATOR permette di simulare l'effetto di un intervento di
-          lotta attiva contro l'incendio, tracciando una linea sulla
-          mappa (il percorso del mezzo, o il punto in cui viene fatto
-          un intervento) e scegliendo quando avviene, rispetto
-          all'inizio della simulazione:
+          PROPAGATOR lets you simulate the effect of an active
+          firefighting intervention, by drawing a line on the map (the
+          path of the asset, or where an intervention takes place) and
+          choosing when it happens, relative to the start of the
+          simulation:
         </p>
         <dl>
           <dt>Canadair</dt>
           <dd>
-            Simula un lancio d'acqua aereo: aumenta l'umidit&agrave;
-            del combustibile lungo la linea tracciata (e in una fascia
-            di sicurezza intorno), rendendo pi&ugrave; difficile che il
-            fuoco prosegua in quella zona. L'effetto non &egrave;
-            permanente: l'umidit&agrave; aggiunta decade nel tempo,
-            circa l'1% al minuto, come l'acqua che evapora o si
-            infiltra nel terreno.
+            Simulates an aerial water drop: increases fuel moisture
+            along the drawn line (and in a safety buffer around it),
+            making it harder for the fire to continue through that
+            area. The effect is not permanent: the added moisture
+            decays over time, about 1% per minute, like water
+            evaporating or soaking into the ground.
           </dd>
-          <dt>Elicottero</dt>
+          <dt>Helicopter</dt>
           <dd>
-            Simile al Canadair ma con lanci d'acqua pi&ugrave; puntuali
-            e sparsi lungo la linea, con un effetto sull'umidit&agrave;
-            leggermente inferiore.
+            Similar to the Canadair drop but with more scattered, point
+            drops along the line, with a slightly smaller effect on
+            moisture.
           </dd>
           <dt>Waterline</dt>
           <dd>
-            Simula un intervento a terra con manichette (una linea
-            d'acqua continua): aumenta l'umidit&agrave; lungo tutta la
-            linea tracciata e nella fascia circostante, con l'effetto
-            pi&ugrave; marcato tra le azioni idriche disponibili.
+            Simulates a ground intervention with hoses (a continuous
+            water line): increases moisture along the entire drawn line
+            and its surrounding buffer, with the strongest effect among
+            the water-based actions available.
           </dd>
-          <dt>Mezzi pesanti</dt>
+          <dt>Heavy vehicles</dt>
           <dd>
-            Simula la creazione di una fascia tagliafuoco (per esempio
-            con un bulldozer): non bagna il combustibile, ma lo rimuove
-            fisicamente lungo la linea tracciata, rendendo quella
-            fascia permanentemente non infiammabile per il resto della
-            simulazione.
+            Simulates the creation of a firebreak (for example with a
+            bulldozer): it does not wet the fuel, but physically
+            removes it along the drawn line, making that strip
+            permanently non-flammable for the rest of the simulation.
           </dd>
         </dl>
       </section>
 
-      <section id="limiti">
-        <h2>8. I limiti del modello</h2>
+      <section id="limits">
+        <h2>8. Limits of the model</h2>
         <p>
-          PROPAGATOR si basa su dati reali (rilievo del terreno, uso
-          del suolo) e su modelli di comportamento del fuoco calibrati
-          su osservazioni ed esperienza, ma resta comunque una
-          semplificazione della realt&agrave;: non conosce condizioni
-          molto locali (una tasca di combustibile particolarmente secco
-          o denso, una raffica di vento improvvisa non prevista), e i
-          dati di partenza (mappa della vegetazione, rilievo del
-          terreno) hanno anch'essi un margine di approssimazione.
+          PROPAGATOR relies on real data (terrain relief, land cover)
+          and on fire-behavior models calibrated on observations and
+          experience, but it remains a simplification of reality: it
+          doesn't know about very local conditions (a particularly dry
+          or dense patch of fuel, a sudden unforecast gust of wind), and
+          the input data itself (vegetation map, terrain relief) also
+          carries some margin of approximation.
         </p>
         <p>
-          Per questo i risultati vanno letti come <strong>probabilit&agrave;
-          e tendenze</strong>, utili per farsi un'idea di dove e con
-          che velocit&agrave; un incendio potrebbe evolvere in un dato
-          scenario meteorologico, e come supporto a chi deve decidere
-          dove concentrare l'attenzione o le risorse &mdash; non come
-          una previsione esatta n&eacute; come unica fonte su cui
-          basare decisioni operative.
+          For this reason, results should be read as
+          <strong>probabilities and trends</strong>, useful for getting
+          a sense of where and how fast a fire could evolve under a
+          given weather scenario, and as support for those who need to
+          decide where to focus attention or resources &mdash; not as
+          an exact forecast, nor as the sole basis for operational
+          decisions.
         </p>
       </section>
     </article>

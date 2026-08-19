@@ -3,9 +3,9 @@
 
   const ACTION_LABELS = {
     canadair: "Canadair",
-    helicopter: "Elicottero",
+    helicopter: "Helicopter",
     waterline_action: "Waterline",
-    heavy_action: "Mezzi pesanti",
+    heavy_action: "Heavy vehicles",
   };
   const ACTION_COLORS = {
     canadair: "#2b6cb0",
@@ -162,8 +162,8 @@
       label.textContent = `${ACTION_LABELS[action.action_type]} — ${action.time_h} h`;
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
-      removeBtn.textContent = "Rimuovi";
-      removeBtn.title = "Rimuove questa azione dalla simulazione";
+      removeBtn.textContent = "Remove";
+      removeBtn.title = "Removes this action from the simulation";
       removeBtn.addEventListener("click", () => {
         map.removeLayer(action.layer);
         state.actions = state.actions.filter((a) => a.id !== action.id);
@@ -230,7 +230,7 @@
     $("warning-banner").classList.remove("visible");
     $("result-panel").classList.remove("visible");
     $("status-panel").classList.add("visible");
-    $("status-text").textContent = "Avvio…";
+    $("status-text").textContent = "Starting…";
     $("progress-fill").style.width = "0%";
     clearResults();
 
@@ -241,7 +241,7 @@
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      $("status-text").textContent = `Errore: ${formatErrorDetail(body.detail, res.statusText)}`;
+      $("status-text").textContent = `Error: ${formatErrorDetail(body.detail, res.statusText)}`;
       $("run-button").disabled = false;
       return;
     }
@@ -266,12 +266,12 @@
     $("progress-fill").style.width = `${pct}%`;
 
     const phaseLabels = {
-      pending: "In coda…",
-      preparing_data: "Scaricamento DEM e uso del suolo…",
-      running: `Simulazione in corso: ${(job.current_time_s / 3600).toFixed(1)} / ${(job.time_limit_s / 3600).toFixed(1)} h`,
-      done: "Completata.",
-      failed: `Errore: ${job.error || "sconosciuto"}`,
-      cancelled: "Annullata.",
+      pending: "Queued…",
+      preparing_data: "Downloading DEM and land cover…",
+      running: `Simulating: ${(job.current_time_s / 3600).toFixed(1)} / ${(job.time_limit_s / 3600).toFixed(1)} h`,
+      done: "Done.",
+      failed: `Error: ${job.error || "unknown"}`,
+      cancelled: "Cancelled.",
     };
     $("status-text").textContent = phaseLabels[job.status] || job.status;
 
