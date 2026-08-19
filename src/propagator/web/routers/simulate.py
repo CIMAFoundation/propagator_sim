@@ -90,13 +90,15 @@ def get_frame(
     manager: JobManager = Depends(get_job_manager),
 ) -> FrameOut:
     job, frame = _get_frame_or_404(job_id, time_s, manager)
-    raw = isochrones_wgs84(
-        frame.fire_probability, job.geo_info, job.request.isochrone_thresholds
-    )
-    isochrones = [
-        Isochrone(threshold=t, coordinates=[[list(pt) for pt in line] for line in coords])
-        for t, coords in raw
-    ]
+    if frame.isochrone_cache is None:
+        raw = isochrones_wgs84(
+            frame.fire_probability, job.geo_info, job.request.isochrone_thresholds
+        )
+        frame.isochrone_cache = [
+            Isochrone(threshold=t, coordinates=[[list(pt) for pt in line] for line in coords])
+            for t, coords in raw
+        ]
+    isochrones = frame.isochrone_cache
     return FrameOut(
         time_s=time_s,
         isochrones=isochrones,
@@ -111,8 +113,9 @@ def get_frame_png(
     manager: JobManager = Depends(get_job_manager),
 ) -> Response:
     _, frame = _get_frame_or_404(job_id, time_s, manager)
-    png_bytes = fire_probability_png(frame.fire_probability)
-    return Response(content=png_bytes, media_type="image/png")
+    if frame.png_cache is None:
+        frame.png_cache = fire_probability_png(frame.fire_probability)
+    return Response(content=frame.png_cache, media_type="image/png")
 
 
 @router.post("/{job_id}/cancel")

@@ -125,6 +125,34 @@ def test_frames_and_frame_endpoints_after_completion(client):
     assert png_res.content[:8] == b"\x89PNG\r\n\x1a\n"
 
 
+def test_frame_png_and_isochrones_are_cached_after_first_request(client):
+    http, manager = client
+    res = http.post("/api/simulate", json=base_request())
+    job_id = res.json()["job_id"]
+
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        if http.get(f"/api/simulate/{job_id}").json()["status"] == "done":
+            break
+        time.sleep(0.05)
+
+    frame = manager.get(job_id).frames[3600]
+    assert frame.png_cache is None
+    assert frame.isochrone_cache is None
+
+    http.get(f"/api/simulate/{job_id}/frame/3600/image.png")
+    assert frame.png_cache is not None
+    cached_png = frame.png_cache
+    http.get(f"/api/simulate/{job_id}/frame/3600/image.png")
+    assert frame.png_cache is cached_png  # not recomputed on the 2nd request
+
+    http.get(f"/api/simulate/{job_id}/frame/3600")
+    assert frame.isochrone_cache is not None
+    cached_iso = frame.isochrone_cache
+    http.get(f"/api/simulate/{job_id}/frame/3600")
+    assert frame.isochrone_cache is cached_iso
+
+
 def test_manual_page_is_served(client):
     http, _ = client
     res = http.get("/manual.html")

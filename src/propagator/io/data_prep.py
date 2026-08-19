@@ -27,6 +27,7 @@ import numpy as np
 import numpy.typing as npt
 import rasterio as rio
 import requests
+import utm
 from pyproj import Transformer
 from rasterio.enums import Resampling
 from rasterio.transform import Affine
@@ -63,8 +64,14 @@ ITALY_BBOX = (6.5, 35.2, 18.6, 47.15)
 
 
 def utm_epsg_for(lat: float, lon: float) -> str:
-    """Return the EPSG code (as 'EPSG:xxxxx') of the local UTM zone."""
-    zone = int((lon + 180) // 6) + 1
+    """Return the EPSG code (as 'EPSG:xxxxx') of the local UTM zone.
+
+    Uses `utm.latlon_to_zone_number` (already relied on by
+    `io.loader.tiles.PropagatorDataFromTiles`) rather than the plain
+    `(lon + 180) // 6 + 1` formula, so this picks the same zone as the
+    tile loader even near the Norway/Svalbard irregular zone boundaries.
+    """
+    zone = utm.latlon_to_zone_number(lat, lon)
     return f"EPSG:{32600 + zone if lat >= 0 else 32700 + zone}"
 
 

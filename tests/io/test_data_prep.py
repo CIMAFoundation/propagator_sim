@@ -27,6 +27,13 @@ def test_utm_epsg_for_southern_hemisphere():
     assert utm_epsg_for(-33.87, 151.21) == "EPSG:32756"
 
 
+def test_utm_epsg_for_norway_irregular_zone():
+    # the naive (lon + 180) // 6 + 1 formula gives zone 31 here; the
+    # actual UTM zone, accounting for Norway's irregular zone boundary,
+    # is 32 (matching io.loader.tiles, which uses utm.from_latlon)
+    assert utm_epsg_for(60.0, 5.0) == "EPSG:32632"
+
+
 def test_wgs84_bbox_from_center_is_centered_and_ordered():
     west, south, east, north, utm_epsg = wgs84_bbox_from_center(
         42.4207, 12.1077, 10.0

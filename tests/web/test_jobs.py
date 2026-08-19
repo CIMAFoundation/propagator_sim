@@ -130,6 +130,21 @@ def test_delete_cancels_a_still_running_job():
     release.set()
 
 
+def test_submit_evicts_finished_jobs_from_previous_runs():
+    manager = JobManager()
+    first_id = manager.submit(make_request(), fast_success_runner)
+    deadline = time.time() + 5
+    while manager.get(first_id).status != JobStatus.DONE and time.time() < deadline:
+        time.sleep(0.05)
+
+    second_id = manager.submit(make_request(), fast_success_runner)
+
+    # the UI only ever displays the latest run, so a finished job should
+    # be evicted once a new one starts rather than kept in memory forever
+    assert manager.get(first_id) is None
+    assert manager.get(second_id) is not None
+
+
 def test_failed_job_reports_error():
     manager = JobManager()
     job_id = manager.submit(make_request(), failing_runner)

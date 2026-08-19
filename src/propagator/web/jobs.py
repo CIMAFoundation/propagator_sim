@@ -37,6 +37,13 @@ class FrameData:
     time_s: int
     fire_probability: npt.NDArray[np.floating]
     stats: dict
+    # Lazily filled in by the routers on first request and reused on
+    # every later one: `fire_probability` never changes once a frame is
+    # recorded, so re-running marching-squares/reprojection or PNG
+    # encoding on every slider tick over an already-viewed frame is
+    # wasted work.
+    png_cache: bytes | None = None
+    isochrone_cache: list | None = None
 
 
 @dataclass
@@ -81,6 +88,19 @@ class JobManager:
                     "A simulation is already running; wait for it to "
                     "finish or cancel it before starting a new one."
                 )
+            # Only one simulation is ever active at a time and the UI only
+            # ever displays the latest one, so finished jobs (and their
+            # per-frame fire_probability grids) would otherwise accumulate
+            # in memory, unfreed, for the lifetime of the process across a
+            # normal "tweak params, rerun" session.
+            for old_id, old_job in list(self._jobs.items()):
+                if old_job.status in (
+                    JobStatus.DONE,
+                    JobStatus.FAILED,
+                    JobStatus.CANCELLED,
+                ):
+                    del self._jobs[old_id]
+
             job_id = uuid.uuid4().hex
             job = JobState(
                 id=job_id,
