@@ -17,21 +17,7 @@ from propagator.web.runner import (
 )
 from propagator.web.schemas import SimulateRequest
 
-
-def make_request(**overrides) -> SimulateRequest:
-    defaults = dict(
-        center_lat=42.42,
-        center_lon=12.11,
-        ignition_lat=42.42,
-        ignition_lon=12.11,
-        radius_km=1.0,
-        cellsize=30.0,
-        realizations=2,
-        time_limit_h=2.0,
-        time_resolution_h=1.0,
-    )
-    defaults.update(overrides)
-    return SimulateRequest(**defaults)
+from .conftest import make_request
 
 
 def make_job(request: SimulateRequest) -> JobState:
@@ -134,7 +120,15 @@ def test_schedule_actions_heavy_action_blocks_ignition_cell():
 
     simulator = build_simulator(veg, dem, request, ign_row=ign_row, ign_col=ign_col)
     schedule_actions(simulator, request, geo_info)
-    run_loop(simulator, job)
+    # seed the global RNG (numba draws from it) so the stochastic spread
+    # attempt from the neutralized cell is reproducible, and restore the
+    # previous state afterwards
+    rng_state = np.random.get_state()
+    np.random.seed(20240601)
+    try:
+        run_loop(simulator, job)
+    finally:
+        np.random.set_state(rng_state)
 
     assert job.status == JobStatus.DONE
     # the ignition cell was neutralized by the heavy_action before the fire

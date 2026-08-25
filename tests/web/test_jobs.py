@@ -6,21 +6,8 @@ import time
 import pytest
 
 from propagator.web.jobs import JobBusyError, JobManager, JobStatus
-from propagator.web.schemas import SimulateRequest
 
-
-def make_request(**overrides) -> SimulateRequest:
-    defaults = dict(
-        center_lat=42.42,
-        center_lon=12.11,
-        ignition_lat=42.45,
-        ignition_lon=12.25,
-        radius_km=5.0,
-        realizations=2,
-        time_limit_h=1.0,
-    )
-    defaults.update(overrides)
-    return SimulateRequest(**defaults)
+from .conftest import make_request
 
 
 def fast_success_runner(job, manager):
