@@ -76,18 +76,21 @@ def extract_isochrone(
             "uint8"
         )
         if np.any(over_t):
-            for s, v in shapes(over_t, transform=transf):
+            # accumulate every polygon of the region above threshold:
+            # assigning results[t] inside the loop would keep only the
+            # last polygon found
+            lines = []
+            for s, _ in shapes(over_t, transform=transf):
                 sh = shape(s)
-
-                ml = [
+                lines.extend(
                     smooth_linestring(
                         interior_line, smooth_sigma
                     )  # .simplify(simp_fact)
                     for interior_line in sh.interiors  # type: ignore # sh.interiors is missing in typing
                     if interior_line.length > min_length
-                ]
-
-                results[t] = MultiLineString(ml)
+                )
+            if lines:
+                results[t] = MultiLineString(lines)
 
     return results
 
@@ -144,24 +147,26 @@ class IsochronesGeoJSONWriter(IsochronesWriterProtocol):
             simp_fact=self.simp_fact,
         )
 
-        # iterate over threshold/geometry and add it to the _isochrones
-        for threshold, geom in isochrones_geoms.items():
-            self._isochrones = gpd.GeoDataFrame(
-                pd.concat(
+        if isochrones_geoms:
+            # build every new threshold row for this step in one frame, then
+            # concat once: concatenating per-threshold inside the loop would
+            # copy the (ever-growing) accumulated history once per
+            # threshold instead of once per call.
+            new_rows = pd.DataFrame(
+                {
+                    "geometry": list(isochrones_geoms.values()),
+                    "date": ref_date.isoformat(),
+                },
+                index=pd.MultiIndex.from_tuples(
                     [
-                        self._isochrones,
-                        pd.DataFrame(
-                            {
-                                "geometry": geom,
-                                "date": ref_date.isoformat(),
-                            },
-                            index=pd.MultiIndex.from_tuples(
-                                [(threshold, output.time)],
-                                names=["threshold", "time"],
-                            ),
-                        ),
-                    ]
+                        (threshold, output.time)
+                        for threshold in isochrones_geoms
+                    ],
+                    names=["threshold", "time"],
                 ),
+            )
+            self._isochrones = gpd.GeoDataFrame(
+                pd.concat([self._isochrones, new_rows]),
                 geometry="geometry",
                 crs=self.dst_crs,
             )
