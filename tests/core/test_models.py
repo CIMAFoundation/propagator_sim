@@ -1,12 +1,9 @@
 from datetime import datetime
 
 import numpy as np
+import pytest
 
-from propagator.core.models import (
-    PropagatorStats,
-    UpdateBatch,
-    UpdateBatchWithTime,
-)
+from propagator.core.models import PropagatorStats, UpdateBatch
 
 
 def test_update_batch_extend_concatenates_fields():
@@ -46,47 +43,15 @@ def test_update_batch_extend_concatenates_fields():
     )
 
 
-def test_update_batch_with_time_split_by_time():
-    data = UpdateBatchWithTime.from_tuple(
-        (
-            np.array([1, 2, 1], dtype=np.int32),
-            np.array([0, 1, 2], dtype=np.int32),
-            np.array([1, 2, 3], dtype=np.int32),
-            np.array([0, 0, 1], dtype=np.int32),
-            np.array([0.2, 0.4, 0.6], dtype=np.float32),
-            np.array([5.0, 10.0, 15.0], dtype=np.float32),
+def test_update_batch_length_mismatch_raises():
+    with pytest.raises(ValueError, match="same length"):
+        UpdateBatch(
+            rows=np.array([0, 1], dtype=np.int32),
+            cols=np.array([0], dtype=np.int32),
+            realizations=np.array([0, 1], dtype=np.int32),
+            rates_of_spread=np.array([0.1, 0.2], dtype=np.float32),
+            fireline_intensities=np.array([1.0, 2.0], dtype=np.float32),
         )
-    )
-
-    grouped = data.split_by_time()
-
-    assert set(grouped.keys()) == {1, 2}
-
-    first = grouped[1]
-    np.testing.assert_array_equal(first.rows, np.array([0, 2], dtype=np.int32))
-    np.testing.assert_array_equal(first.cols, np.array([1, 3], dtype=np.int32))
-    np.testing.assert_array_equal(
-        first.realizations, np.array([0, 1], dtype=np.int32)
-    )
-    np.testing.assert_allclose(
-        first.rates_of_spread, np.array([0.2, 0.6], dtype=np.float32)
-    )
-    np.testing.assert_allclose(
-        first.fireline_intensities, np.array([5.0, 15.0], dtype=np.float32)
-    )
-
-    second = grouped[2]
-    np.testing.assert_array_equal(second.rows, np.array([1], dtype=np.int32))
-    np.testing.assert_array_equal(second.cols, np.array([2], dtype=np.int32))
-    np.testing.assert_array_equal(
-        second.realizations, np.array([0], dtype=np.int32)
-    )
-    np.testing.assert_allclose(
-        second.rates_of_spread, np.array([0.4], dtype=np.float32)
-    )
-    np.testing.assert_allclose(
-        second.fireline_intensities, np.array([10.0], dtype=np.float32)
-    )
 
 
 def test_propagator_stats_to_dict_contains_expected_fields():

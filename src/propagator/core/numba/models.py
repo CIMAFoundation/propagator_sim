@@ -3,8 +3,6 @@
 This file defines the data structures used in the Numba JIT-compiled wildfire propagation engine.
 """
 
-from logging import warning
-
 import numpy as np
 from numba import types
 from numba.experimental import jitclass

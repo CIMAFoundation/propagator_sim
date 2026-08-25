@@ -476,53 +476,6 @@ class Propagator:
 
         self.scheduler.add_event(boundary_condition.time, event)
 
-    def _apply_updates(
-        self,
-        updates: UpdateBatch,
-        new_time: int | None = None,
-    ) -> None:
-        """Apply a batch of burning updates to the state.
-        Parameters
-        ----------
-        updates : UpdateBatch
-            Batch of updates to apply at the current time step.
-        new_time : int | None
-            Optional simulation time to set.
-        Returns
-        -------
-        None
-        """
-
-        if new_time is not None:
-            self.time = new_time
-        rows = updates.rows
-        cols = updates.cols
-        realizations = updates.realizations
-        ros = updates.rates_of_spread
-        fireline_intensity = updates.fireline_intensities
-
-        self.fire[rows, cols, realizations] = True
-        self.arrival_time[rows, cols, realizations] = int(self.time)
-        self.ros[rows, cols, realizations] = ros
-        self.fireline_int[rows, cols, realizations] = fireline_intensity
-
-    def _calculate_next_updates(self, updates: UpdateBatch, time: int) -> None:
-        """Calculate and schedule the next updates based on the current state.
-        Parameters
-        ----------
-        updates : UpdateBatch
-            Batch of updates that were just applied.
-        time : int
-            The simulation time of the updates.
-        Returns
-        -------
-        None
-        """
-
-        raise RuntimeError(
-            "UpdateBatch scheduling is not used in front tracking"
-        )
-
     def _schedule_ignitions(
         self, time: int, updates: UpdateBatch | None
     ) -> None:
@@ -613,65 +566,6 @@ class Propagator:
         moisture = np.clip(moisture, 0.0, 1.0).astype(np.float32, copy=False)
 
         return moisture
-
-    def _get_simulation_bbox(self) -> tuple[int, int, int, int]:
-        """Get the bounding box of the simulation area.
-
-        Returns:
-            tuple[int, int, int, int]: (row_min, col_min, row_max, col_max)
-        """
-        n_rows, n_cols = self.veg.shape
-        return (0, 0, n_rows - 1, n_cols - 1)
-
-    def _check_out_of_bounds(self, updates: UpdateBatch) -> None:
-        # check that all updates are within bounds
-        bbox = updates.get_bbox()
-        if bbox is None:
-            return
-
-        update_r0, update_c0, update_r1, update_c1 = bbox
-        sim_bbox = self._get_simulation_bbox()
-        sim_r0, sim_c0, sim_r1, sim_c1 = sim_bbox
-        n_rows, n_cols = self.veg.shape
-        if (
-            update_r0 <= sim_r0
-            or update_c0 <= sim_c0
-            or update_r1 >= n_rows - 1
-            or update_c1 >= n_cols - 1
-        ):
-            raise PropagatorOutOfBoundsError("""Simulation reached the edge of the grid.
-                             To ignore this error, set out_of_bounds_mode to 'ignore'.""")
-
-    def _filter_valid_updates(self, updates: UpdateBatch) -> UpdateBatch:
-        """Filter out updates that are not valid, e.g. cells that have already
-        burned.
-        Parameters
-        ----------
-        updates : UpdateBatch
-            Batch of updates to filter.
-        Returns
-        -------
-        UpdateBatch
-            Filtered batch of updates.
-        """
-
-        must_be_updated = (
-            self.fire[updates.rows, updates.cols, updates.realizations] == 0
-        )
-
-        rows = updates.rows[must_be_updated]
-        cols = updates.cols[must_be_updated]
-        realizations = updates.realizations[must_be_updated]
-        ros = updates.rates_of_spread[must_be_updated]
-        fireline_intensity = updates.fireline_intensities[must_be_updated]
-
-        return UpdateBatch(
-            rows=rows,
-            cols=cols,
-            realizations=realizations,
-            rates_of_spread=ros,
-            fireline_intensities=fireline_intensity,
-        )
 
     def _update_boundary_conditions(
         self, time_delta: int, scheduler_event: SchedulerEvent

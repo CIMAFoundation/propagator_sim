@@ -2,43 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from propagator.core.models import UpdateBatch, UpdateBatchWithTime
+from propagator.core.models import UpdateBatch
 from propagator.core.scheduler import Scheduler, SchedulerEvent
-
-
-def test_push_updates_groups_by_time():
-    scheduler = Scheduler(realizations=2)
-
-    batch = UpdateBatchWithTime.from_tuple(
-        (
-            np.array([2, 1, 1], dtype=np.int32),
-            np.array([0, 1, 2], dtype=np.int32),
-            np.array([1, 2, 3], dtype=np.int32),
-            np.array([0, 1, 1], dtype=np.int32),
-            np.array([0.2, 0.5, 0.6], dtype=np.float32),
-            np.array([4.0, 5.0, 6.0], dtype=np.float32),
-        )
-    )
-
-    scheduler.push_updates(batch)
-
-    assert len(scheduler) == 2
-    assert scheduler.next_time() == 1
-
-    time_one, event_one = scheduler.pop()
-    assert time_one == 1
-    np.testing.assert_array_equal(
-        event_one.updates.rows, np.array([1, 2], dtype=np.int32)
-    )
-    np.testing.assert_array_equal(
-        event_one.updates.cols, np.array([2, 3], dtype=np.int32)
-    )
-
-    time_two, event_two = scheduler.pop()
-    assert time_two == 2
-    np.testing.assert_array_equal(
-        event_two.updates.rows, np.array([0], dtype=np.int32)
-    )
 
 
 def test_add_event_merges_updates_and_actions():
@@ -132,21 +97,35 @@ def test_scheduler_event_update_lets_later_event_overwrite_same_cell():
     np.testing.assert_array_equal(a.vegetation_changes, np.array([[0.0]]))
 
 
-def test_active_returns_unique_realizations():
-    scheduler = Scheduler(realizations=3)
+def test_add_event_same_time_merges_updates():
+    scheduler = Scheduler(realizations=2)
 
-    scheduled = UpdateBatchWithTime.from_tuple(
-        (
-            np.array([1, 2, 2], dtype=np.int32),
-            np.array([0, 1, 2], dtype=np.int32),
-            np.array([1, 2, 3], dtype=np.int32),
-            np.array([0, 1, 2], dtype=np.int32),
-            np.array([0.2, 0.3, 0.4], dtype=np.float32),
-            np.array([4.0, 5.0, 6.0], dtype=np.float32),
-        )
+    scheduler.add_event(
+        10,
+        SchedulerEvent(
+            updates=UpdateBatch(
+                rows=np.array([0], dtype=np.int32),
+                cols=np.array([0], dtype=np.int32),
+                realizations=np.array([0], dtype=np.int32),
+                rates_of_spread=np.array([1.0], dtype=np.float32),
+                fireline_intensities=np.array([1.0], dtype=np.float32),
+            )
+        ),
+    )
+    scheduler.add_event(
+        10,
+        SchedulerEvent(
+            updates=UpdateBatch(
+                rows=np.array([1], dtype=np.int32),
+                cols=np.array([1], dtype=np.int32),
+                realizations=np.array([1], dtype=np.int32),
+                rates_of_spread=np.array([2.0], dtype=np.float32),
+                fireline_intensities=np.array([2.0], dtype=np.float32),
+            )
+        ),
     )
 
-    scheduler.push_updates(scheduled)
+    time, event = scheduler.pop()
 
-    active = scheduler.active()
-    np.testing.assert_array_equal(active, np.array([0, 1, 2], dtype=np.int32))
+    assert time == 10
+    np.testing.assert_array_equal(event.updates.rows, [0, 1])

@@ -395,29 +395,6 @@ def test_decay_actions_moisture_exponential():
     assert propagator.actions_moisture is None
 
 
-def test_apply_updates_updates_state():
-    propagator = make_propagator(realizations=1)
-
-    updates = UpdateBatch(
-        rows=np.array([0], dtype=np.int32),
-        cols=np.array([1], dtype=np.int32),
-        realizations=np.array([0], dtype=np.int32),
-        rates_of_spread=np.array([2.5], dtype=np.float32),
-        fireline_intensities=np.array([7.5], dtype=np.float32),
-    )
-
-    future_time = 5
-    propagator._apply_updates(updates, new_time=future_time)
-
-    assert propagator.fire[0, 1, 0] == 1
-    assert propagator.arrival_time[0, 1, 0] == future_time
-    assert propagator.ros[0, 1, 0] == pytest.approx(2.5)
-    assert propagator.fireline_int[0, 1, 0] == pytest.approx(7.5)
-
-    time = propagator.time
-    assert time == future_time
-
-
 def test_front_capacity_defaults_to_twice_grid_cells():
     veg = np.array([[1, 2], [3, 4]], dtype=np.int32)
     dem = np.zeros_like(veg, dtype=np.float32)

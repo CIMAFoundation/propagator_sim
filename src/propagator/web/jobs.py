@@ -138,7 +138,3 @@ class JobManager:
             # and stop at its next loop iteration.
             job.cancel_requested = True
             return True
-
-    @property
-    def lock(self) -> threading.Lock:
-        return self._lock

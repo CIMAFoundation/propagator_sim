@@ -6,7 +6,6 @@ from .functions import (
     get_p_time_fn,
 )
 from .models import FUEL_SYSTEM_LEGACY, FuelSystem, fuelsystem_from_dict
-from .propagation import next_updates_fn
 
 __all__ = [
     "FUEL_SYSTEM_LEGACY",
@@ -16,6 +15,5 @@ __all__ = [
     "MoistureModel",
     "RateOfSpreadModel",
     "advance_front_until",
-    "next_updates_fn",
     "FuelSystem",
 ]
