@@ -6,9 +6,10 @@ moisture inputs. Public dataclasses capture boundary conditions, actions,
 summary statistics, and output snapshots suitable for CLI and IO layers.
 """
 
+import math
 import warnings
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -68,6 +69,14 @@ class Propagator:
         Whether to enable fire-spotting in the model.
     realizations : int, optional
         Number of stochastic realizations to simulate.
+    front_capacity_factor : float, optional
+        Multiplier applied to the number of grid cells to size the
+        per-realization front (event) heap. The default of 2.0 leaves
+        headroom for the pending updates piled up by spreading and,
+        especially, spotting. Default is 2.0.
+    front_capacity : int, optional
+        Explicit front heap capacity in events per realization,
+        overriding ``front_capacity_factor`` when given.
     p_time_fn: Any, optional
         The function to compute the spread time (must be jit-compiled).
         Units are compliant with other functions.
@@ -96,6 +105,14 @@ class Propagator:
     cellsize: float = field(default=CELLSIZE)
     do_spotting: bool = field(default=False)
     realizations: int = field(default=REALIZATIONS)
+
+    # capacity of the per-realization front (event) heap: pending spread
+    # updates accumulate here (spotting in particular enqueues embers
+    # from *every* burning cell, so the queue can exceed the number of
+    # cells). Scaled by `front_capacity_factor`; set `front_capacity` to
+    # override the computed size explicitly.
+    front_capacity_factor: float = field(default=2.0)
+    front_capacity: Optional[int] = field(default=None)
 
     # selected simulation functions
     p_time_fn: Any = field(default=get_p_time_fn(ROS_DEFAULT))
@@ -135,7 +152,12 @@ class Propagator:
         on the vegetation grid shape."""
         shape = self.veg.shape
         self.scheduler = Scheduler(realizations=self.realizations)
-        self._front_capacity = int(self.veg.size)
+        if self.front_capacity is not None:
+            self._front_capacity = int(self.front_capacity)
+        else:
+            self._front_capacity = int(
+                math.ceil(self.front_capacity_factor * self.veg.size)
+            )
         self._front_times = np.zeros(
             (self.realizations, self._front_capacity), dtype=np.int32
         )
@@ -817,7 +839,8 @@ class Propagator:
 
         if int(np.sum(self._front_overflow)) > 0:
             raise RuntimeError(
-                "Propagation front queue overflowed capacity; increase capacity."
+                "Propagation front queue overflowed capacity; "
+                "increase front_capacity or front_capacity_factor."
             )
 
         if (

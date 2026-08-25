@@ -160,6 +160,12 @@ def advance_front_until(
             if fire[row, col, realization] != 0:
                 continue
 
+            # Reaching the outer frame of the domain (not an actual
+            # out-of-array index: single_cell_updates() already discards
+            # neighbours outside [0, shape) before they reach the heap) is
+            # flagged as a deliberate early warning that the fire may spread
+            # past the simulated area, so callers can enlarge the domain.
+            # See out_of_bounds_mode on Propagator.
             if row <= 0 or col <= 0 or row >= n_rows - 1 or col >= n_cols - 1:
                 out_of_bounds[realization] = 1
 

@@ -418,6 +418,93 @@ def test_apply_updates_updates_state():
     assert time == future_time
 
 
+def test_front_capacity_defaults_to_twice_grid_cells():
+    veg = np.array([[1, 2], [3, 4]], dtype=np.int32)
+    dem = np.zeros_like(veg, dtype=np.float32)
+
+    propagator = Propagator(
+        veg=veg,
+        dem=dem,
+        realizations=2,
+        do_spotting=False,
+    )
+
+    assert propagator._front_capacity == 2 * veg.size
+
+
+def test_front_capacity_explicit_override():
+    veg = np.array([[1, 2], [3, 4]], dtype=np.int32)
+    dem = np.zeros_like(veg, dtype=np.float32)
+
+    propagator = Propagator(
+        veg=veg,
+        dem=dem,
+        realizations=2,
+        do_spotting=False,
+        front_capacity_factor=5.0,
+        front_capacity=3,
+    )
+
+    assert propagator._front_capacity == 3
+
+
+def test_front_push_sets_overflow_beyond_capacity():
+    veg = np.array([[1, 2], [3, 4]], dtype=np.int32)
+    dem = np.zeros_like(veg, dtype=np.float32)
+
+    propagator = Propagator(
+        veg=veg,
+        dem=dem,
+        realizations=1,
+        do_spotting=False,
+        front_capacity=1,
+    )
+
+    propagator._front_push(
+        realization=0, time=0, row=0, col=0, ros=0.0, fli=0.0
+    )
+    assert propagator._front_overflow[0] == 0
+
+    propagator._front_push(
+        realization=0, time=1, row=1, col=1, ros=0.0, fli=0.0
+    )
+    assert propagator._front_overflow[0] == 1
+
+
+def test_front_heap_overflow_raises_runtime_error():
+    """A front queue that overflows capacity must fail loudly instead of
+    silently dropping pending spread updates."""
+    from propagator.core.numba.models import FuelSystem
+
+    veg = np.array([[5, 5], [5, 5]], dtype=np.int32)
+    dem = np.zeros_like(veg, dtype=np.float32)
+
+    # single-fuel system with certain (p=1) transition: every neighbour
+    # of a burning cell is scheduled, deterministically
+    fuels = FuelSystem(1)
+    fuels.add_fuel(5, "conifers", 1.0, 1.0, 20000.0, 0.0, -9999.0)
+    fuels.add_transition_probability(5, 5, 1.0)
+
+    propagator = Propagator(
+        veg=veg,
+        dem=dem,
+        realizations=1,
+        do_spotting=False,
+        fuels=fuels,
+        front_capacity=2,
+    )
+    propagator.moisture = np.zeros((2, 2), dtype=np.float32)
+    propagator.wind_dir = np.zeros((2, 2), dtype=np.float32)
+    propagator.wind_speed = np.zeros((2, 2), dtype=np.float32)
+
+    propagator.set_boundary_conditions(
+        BoundaryConditions(time=0, ignitions=[(0, 0)])
+    )
+
+    with pytest.raises(RuntimeError, match="front queue overflowed"):
+        propagator.step()
+
+
 def test_step_applies_event():
     propagator = make_propagator(realizations=1)
     propagator.actions_moisture = np.full((2, 2), 0.5, dtype=np.float32)
