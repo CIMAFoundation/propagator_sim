@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import rasterio as rio
 from pyproj import CRS
-from shapely import LineString
+from shapely import LineString, Point
 
 from propagator.io.actions import CanadairAction, HeavyAction, HelicopterAction
 from propagator.io.boundary_conditions import TimedInput
@@ -31,6 +31,14 @@ def _pixel_center_lonlat(geo_info: GeographicInfo, row: int, col: int):
     to_wgs84 = Transformer.from_crs(geo_info.crs, "EPSG:4326", always_xy=True)
     lon, lat = to_wgs84.transform(x, y)
     return lon, lat
+
+
+def _pixel_center_utm(geo_info: GeographicInfo, row: int, col: int):
+    transform = geo_info.trans
+    return (
+        transform.c + (col + 0.5) * transform.a,
+        transform.f + (row + 0.5) * transform.e,
+    )
 
 
 def _line_through(geo_info, row, col):
@@ -88,6 +96,23 @@ def test_helicopter_action_actually_affects_moisture():
     assert np.any(bc.additional_moisture > 0)
 
 
+def test_helicopter_action_jitter_is_deterministic():
+    """The helicopter drop jitter must be reproducible: same geometry in
+    the same grid yields the same moisture pattern on every call (the
+    pattern used to come from the unseeded global NumPy RNG)."""
+    geo_info = make_geo_info()
+    line = _line_through(geo_info, 15, 15)
+
+    first = HelicopterAction(geometries=[line]).rasterize_action_moisture(
+        geo_info
+    )
+    second = HelicopterAction(geometries=[line]).rasterize_action_moisture(
+        geo_info
+    )
+
+    np.testing.assert_array_equal(first, second)
+
+
 def test_heavy_action_alone_does_not_touch_moisture():
     geo_info = make_geo_info()
     action = HeavyAction(geometries=[_line_through(geo_info, 15, 15)])
@@ -98,3 +123,58 @@ def test_heavy_action_alone_does_not_touch_moisture():
     assert bc.moisture is None
     assert bc.additional_moisture is None
     assert bc.vegetation_changes is not None
+
+
+def test_ignition_geometry_uses_configured_epsg():
+    """Regression test: geometries were always reprojected *from* EPSG:4326
+    in `rasterize_geometries`, silently mis-placing any ignition provided
+    in a projected CRS (e.g. UTM) via the config `epsg` field."""
+    geo_info = make_geo_info()
+    easting, northing = _pixel_center_utm(geo_info, 15, 15)
+    point = Point((easting, northing))
+
+    ti = TimedInput(time=0, ignitions=[point], epsg=32633)
+
+    bc = ti.get_boundary_conditions(geo_info, non_vegetated=3)
+
+    assert bc.ignitions is not None
+    np.testing.assert_array_equal(
+        np.argwhere(bc.ignitions > 0), np.array([[15, 15]])
+    )
+
+
+def test_ignition_default_epsg_stays_wgs84():
+    geo_info = make_geo_info()
+    lon, lat = _pixel_center_lonlat(geo_info, 15, 15)
+    point = Point((lon, lat))
+
+    ti = TimedInput(time=0, ignitions=[point])
+
+    bc = ti.get_boundary_conditions(geo_info, non_vegetated=3)
+
+    assert bc.ignitions is not None
+    np.testing.assert_array_equal(
+        np.argwhere(bc.ignitions > 0), np.array([[15, 15]])
+    )
+
+
+def test_action_geometry_uses_configured_epsg():
+    """Actions must honour the geometry CRS too: an action line drawn in
+    UTM with `epsg=32633` lands on the same pixels as the same line in
+    WGS84 with the default."""
+    geo_info = make_geo_info()
+    east0, north0 = _pixel_center_utm(geo_info, 15, 15)
+    east1, north1 = _pixel_center_utm(geo_info, 15, 16)
+    line_utm = LineString([(east0, north0), (east1, north1)])
+
+    ti = TimedInput(
+        time=3600,
+        epsg=32633,
+        actions=[CanadairAction(geometries=[line_utm], epsg=32633)],
+    )
+
+    bc = ti.get_boundary_conditions(geo_info, non_vegetated=3)
+
+    assert bc.additional_moisture is not None
+    rows, cols = np.nonzero(bc.additional_moisture > 0)
+    assert 15 in rows and (15, 15) in set(zip(rows, cols))

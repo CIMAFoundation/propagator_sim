@@ -36,6 +36,11 @@ class TimedInput(BaseModel):
 
     time: int = Field(0, description="seconds from simulation start")
 
+    epsg: int = Field(
+        DEFAULT_EPSG_GEOMETRY,
+        description="EPSG code of the geometry coordinates",
+    )
+
     # Weather conditions
     w_dir: Optional[float] = Field(
         None,
@@ -86,6 +91,8 @@ class TimedInput(BaseModel):
         if not isinstance(data, dict):
             return data
         epsg = (info.context or {}).get("epsg", DEFAULT_EPSG_GEOMETRY)
+        # propagate the geometry CRS so rasterization honours it
+        data.setdefault("epsg", epsg)
         #  legacy ignitions parsing
         if "ignitions" in data:
             v = data["ignitions"]
@@ -138,6 +145,7 @@ class TimedInput(BaseModel):
                 default_value=1,  # set 1 for ignited pixels
                 dtype="uint8",
                 merge_alg="replace",
+                src_epsg=self.epsg,
             )
 
         if self.actions is not None:
