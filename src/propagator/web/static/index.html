@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>PROPAGATOR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+  <header>
+    <h1>PROPAGATOR</h1>
+    <span class="subtitle">interactive fire simulation &mdash; local only</span>
+    <a class="manual-link" href="manual.html" target="_blank" rel="noopener"
+      title="Opens the user manual in a new tab">&#128214; Manual</a>
+  </header>
+
+  <div id="sidebar">
+    <fieldset>
+      <legend>Area</legend>
+      <div class="pick-buttons">
+        <button type="button" id="pick-center" class="active"
+          title="Click on the map to set the center of the simulation area">1. Pick center</button>
+        <button type="button" id="pick-ignition"
+          title="Click on the map to set the fire ignition point (must be on vegetated land, not on a town or city)">2.
+          Pick ignition</button>
+      </div>
+      <label>Radius <span class="value" id="radius-value">15 km</span></label>
+      <input type="range" id="radius" min="1" max="50" step="1" value="15"
+        title="Radius of the area around the chosen center, in km (max 50)">
+      <label>Cellsize <span class="value" id="cellsize-value">30 m</span></label>
+      <input type="range" id="cellsize" min="20" max="100" step="5" value="30"
+        title="Size of the simulation grid cell, in meters: lower values give more detail but take longer to compute">
+    </fieldset>
+
+    <fieldset>
+      <legend>Weather</legend>
+      <label>Wind direction <span class="value" id="wind-dir-value">0&deg;</span></label>
+      <input type="range" id="wind-dir" min="0" max="359" step="1" value="0"
+        title="Direction the wind is blowing from, in degrees from north (0°=North, 90°=East, 180°=South, 270°=West)">
+      <label>Wind speed <span class="value" id="wind-speed-value">20 km/h</span></label>
+      <input type="range" id="wind-speed" min="0" max="80" step="1" value="20" title="Wind speed, in km/h">
+      <label>Moisture <span class="value" id="moisture-value">10%</span></label>
+      <input type="range" id="moisture" min="0" max="100" step="1" value="10"
+        title="Fuel moisture, as a percentage: higher values slow down fire spread">
+    </fieldset>
+
+    <fieldset>
+      <legend>Simulation</legend>
+      <label>Duration <span class="value" id="duration-value">6 h</span></label>
+      <input type="range" id="duration" min="1" max="48" step="1" value="6"
+        title="Simulated duration of the fire, in hours">
+      <label>Time resolution <span class="value" id="resolution-value">1 h</span></label>
+      <input type="range" id="resolution" min="0.5" max="6" step="0.5" value="1"
+        title="How often a results frame (map, statistics) is saved">
+      <label>Realizations <span class="value" id="realizations-value">10</span></label>
+      <input type="range" id="realizations" min="1" max="50" step="1" value="10"
+        title="Number of independent stochastic simulations run: higher values give more reliable probability estimates but take longer">
+      <label
+        title="If enabled, the model generates wind-carried embers that can start new spot fires ahead of the main front">
+        Spotting (embers)
+        <input type="checkbox" id="do-spotting">
+      </label>
+      <label title="Probability thresholds (0-1, comma-separated) for which isochrones are drawn on the map">
+        Isochrone thresholds
+        <input type="text" id="isochrone-thresholds" value="0.5,0.75,0.9" size="12">
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Firefighting actions</legend>
+      <label>Type <span class="value"></span></label>
+      <select id="action-type"
+        title="Type of intervention (the added moisture stacks on top of the base value and decays over time, about -1%/minute): Canadair +25% on the line, +22% in the one-cell buffer; Waterline +27% on the line and buffer; Helicopter +22% on scattered points along the line, +20% in the buffer; Heavy vehicles: does not affect moisture, replaces the fuel with a non-flammable strip">
+        <option value="canadair"
+          title="Moisture +25% on the line, +22% in the one-cell buffer (stacks on top of the base value, then decays over time)">
+          Canadair</option>
+        <option value="helicopter"
+          title="Moisture +22% on scattered points along the line, +20% in the one-cell buffer (stacks on top of the base value, then decays over time)">
+          Helicopter</option>
+        <option value="waterline_action"
+          title="Moisture +27% along the whole line and the one-cell buffer (stacks on top of the base value, then decays over time)">
+          Waterline</option>
+        <option value="heavy_action"
+          title="Does not affect moisture: permanently replaces the fuel along the line (and one-cell buffer) with a non-flammable strip">
+          Heavy vehicles</option>
+      </select>
+      <label>Action time <span class="value" id="action-time-value">1 h</span></label>
+      <input type="range" id="action-time" min="0" max="48" step="0.5" value="1"
+        title="Hours from the start of the simulation at which the action is carried out">
+      <div class="pick-buttons">
+        <button type="button" id="draw-action-line"
+          title="Click on the map to add points to the intervention line, then press Finish line">Draw line</button>
+        <button type="button" id="finish-action-line" disabled
+          title="Finishes the drawn line and adds the action to the list">Finish line</button>
+      </div>
+      <ul id="actions-list"></ul>
+    </fieldset>
+
+    <button type="button" id="run-button" disabled title="Start the simulation with the current settings">Run
+      simulation</button>
+
+    <div class="warning" id="warning-banner"></div>
+
+    <div id="status-panel">
+      <div id="status-text">Running&hellip;</div>
+      <div class="progress-bar">
+        <div id="progress-fill"></div>
+      </div>
+    </div>
+
+    <div id="result-panel">
+      <label>Time <span class="value" id="frame-value">&mdash;</span></label>
+      <input type="range" id="frame-slider" min="0" max="0" step="1" value="0"
+        title="Scrub to see the fire map hour by hour, across the available results">
+      <div class="stat-grid">
+        <div class="stat" title="Expected burned area: sum of each cell's fire probability × cell area (hectares)">
+          <div class="stat-value" id="stat-area-mean">&mdash;</div>
+          <div class="stat-label">Mean area (ha)</div>
+        </div>
+        <div class="stat" title="Area where the fire arrived in at least 50% of the simulated realizations (hectares)">
+          <div class="stat-value" id="stat-area-50">&mdash;</div>
+          <div class="stat-label">Area prob&ge;50%</div>
+        </div>
+        <div class="stat"
+          title="Number of realizations, out of the total configured, whose fire front is still active at this instant">
+          <div class="stat-value" id="stat-n-active">&mdash;</div>
+          <div class="stat-label">Active realizations</div>
+        </div>
+        <div class="stat" title="Number of time instants (hourly frames) available for this simulation">
+          <div class="stat-value" id="stat-frame-count">&mdash;</div>
+          <div class="stat-label">Available frames</div>
+        </div>
+      </div>
+      <svg id="chart" viewBox="0 0 320 140"
+        title="Burned area over time: solid line = expected mean area, dashed line = area with probability ≥50%"></svg>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/app.js"></script>
+</body>
+
+</html>

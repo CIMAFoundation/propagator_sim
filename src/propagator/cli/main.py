@@ -302,6 +302,7 @@ def main() -> None:
         veg=veg,
         realizations=cfg.realizations,
         fuels=fuel_system,
+        cellsize=cfg.cellsize,
         do_spotting=cfg.do_spotting,
         out_of_bounds_mode="ignore" if cli.ignore_out_of_bounds else "raise",
         p_time_fn=cfg.p_time_fn if cfg.p_time_fn is not None else None,

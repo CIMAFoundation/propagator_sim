@@ -195,6 +195,7 @@ def rasterize_geometries(
     all_touched: bool = True,
     dtype: str = "uint8",
     merge_alg: str = "replace",  # "replace" | "add"
+    src_epsg: int = DEFAULT_EPSG_GEOMETRY,
 ) -> np.ndarray:
     """
     Rasterize a sequence of Geometry objects into a numpy array.
@@ -202,7 +203,7 @@ def rasterize_geometries(
     Parameters
     ----------
     geometries : list of Geometry
-        Geometry objects in the same CRS `src_crs`.
+        Geometry objects in the CRS given by `src_epsg`.
     geo_info: GeographicInfo
         Geographic information for the output raster.
     fill : scalar
@@ -217,6 +218,8 @@ def rasterize_geometries(
         Output dtype.
     merge_alg : str
         "replace" (last wins) or "add" (sum overlaps).
+    src_epsg : int
+        EPSG code of the input geometries (default WGS84, 4326).
 
     Returns
     -------
@@ -230,7 +233,9 @@ def rasterize_geometries(
     # Prepare shapes in destination CRS
     shapes: List[Tuple[dict, Union[int, float]]] = []
     for i, g in enumerate(geometries):
-        geom = reproject_geometry(g, "epsg:4326", str(geo_info.crs))
+        geom = reproject_geometry(
+            g, CRS.from_epsg(src_epsg), str(geo_info.crs)
+        )
         gj = json.loads(shapely.to_geojson(geom))
         val = values[i] if values is not None else default_value
         shapes.append((gj, val))

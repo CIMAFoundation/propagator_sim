@@ -13,19 +13,6 @@ from typing import Optional
 import numpy as np
 import numpy.typing as npt
 
-# Integer coords array of shape (n, 3). We can’t encode the shape statically
-# with stdlib typing, but we DO lock the dtype to integer families.
-FireBehaviourUpdate = tuple[int, int, int, float, float, bool]
-
-UpdateBatchTuple = tuple[
-    npt.NDArray[np.integer],
-    npt.NDArray[np.integer],
-    npt.NDArray[np.integer],
-    npt.NDArray[np.integer],
-    npt.NDArray[np.float32],
-    npt.NDArray[np.float32],
-]
-
 
 @dataclass
 class UpdateBatch:
@@ -49,19 +36,8 @@ class UpdateBatch:
         default_factory=lambda: np.empty((0,), dtype=np.float32)
     )
 
-    # Bounding box (min_row, min_col, max_row, max_col) - computed lazily
-    bbox: Optional[tuple[int, int, int, int]] = field(init=False, default=None)
-    # Flag to track whether bbox has been computed (avoids recomputation)
-    _bbox_computed: bool = field(init=False, default=False, repr=False)
-
     def __post_init__(self):
-        """Validate array lengths and initialize lazy bbox computation.
-
-        OPTIMIZATION: Previously computed bbox (min/max) in __post_init__ for
-        every UpdateBatch creation. Profiling showed this was expensive and
-        often wasteful since bbox is only needed for bounds checking, which
-        is rarely triggered. Now we defer computation until actually needed.
-        """
+        """Validate that all component arrays have the same length."""
         n = len(self.rows)
         if not (
             len(self.cols) == n
@@ -70,61 +46,9 @@ class UpdateBatch:
             and len(self.fireline_intensities) == n
         ):
             raise ValueError("All input arrays must have the same length")
-        # Initialize bbox as uncomputed
-        # Note: Must use object.__setattr__ because dataclass may be frozen
-        # or have custom __setattr__ behavior in subclasses
-        object.__setattr__(self, "_bbox_computed", False)
-        object.__setattr__(self, "bbox", None)
-
-    def _compute_bbox(self) -> None:
-        """Compute bounding box from update coordinates.
-
-        This is an expensive operation (4 min/max calls over potentially
-        large arrays) so we only do it when bbox is actually accessed.
-        Uses object.__setattr__ to bypass any dataclass restrictions.
-        """
-        if self._bbox_computed:
-            return
-
-        n = len(self.rows)
-        if n == 0:
-            object.__setattr__(self, "bbox", None)
-        else:
-            # Compute tight bounding box around all updates
-            r0 = int(np.min(self.rows))
-            c0 = int(np.min(self.cols))
-            r1 = int(np.max(self.rows))
-            c1 = int(np.max(self.cols))
-            object.__setattr__(self, "bbox", (r0, c0, r1, c1))
-        object.__setattr__(self, "_bbox_computed", True)
-
-    def get_bbox(self) -> Optional[tuple[int, int, int, int]]:
-        """Get bounding box, computing lazily if not yet calculated.
-
-        External code should use this instead of accessing .bbox directly
-        to ensure the bbox is computed when needed.
-        """
-        if not self._bbox_computed:
-            self._compute_bbox()
-        return self.bbox
 
     def extend(self, other: "UpdateBatch") -> None:
-        """Merge another UpdateBatch into this one.
-
-        Concatenates all arrays and invalidates the cached bounding box.
-
-        OPTIMIZATION: Previously had complex logic to merge bboxes, checking
-        if either was None, then computing min/max of merged bounds. This was
-        wasteful because:
-        1. Often the merged bbox is never used
-        2. If it is used, we can compute it directly from the merged arrays
-
-        New approach: Simply invalidate the bbox cache. If someone needs it
-        later via get_bbox(), it will be computed fresh from all data.
-
-        Performance: Avoids 8 min/max operations per extend call in the
-        common case where bbox isn't needed afterward.
-        """
+        """Merge another UpdateBatch into this one."""
         self.rows = np.concatenate([self.rows, other.rows])
         self.cols = np.concatenate([self.cols, other.cols])
         self.realizations = np.concatenate(
@@ -136,90 +60,6 @@ class UpdateBatch:
         self.fireline_intensities = np.concatenate(
             [self.fireline_intensities, other.fireline_intensities]
         )
-        # Invalidate cached bbox - will be recomputed if needed
-        object.__setattr__(self, "_bbox_computed", False)
-        object.__setattr__(self, "bbox", None)
-
-
-@dataclass(frozen=True)
-class UpdateBatchWithTime:
-    times: npt.NDArray[np.integer]
-    rows: npt.NDArray[np.integer]
-    cols: npt.NDArray[np.integer]
-    realizations: npt.NDArray[np.integer]
-    rates_of_spread: npt.NDArray[np.float32]
-    fireline_intensities: npt.NDArray[np.float32]
-
-    @staticmethod
-    def from_tuple(data: UpdateBatchTuple) -> "UpdateBatchWithTime":
-        (
-            times,
-            rows,
-            cols,
-            realizations,
-            rates_of_spread,
-            fireline_intensities,
-        ) = data
-        return UpdateBatchWithTime(
-            times=times,
-            rows=rows,
-            cols=cols,
-            realizations=realizations,
-            rates_of_spread=rates_of_spread,
-            fireline_intensities=fireline_intensities,
-        )
-
-    def split_by_time(self) -> dict[int, UpdateBatch]:
-        """Split updates into separate batches grouped by time.
-
-        OPTIMIZATION: This function is called in the hot path (Scheduler.push_updates)
-        and was identified as a major bottleneck. Several optimizations:
-
-        1. FAST PATH: Check if all updates are at the same time (common case).
-           If so, avoid array indexing and just wrap the existing arrays.
-           This happens frequently when processing a batch of cells that all
-           spread to neighbors at the same relative time.
-
-        2. REDUCED OBJECT CREATION: Eliminated intermediate variables that
-           were created just to pass to UpdateBatch constructor. Now pass
-           sliced arrays directly.
-
-        3. TYPE CONVERSION: Move int() conversion outside the inner operations
-           to reduce redundant type checking.
-
-        Note: Each UpdateBatch created here will have _bbox_computed=False,
-        deferring expensive min/max calculations until/unless needed.
-        """
-        result: dict[int, UpdateBatch] = {}
-        unique_times = np.unique(self.times)
-
-        # Fast path for single time value (common when cells spread uniformly)
-        if len(unique_times) == 1:
-            time = int(unique_times[0])
-            # No need to slice - all updates are at this time
-            result[time] = UpdateBatch(
-                self.rows,
-                self.cols,
-                self.realizations,
-                self.rates_of_spread,
-                self.fireline_intensities,
-            )
-            return result
-
-        # General case: split by time using boolean indexing
-        for time in unique_times:
-            # Create boolean mask for this time
-            index = self.times == time
-            # Create UpdateBatch with sliced arrays (bbox computed lazily)
-            result[int(time)] = UpdateBatch(
-                self.rows[index],
-                self.cols[index],
-                self.realizations[index],
-                self.rates_of_spread[index],
-                self.fireline_intensities[index],
-            )
-
-        return result
 
 
 class PropagatorError(Exception):

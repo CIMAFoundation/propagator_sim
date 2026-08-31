@@ -60,26 +60,23 @@ class PropagatorDataFromGeotiffs(PropagatorInputDataProtocol):
     dem_file: str
     veg_file: str
 
-    def __post_init__(self):
-        try:
-            with (
-                rio.open(self.dem_file) as dem_file,
-                rio.open(self.veg_file) as veg_file,
-            ):
-                check_input_files_consistency(dem_file, veg_file)
-        except PropagatorDataLoaderException as e:
-            raise PropagatorDataLoaderException(
-                f"Error in input files: {e}"
-            ) from e
+    def __attrs_post_init__(self):
+        # Load once and cache: the previous implementation re-opened both
+        # files in every getter (dem, veg, geo_info => 3 reads). attrs
+        # (not stdlib dataclasses) is what decorates this class, so the
+        # post-init hook is `__attrs_post_init__`, not `__post_init__`.
+        self._cache: tuple[np.ndarray, np.ndarray, GeographicInfo] = (
+            load_data_from_files(self.veg_file, self.dem_file)
+        )
 
     def get_dem(self) -> np.ndarray:
-        dem, _, _ = load_data_from_files(self.veg_file, self.dem_file)
+        dem, _, _ = self._cache
         return dem
 
     def get_veg(self) -> np.ndarray:
-        _, veg, _ = load_data_from_files(self.veg_file, self.dem_file)
+        _, veg, _ = self._cache
         return veg
 
     def get_geo_info(self) -> GeographicInfo:
-        _, _, geo_info = load_data_from_files(self.veg_file, self.dem_file)
+        _, _, geo_info = self._cache
         return geo_info

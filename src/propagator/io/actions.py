@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import hashlib
+from abc import abstractmethod
 from enum import Enum
 from typing import Any, List, Literal, Optional
 
 import numpy as np
 import numpy.typing as npt
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from pyparsing import abstractmethod
 from scipy import ndimage
 
 from propagator.io.geo import GeographicInfo
 from propagator.io.geometry import (
+    DEFAULT_EPSG_GEOMETRY,
     Geometry,
     GeometryKind,
     is_allowed,
@@ -20,7 +22,9 @@ from propagator.io.geometry import (
 
 
 def build_mask(
-    geometries: List[Geometry], geo_info: GeographicInfo
+    geometries: List[Geometry],
+    geo_info: GeographicInfo,
+    src_epsg: int = DEFAULT_EPSG_GEOMETRY,
 ) -> np.ndarray:
     """Boolean mask of the action geometries."""
     m = rasterize_geometries(
@@ -30,6 +34,7 @@ def build_mask(
         default_value=1,
         all_touched=True,
         dtype="uint8",
+        src_epsg=src_epsg,
     )
     return m.astype(bool)
 
@@ -52,6 +57,10 @@ HELICOPTER_BUFFER_MOIST_VALUE = 20
 # ---------- Base class ----------
 class Action(BaseModel):
     geometries: List[Geometry] = Field(default_factory=list, exclude=True)
+    epsg: int = Field(
+        default=DEFAULT_EPSG_GEOMETRY,
+        description="EPSG code of the geometry coordinates",
+    )
     model_config = ConfigDict(
         arbitrary_types_allowed=True  # use shapely geometry for geometries
     )
@@ -98,7 +107,7 @@ class WaterlineAction(Action):
     def rasterize_action_moisture(
         self, geo_info: GeographicInfo
     ) -> Optional[npt.NDArray[np.floating]]:
-        mask_action = build_mask(self.geometries, geo_info)
+        mask_action = build_mask(self.geometries, geo_info, src_epsg=self.epsg)
         mask_buffer = ndimage.binary_dilation(mask_action)
         moisture_action = np.where(
             mask_buffer, WATERLINE_ACTION_MOIST_VALUE, np.nan
@@ -118,7 +127,7 @@ class CanadairAction(Action):
     def rasterize_action_moisture(
         self, geo_info: GeographicInfo
     ) -> npt.NDArray[np.floating]:
-        mask_action = build_mask(self.geometries, geo_info)
+        mask_action = build_mask(self.geometries, geo_info, src_epsg=self.epsg)
         mask_buffer = ndimage.binary_dilation(mask_action)
         moisture_action = np.where(
             mask_buffer, CANADAIR_BUFFER_MOIST_VALUE, np.nan
@@ -138,15 +147,27 @@ class HelicopterAction(Action):
     def allowed_kinds(cls) -> set[GeometryKind]:
         return {GeometryKind.LINE}
 
-    def rasterize_action(
+    def rasterize_action_moisture(
         self, geo_info: GeographicInfo
     ) -> npt.NDArray[np.floating]:
-        mask_action = build_mask(self.geometries, geo_info)
+        mask_action = build_mask(self.geometries, geo_info, src_epsg=self.epsg)
         # create "jittered" seed points near the line pixels
         iy, ix = np.nonzero(mask_action)
         seed_mask = np.zeros(geo_info.shape, dtype=bool)
         if iy.size:
-            jit = np.random.randint(-1, 2, size=(iy.size, 2))  # [-1, 0, 1]
+            # deterministic jitter: seed from the geometry WKT so repeated
+            # runs with the same configuration produce the same drop pattern
+            seed = int(
+                hashlib.md5(
+                    " | ".join(
+                        g.wkt for g in self.geometries
+                    ).encode("utf-8")
+                ).hexdigest()[:8],
+                16,
+            )
+            jit = np.random.default_rng(seed).integers(
+                -1, 2, size=(iy.size, 2)
+            )  # [-1, 0, 1]
             jy = np.clip(iy + jit[:, 0], 0, geo_info.shape[0] - 1)
             jx = np.clip(ix + jit[:, 1], 0, geo_info.shape[1] - 1)
             seed_mask[jy, jx] = True
@@ -172,10 +193,18 @@ class HeavyAction(Action):
     def rasterize_action_fuel(
         self, geo_info: GeographicInfo, fuel: int
     ) -> npt.NDArray[np.floating]:
-        mask_action = build_mask(self.geometries, geo_info)
+        mask_action = build_mask(self.geometries, geo_info, src_epsg=self.epsg)
         mask_buffer = ndimage.binary_dilation(mask_action)
         fuel_action = np.where(mask_buffer, fuel, np.nan)
         return fuel_action
+
+
+ACTION_CLASSES: dict[str, type[Action]] = {
+    ActionType.WATERLINE_ACTION.value: WaterlineAction,
+    ActionType.CANADAIR.value: CanadairAction,
+    ActionType.HELICOPTER.value: HelicopterAction,
+    ActionType.HEAVY_ACTION.value: HeavyAction,
+}
 
 
 def parse_actions(
@@ -206,7 +235,7 @@ def parse_actions(
             epsg=epsg,
         )
         if geometries:
-            actions.append(WaterlineAction(geometries=geometries))
+            actions.append(WaterlineAction(geometries=geometries, epsg=epsg))
 
     if ActionType.CANADAIR.value in data:
         raw = data.pop(ActionType.CANADAIR.value)
@@ -216,7 +245,7 @@ def parse_actions(
             epsg=epsg,
         )
         if geometries:
-            actions.append(CanadairAction(geometries=geometries))
+            actions.append(CanadairAction(geometries=geometries, epsg=epsg))
 
     if ActionType.HELICOPTER.value in data:
         raw = data.pop(ActionType.HELICOPTER.value)
@@ -226,7 +255,9 @@ def parse_actions(
             epsg=epsg,
         )
         if geometries:
-            actions.append(HelicopterAction(geometries=geometries))
+            actions.append(
+                HelicopterAction(geometries=geometries, epsg=epsg)
+            )
 
     if ActionType.HEAVY_ACTION.value in data:
         raw = data.pop(ActionType.HEAVY_ACTION.value)
@@ -236,6 +267,6 @@ def parse_actions(
             epsg=epsg,
         )
         if geometries:
-            actions.append(HeavyAction(geometries=geometries))
+            actions.append(HeavyAction(geometries=geometries, epsg=epsg))
 
     return actions

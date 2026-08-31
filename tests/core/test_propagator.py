@@ -55,6 +55,30 @@ def test_spotting_state_allocated_only_when_enabled():
     assert with_spotting.spotting_receiving is not None
 
 
+def test_disabling_spotting_does_not_mutate_shared_default_fuel_system():
+    """Regression test: `Propagator(do_spotting=False)` used to call
+    `self.fuels.disable_spotting()` in place on whatever fuel system it
+    was given. Since the default fuel system is `FUEL_SYSTEM_LEGACY`, a
+    single shared module-level instance, this permanently disabled
+    spotting on it — silently breaking spotting for every subsequently
+    created `Propagator(do_spotting=True)` in the same process that also
+    relied on the default fuel system."""
+    from propagator.core import FUEL_SYSTEM_LEGACY
+
+    base_veg = np.array([[5, 5], [5, 5]], dtype=np.int32)  # conifers: spotting-capable
+    base_dem = np.zeros_like(base_veg, dtype=np.float32)
+    spotting_before = list(FUEL_SYSTEM_LEGACY.spotting)
+
+    Propagator(veg=base_veg, dem=base_dem, realizations=1, do_spotting=False)
+
+    assert list(FUEL_SYSTEM_LEGACY.spotting) == spotting_before
+
+    with_spotting = Propagator(
+        veg=base_veg, dem=base_dem, realizations=1, do_spotting=True
+    )
+    assert any(with_spotting.fuels.spotting)
+
+
 def test_compute_fire_probability_and_means():
     propagator = make_propagator(realizations=2)
 
@@ -371,27 +395,91 @@ def test_decay_actions_moisture_exponential():
     assert propagator.actions_moisture is None
 
 
-def test_apply_updates_updates_state():
-    propagator = make_propagator(realizations=1)
+def test_front_capacity_defaults_to_twice_grid_cells():
+    veg = np.array([[1, 2], [3, 4]], dtype=np.int32)
+    dem = np.zeros_like(veg, dtype=np.float32)
 
-    updates = UpdateBatch(
-        rows=np.array([0], dtype=np.int32),
-        cols=np.array([1], dtype=np.int32),
-        realizations=np.array([0], dtype=np.int32),
-        rates_of_spread=np.array([2.5], dtype=np.float32),
-        fireline_intensities=np.array([7.5], dtype=np.float32),
+    propagator = Propagator(
+        veg=veg,
+        dem=dem,
+        realizations=2,
+        do_spotting=False,
     )
 
-    future_time = 5
-    propagator._apply_updates(updates, new_time=future_time)
+    assert propagator._front_capacity == 2 * veg.size
 
-    assert propagator.fire[0, 1, 0] == 1
-    assert propagator.arrival_time[0, 1, 0] == future_time
-    assert propagator.ros[0, 1, 0] == pytest.approx(2.5)
-    assert propagator.fireline_int[0, 1, 0] == pytest.approx(7.5)
 
-    time = propagator.time
-    assert time == future_time
+def test_front_capacity_explicit_override():
+    veg = np.array([[1, 2], [3, 4]], dtype=np.int32)
+    dem = np.zeros_like(veg, dtype=np.float32)
+
+    propagator = Propagator(
+        veg=veg,
+        dem=dem,
+        realizations=2,
+        do_spotting=False,
+        front_capacity_factor=5.0,
+        front_capacity=3,
+    )
+
+    assert propagator._front_capacity == 3
+
+
+def test_front_push_sets_overflow_beyond_capacity():
+    veg = np.array([[1, 2], [3, 4]], dtype=np.int32)
+    dem = np.zeros_like(veg, dtype=np.float32)
+
+    propagator = Propagator(
+        veg=veg,
+        dem=dem,
+        realizations=1,
+        do_spotting=False,
+        front_capacity=1,
+    )
+
+    propagator._front_push(
+        realization=0, time=0, row=0, col=0, ros=0.0, fli=0.0
+    )
+    assert propagator._front_overflow[0] == 0
+
+    propagator._front_push(
+        realization=0, time=1, row=1, col=1, ros=0.0, fli=0.0
+    )
+    assert propagator._front_overflow[0] == 1
+
+
+def test_front_heap_overflow_raises_runtime_error():
+    """A front queue that overflows capacity must fail loudly instead of
+    silently dropping pending spread updates."""
+    from propagator.core.numba.models import FuelSystem
+
+    veg = np.array([[5, 5], [5, 5]], dtype=np.int32)
+    dem = np.zeros_like(veg, dtype=np.float32)
+
+    # single-fuel system with certain (p=1) transition: every neighbour
+    # of a burning cell is scheduled, deterministically
+    fuels = FuelSystem(1)
+    fuels.add_fuel(5, "conifers", 1.0, 1.0, 20000.0, 0.0, -9999.0)
+    fuels.add_transition_probability(5, 5, 1.0)
+
+    propagator = Propagator(
+        veg=veg,
+        dem=dem,
+        realizations=1,
+        do_spotting=False,
+        fuels=fuels,
+        front_capacity=2,
+    )
+    propagator.moisture = np.zeros((2, 2), dtype=np.float32)
+    propagator.wind_dir = np.zeros((2, 2), dtype=np.float32)
+    propagator.wind_speed = np.zeros((2, 2), dtype=np.float32)
+
+    propagator.set_boundary_conditions(
+        BoundaryConditions(time=0, ignitions=[(0, 0)])
+    )
+
+    with pytest.raises(RuntimeError, match="front queue overflowed"):
+        propagator.step()
 
 
 def test_step_applies_event():

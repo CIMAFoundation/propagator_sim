@@ -3,8 +3,6 @@
 This file defines the data structures used in the Numba JIT-compiled wildfire propagation engine.
 """
 
-from logging import warning
-
 import numpy as np
 from numba import types
 from numba.experimental import jitclass
@@ -213,6 +211,27 @@ class FuelSystem:
         for i in range(len(self.spotting)):
             self.spotting[i] = False
             self.prob_ign_by_embers[i] = 0.0
+
+    def copy(self) -> "FuelSystem":
+        """Return an independent copy, so callers can mutate it (e.g. via
+        `disable_spotting`) without affecting the object it was copied
+        from — important since `FUEL_SYSTEM_LEGACY` is a shared module-level
+        instance reused as the default fuel system across simulations."""
+        n = len(self.v0)
+        new = FuelSystem(n)
+        new.fuels_id = self.fuels_id.copy()
+        new.v0 = self.v0.copy()
+        new.d0 = self.d0.copy()
+        new.d1 = self.d1.copy()
+        new.hhv = self.hhv.copy()
+        new.humidity = self.humidity.copy()
+        new.spread_probability = self.spread_probability.copy()
+        new.spotting = self.spotting.copy()
+        new.prob_ign_by_embers = self.prob_ign_by_embers.copy()
+        new.burn = self.burn.copy()
+        new.name = self.name.copy()
+        new._non_vegetated = self._non_vegetated
+        return new
 
 
 def fuelsystem_from_dict(fuels: dict[int, dict]) -> FuelSystem:

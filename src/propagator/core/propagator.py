@@ -6,9 +6,10 @@ moisture inputs. Public dataclasses capture boundary conditions, actions,
 summary statistics, and output snapshots suitable for CLI and IO layers.
 """
 
+import math
 import warnings
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -68,6 +69,14 @@ class Propagator:
         Whether to enable fire-spotting in the model.
     realizations : int, optional
         Number of stochastic realizations to simulate.
+    front_capacity_factor : float, optional
+        Multiplier applied to the number of grid cells to size the
+        per-realization front (event) heap. The default of 2.0 leaves
+        headroom for the pending updates piled up by spreading and,
+        especially, spotting. Default is 2.0.
+    front_capacity : int, optional
+        Explicit front heap capacity in events per realization,
+        overriding ``front_capacity_factor`` when given.
     p_time_fn: Any, optional
         The function to compute the spread time (must be jit-compiled).
         Units are compliant with other functions.
@@ -96,6 +105,14 @@ class Propagator:
     cellsize: float = field(default=CELLSIZE)
     do_spotting: bool = field(default=False)
     realizations: int = field(default=REALIZATIONS)
+
+    # capacity of the per-realization front (event) heap: pending spread
+    # updates accumulate here (spotting in particular enqueues embers
+    # from *every* burning cell, so the queue can exceed the number of
+    # cells). Scaled by `front_capacity_factor`; set `front_capacity` to
+    # override the computed size explicitly.
+    front_capacity_factor: float = field(default=2.0)
+    front_capacity: Optional[int] = field(default=None)
 
     # selected simulation functions
     p_time_fn: Any = field(default=get_p_time_fn(ROS_DEFAULT))
@@ -135,7 +152,12 @@ class Propagator:
         on the vegetation grid shape."""
         shape = self.veg.shape
         self.scheduler = Scheduler(realizations=self.realizations)
-        self._front_capacity = int(self.veg.size)
+        if self.front_capacity is not None:
+            self._front_capacity = int(self.front_capacity)
+        else:
+            self._front_capacity = int(
+                math.ceil(self.front_capacity_factor * self.veg.size)
+            )
         self._front_times = np.zeros(
             (self.realizations, self._front_capacity), dtype=np.int32
         )
@@ -172,6 +194,12 @@ class Propagator:
             shape + (self.realizations,), dtype=np.float32
         )
         if not self.do_spotting:
+            # Copy before mutating: `self.fuels` defaults to (or may be
+            # explicitly passed as) the shared `FUEL_SYSTEM_LEGACY`
+            # instance. Disabling spotting in place on that shared object
+            # would silently disable spotting for every other Propagator
+            # in the process that also uses the default/legacy fuels.
+            self.fuels = self.fuels.copy()
             self.fuels.disable_spotting()
 
     def compute_fire_probability(self) -> npt.NDArray[np.floating]:
@@ -448,53 +476,6 @@ class Propagator:
 
         self.scheduler.add_event(boundary_condition.time, event)
 
-    def _apply_updates(
-        self,
-        updates: UpdateBatch,
-        new_time: int | None = None,
-    ) -> None:
-        """Apply a batch of burning updates to the state.
-        Parameters
-        ----------
-        updates : UpdateBatch
-            Batch of updates to apply at the current time step.
-        new_time : int | None
-            Optional simulation time to set.
-        Returns
-        -------
-        None
-        """
-
-        if new_time is not None:
-            self.time = new_time
-        rows = updates.rows
-        cols = updates.cols
-        realizations = updates.realizations
-        ros = updates.rates_of_spread
-        fireline_intensity = updates.fireline_intensities
-
-        self.fire[rows, cols, realizations] = True
-        self.arrival_time[rows, cols, realizations] = int(self.time)
-        self.ros[rows, cols, realizations] = ros
-        self.fireline_int[rows, cols, realizations] = fireline_intensity
-
-    def _calculate_next_updates(self, updates: UpdateBatch, time: int) -> None:
-        """Calculate and schedule the next updates based on the current state.
-        Parameters
-        ----------
-        updates : UpdateBatch
-            Batch of updates that were just applied.
-        time : int
-            The simulation time of the updates.
-        Returns
-        -------
-        None
-        """
-
-        raise RuntimeError(
-            "UpdateBatch scheduling is not used in front tracking"
-        )
-
     def _schedule_ignitions(
         self, time: int, updates: UpdateBatch | None
     ) -> None:
@@ -585,65 +566,6 @@ class Propagator:
         moisture = np.clip(moisture, 0.0, 1.0).astype(np.float32, copy=False)
 
         return moisture
-
-    def _get_simulation_bbox(self) -> tuple[int, int, int, int]:
-        """Get the bounding box of the simulation area.
-
-        Returns:
-            tuple[int, int, int, int]: (row_min, col_min, row_max, col_max)
-        """
-        n_rows, n_cols = self.veg.shape
-        return (0, 0, n_rows - 1, n_cols - 1)
-
-    def _check_out_of_bounds(self, updates: UpdateBatch) -> None:
-        # check that all updates are within bounds
-        bbox = updates.get_bbox()
-        if bbox is None:
-            return
-
-        update_r0, update_c0, update_r1, update_c1 = bbox
-        sim_bbox = self._get_simulation_bbox()
-        sim_r0, sim_c0, sim_r1, sim_c1 = sim_bbox
-        n_rows, n_cols = self.veg.shape
-        if (
-            update_r0 <= sim_r0
-            or update_c0 <= sim_c0
-            or update_r1 >= n_rows - 1
-            or update_c1 >= n_cols - 1
-        ):
-            raise PropagatorOutOfBoundsError("""Simulation reached the edge of the grid.
-                             To ignore this error, set out_of_bounds_mode to 'ignore'.""")
-
-    def _filter_valid_updates(self, updates: UpdateBatch) -> UpdateBatch:
-        """Filter out updates that are not valid, e.g. cells that have already
-        burned.
-        Parameters
-        ----------
-        updates : UpdateBatch
-            Batch of updates to filter.
-        Returns
-        -------
-        UpdateBatch
-            Filtered batch of updates.
-        """
-
-        must_be_updated = (
-            self.fire[updates.rows, updates.cols, updates.realizations] == 0
-        )
-
-        rows = updates.rows[must_be_updated]
-        cols = updates.cols[must_be_updated]
-        realizations = updates.realizations[must_be_updated]
-        ros = updates.rates_of_spread[must_be_updated]
-        fireline_intensity = updates.fireline_intensities[must_be_updated]
-
-        return UpdateBatch(
-            rows=rows,
-            cols=cols,
-            realizations=realizations,
-            rates_of_spread=ros,
-            fireline_intensities=fireline_intensity,
-        )
 
     def _update_boundary_conditions(
         self, time_delta: int, scheduler_event: SchedulerEvent
@@ -811,7 +733,8 @@ class Propagator:
 
         if int(np.sum(self._front_overflow)) > 0:
             raise RuntimeError(
-                "Propagation front queue overflowed capacity; increase capacity."
+                "Propagation front queue overflowed capacity; "
+                "increase front_capacity or front_capacity_factor."
             )
 
         if (
