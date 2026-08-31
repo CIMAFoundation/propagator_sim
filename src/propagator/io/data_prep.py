@@ -101,7 +101,8 @@ def dem_tile_urls(
     lon0, lon1 = int(np.floor(west)), int(np.floor(east))
     for lat in range(lat0, lat1 + 1):
         for lon in range(lon0, lon1 + 1):
-            ns, ew = ("N", "E") if lat >= 0 else ("S", "W")
+            ns = "N" if lat >= 0 else "S"
+            ew = "E" if lon >= 0 else "W"
             name = (
                 f"Copernicus_DSM_COG_10_{ns}{abs(lat):02d}_00_"
                 f"{ew}{abs(lon):03d}_00_DEM"
@@ -121,7 +122,8 @@ def worldcover_tile_urls(
     lon1 = int(np.floor(east / 3.0) * 3)
     for lat in range(lat0, lat1 + 1, 3):
         for lon in range(lon0, lon1 + 1, 3):
-            ns, ew = ("N", "E") if lat >= 0 else ("S", "W")
+            ns = "N" if lat >= 0 else "S"
+            ew = "E" if lon >= 0 else "W"
             name = (
                 f"ESA_WorldCover_10m_2021_v200_"
                 f"{ns}{abs(lat):02d}{ew}{abs(lon):03d}_Map"

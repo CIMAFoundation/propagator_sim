@@ -113,6 +113,12 @@ include-package-data = false
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# The web UI's frontend (index.html/app.js/CSS) is served straight off
+# disk from `propagator.web.app`'s `STATIC_DIR`, so it has to ship inside
+# the wheel too, not just the source tree.
+[tool.setuptools.package-data]
+"propagator.web" = ["static/*"]
+
 
 [tool.pytest.ini_options]
 minversion = "8.0"

@@ -68,6 +68,55 @@ def test_worldcover_tile_urls_rounds_to_3_degrees():
     assert url.endswith(f"{name}.tif")
 
 
+# N/S must depend only on latitude and E/W only on longitude, so each of
+# the four lat/lon sign combinations is exercised independently below
+# (regression for a bug where the E/W hemisphere was derived from `lat`
+# instead of `lon`, which silently pointed DEM/WorldCover downloads at
+# the wrong side of the globe for any negative-longitude bbox).
+
+
+def test_dem_tile_urls_northern_western_hemisphere():
+    # San Francisco, USA: lat +37, lon -122 (west of Greenwich)
+    names = {name for _, name in dem_tile_urls(-122.95, 37.05, -122.80, 37.15)}
+    assert names == {"Copernicus_DSM_COG_10_N37_00_W123_00_DEM"}
+
+
+def test_dem_tile_urls_southern_eastern_hemisphere():
+    # Sydney, Australia: lat -34, lon +151
+    names = {name for _, name in dem_tile_urls(151.05, -33.95, 151.20, -33.85)}
+    assert names == {"Copernicus_DSM_COG_10_S34_00_E151_00_DEM"}
+
+
+def test_dem_tile_urls_southern_western_hemisphere():
+    # Santiago, Chile: lat -34, lon -71
+    names = {name for _, name in dem_tile_urls(-70.70, -33.50, -70.55, -33.40)}
+    assert names == {"Copernicus_DSM_COG_10_S34_00_W071_00_DEM"}
+
+
+def test_worldcover_tile_urls_northern_western_hemisphere():
+    names = {
+        name
+        for _, name in worldcover_tile_urls(-122.95, 37.05, -122.80, 37.15)
+    }
+    assert names == {"ESA_WorldCover_10m_2021_v200_N36W123_Map"}
+
+
+def test_worldcover_tile_urls_southern_eastern_hemisphere():
+    names = {
+        name
+        for _, name in worldcover_tile_urls(151.05, -33.95, 151.20, -33.85)
+    }
+    assert names == {"ESA_WorldCover_10m_2021_v200_S36E150_Map"}
+
+
+def test_worldcover_tile_urls_southern_western_hemisphere():
+    names = {
+        name
+        for _, name in worldcover_tile_urls(-70.70, -33.50, -70.55, -33.40)
+    }
+    assert names == {"ESA_WorldCover_10m_2021_v200_S36W072_Map"}
+
+
 def test_build_target_grid_covers_requested_radius():
     transform, width, height = build_target_grid(
         42.4207, 12.1077, 5.0, 30.0, "EPSG:32633"
