@@ -647,7 +647,9 @@ class Propagator:
                 raise ValueError(
                     "Invalid ignitions in BoundaryConditions: realization "
                     f"index out of range for {self.realizations} "
-                    "realization(s)."
+                    f"realization(s); got indices in "
+                    f"[{int(realizations.min())}, "
+                    f"{int(realizations.max())}]."
                 )
 
             fireline_intensity = np.zeros_like(

@@ -225,10 +225,6 @@ def run_loop(simulator: Propagator, job: JobState) -> None:
         )
         job.frame_times.append(output.time)
         job.current_time_s = output.time
-    # The loop also exits when the front dies out before `time_limit_s`;
-    # the run is still complete, so report full progress rather than
-    # leaving the UI stuck at the extinction time.
-    job.current_time_s = request.time_limit_s
     job.status = JobStatus.DONE
 
 

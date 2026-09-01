@@ -601,7 +601,8 @@ def test_negative_ignition_realization_raises_instead_of_wrapping():
     # through NumPy's wrap-around rather than the intended one.
     propagator = make_propagator(realizations=2)
 
-    with pytest.raises(ValueError, match="realization index out of range"):
+    # The message names the offending index, not just the bound.
+    with pytest.raises(ValueError, match=r"got indices in \[-1, -1\]"):
         propagator.set_boundary_conditions(
             BoundaryConditions(time=0, ignitions=[(0, 0, -1)])
         )

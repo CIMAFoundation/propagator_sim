@@ -308,7 +308,15 @@
       $("warning-banner").classList.add("visible");
     }
 
-    const pct = job.time_limit_s > 0 ? Math.min(100, (100 * job.current_time_s) / job.time_limit_s) : 0;
+    // `current_time_s` stays the last simulated time, which stops short of
+    // `time_limit_s` when the front dies out early; a finished run is still
+    // 100% done.
+    const pct =
+      job.status === "done"
+        ? 100
+        : job.time_limit_s > 0
+          ? Math.min(100, (100 * job.current_time_s) / job.time_limit_s)
+          : 0;
     $("progress-fill").style.width = `${pct}%`;
 
     const phaseLabels = {
