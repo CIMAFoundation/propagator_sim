@@ -54,7 +54,8 @@ uv run mkdocs serve                 # docs with live reload
 uv run mkdocs build                 # static docs site
 
 uv sync --extra web                 # add the web UI's extra deps
-uv run propagator-web               # serve the web UI on 0.0.0.0:8765 (LAN-reachable)
+uv run propagator-web               # serve the web UI on 127.0.0.1:8765
+PROPAGATOR_WEB_HOST=0.0.0.0 uv run propagator-web   # opt into LAN exposure
 ```
 
 Tests are configured in `pyproject.toml` ([tool.pytest.ini_options]) with
@@ -123,10 +124,11 @@ Four packages under `src/propagator/`:
   `logging_config.py` handle Rich-based terminal output and logging setup.
 
 - **`propagator.web`** — a single-user, unauthenticated FastAPI app
-  (`propagator-web` console script, binds to `0.0.0.0:8765` so it's
-  LAN-reachable) exposing an interactive map UI for running simulations
+  (`propagator-web` console script, binds to `127.0.0.1:8765`; set
+  `PROPAGATOR_WEB_HOST=0.0.0.0` to opt into LAN exposure, `PROPAGATOR_WEB_PORT`
+  for the port) exposing an interactive map UI for running simulations
   without hand-authoring a config/GeoTIFFs. No login and one job at a time
-  server-wide — only run it on a trusted network. See `docs/web.md` for
+  server-wide — only expose it on a trusted network. See `docs/web.md` for
   usage and guardrails.
   - `app.py`/`server.py` — FastAPI app factory and the `propagator-web` entry
     point; `static/` holds the vanilla-JS/HTML/CSS frontend

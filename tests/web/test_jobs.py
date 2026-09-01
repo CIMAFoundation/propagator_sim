@@ -69,6 +69,60 @@ def test_submit_rejects_second_job_while_one_is_running():
     release.set()
 
 
+def test_submit_rejects_a_second_job_while_one_is_fetching_pois():
+    """Regression test: the busy guard listed PENDING/PREPARING_DATA/
+    RUNNING explicitly, so the later-added FETCHING_POIS left a window
+    (tens of seconds on a slow Overpass endpoint) where a second run was
+    accepted and then sat in PENDING behind the single worker."""
+    manager = JobManager()
+    started = threading.Event()
+    release = threading.Event()
+
+    def poi_fetching_runner(job, manager):
+        job.status = JobStatus.FETCHING_POIS
+        started.set()
+        release.wait(timeout=5)
+        job.status = JobStatus.DONE
+
+    manager.submit(make_request(), poi_fetching_runner)
+    assert started.wait(timeout=5)
+
+    with pytest.raises(JobBusyError):
+        manager.submit(make_request(), poi_fetching_runner)
+
+    release.set()
+
+
+def test_every_non_terminal_status_counts_as_busy():
+    """The guard is derived by negating TERMINAL_STATUSES precisely so a
+    status added later is busy by default; keep that property enforced."""
+    from propagator.web.jobs import TERMINAL_STATUSES
+
+    assert TERMINAL_STATUSES == {
+        JobStatus.DONE,
+        JobStatus.FAILED,
+        JobStatus.CANCELLED,
+    }
+    for status in JobStatus:
+        if status in TERMINAL_STATUSES:
+            continue
+        manager = JobManager()
+        started = threading.Event()
+        release = threading.Event()
+
+        def runner(job, manager, _status=status):
+            job.status = _status
+            started.set()
+            release.wait(timeout=5)
+            job.status = JobStatus.DONE
+
+        manager.submit(make_request(), runner)
+        assert started.wait(timeout=5)
+        with pytest.raises(JobBusyError):
+            manager.submit(make_request(), runner)
+        release.set()
+
+
 def test_cancel_sets_flag_on_job_state():
     manager = JobManager()
     job_id = manager.submit(make_request(), fast_success_runner)

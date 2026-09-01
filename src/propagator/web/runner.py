@@ -204,6 +204,14 @@ def run_job(job: JobState, manager: JobManager) -> None:
 
         if request.include_pois:
             job.status = JobStatus.FETCHING_POIS
+            # The POI overlay is best-effort: the simulation itself is
+            # already fully specified by the DEM/fuel data fetched above,
+            # so *nothing* here may fail the run. Catch broadly rather
+            # than only OverpassError -- a malformed Overpass body
+            # (JSONDecodeError), any other requests exception (SSL,
+            # redirects), a corrupted cache entry, or an OSError writing
+            # the cache would otherwise reach run_job's generic handler
+            # and mark an otherwise valid simulation FAILED.
             try:
                 job.pois = fetch_area_pois(
                     request.center_lat,
@@ -213,12 +221,25 @@ def run_job(job: JobState, manager: JobManager) -> None:
                     max_pois=request.max_pois,
                     categories=request.poi_categories,
                 )
+                job.poi_cells = build_sample_cells(
+                    job.pois, geo_info, area.utm_epsg
+                )
             except OverpassError as e:
                 job.poi_warning = f"Could not fetch OpenStreetMap POIs: {e}"
                 job.pois = []
-            job.poi_cells = build_sample_cells(
-                job.pois, geo_info, area.utm_epsg
-            )
+                job.poi_cells = []
+            except Exception as e:
+                job.poi_warning = (
+                    f"Could not fetch OpenStreetMap POIs: "
+                    f"{type(e).__name__}: {e}"
+                )
+                job.pois = []
+                job.poi_cells = []
+                logger.exception(
+                    "Unexpected error fetching POIs for job %s; continuing "
+                    "without the POI overlay",
+                    job.id,
+                )
 
         simulator = build_simulator(veg, dem, request, ign_row, ign_col)
         schedule_actions(simulator, request, geo_info)

@@ -52,10 +52,18 @@ def _byram_flame_length(
 ) -> npt.NDArray[np.floating]:
     """Vectorized Byram (1959) flame length (m) from fireline
     intensity (kW/m)."""
-    safe = np.maximum(fireline_int, 0.0)
-    return BYRAM_FLAME_LENGTH_COEFF * np.power(
-        safe, BYRAM_FLAME_LENGTH_EXPONENT
-    )
+    # Reuse one transient buffer. `compute_flame_length_mean` calls this
+    # on the full (rows, cols, realizations) intensity array once per
+    # `get_output()`, so computing it as
+    # `COEFF * np.power(np.maximum(x, 0), EXP)` would allocate two copies
+    # of that array rather than one -- an unbudgeted spike of the same
+    # order as the per-realization state itself at the top of the grid
+    # sizes `web.schemas` allows. `np.maximum` already copies, so the
+    # in-place steps never touch the caller's array.
+    out = np.maximum(fireline_int, 0.0)
+    np.power(out, BYRAM_FLAME_LENGTH_EXPONENT, out=out)
+    out *= BYRAM_FLAME_LENGTH_COEFF
+    return out
 
 
 @dataclass
@@ -333,19 +341,29 @@ class Propagator:
         """
         return self._compute_variable_mean(self.fireline_int)
 
-    def compute_flame_length_max(self) -> npt.NDArray[np.floating]:
+    def compute_flame_length_max(
+        self, fli_max: npt.NDArray[np.floating] | None = None
+    ) -> npt.NDArray[np.floating]:
         """Return per-cell maximum Byram flame length (m) across
         realizations, derived from the maximum fireline intensity.
 
         Byram's flame-length relation is monotonically increasing in
         intensity, so max(flame_length) == flame_length(max(intensity)).
 
+        Parameters
+        ----------
+        fli_max : numpy.ndarray, optional
+            An already-computed `compute_fireline_int_max()` result to
+            reuse. Only an optimization for callers that need both (see
+            `get_output`); recomputed when omitted.
+
         Returns
         -------
         numpy.ndarray
             2D array of max flame length values (m).
         """
-        fli_max = self.compute_fireline_int_max()
+        if fli_max is None:
+            fli_max = self.compute_fireline_int_max()
         return _byram_flame_length(fli_max).astype(np.float32)
 
     def compute_flame_length_mean(self) -> npt.NDArray[np.floating]:
@@ -366,13 +384,23 @@ class Propagator:
         )
 
     def sample_cells(
-        self, cells: list[tuple[str, int, int]]
+        self,
+        cells: list[tuple[str, int, int]],
+        *,
+        fire_probability: npt.NDArray[np.floating] | None = None,
+        min_arrival: npt.NDArray[np.floating] | None = None,
+        mean_arrival: npt.NDArray[np.floating] | None = None,
     ) -> tuple[CellArrivalSample, ...]:
         """Sample already-computed per-cell arrival time at arbitrary
         (row, col) locations, keyed by an opaque caller-supplied id.
 
         Generic, grid-index-only utility with no knowledge of lat/lon or
         POI semantics — that mapping is an io/web-layer concern.
+
+        `fire_probability`/`min_arrival`/`mean_arrival` let a caller that
+        has already reduced those grids pass them in instead of having
+        them recomputed (see `get_output`); each is computed here when
+        omitted.
 
         Returns
         -------
@@ -383,9 +411,12 @@ class Propagator:
         """
         if not cells:
             return ()
-        fire_probability = self.compute_fire_probability()
-        min_arrival = self.compute_arrival_time_min()
-        mean_arrival = self.compute_arrival_time_mean()
+        if fire_probability is None:
+            fire_probability = self.compute_fire_probability()
+        if min_arrival is None:
+            min_arrival = self.compute_arrival_time_min()
+        if mean_arrival is None:
+            mean_arrival = self.compute_arrival_time_mean()
         height, width = fire_probability.shape
         samples = []
         for key, row, col in cells:
@@ -893,10 +924,25 @@ class Propagator:
         ros_mean = self.compute_ros_mean()
         fireline_intensity_max = self.compute_fireline_int_max()
         fireline_intensity_mean = self.compute_fireline_int_mean()
-        flame_length_max = self.compute_flame_length_max()
+        # Hand the reductions computed just above to the helpers that
+        # would otherwise redo them over the full
+        # (rows, cols, realizations) arrays -- on the web app's larger
+        # grids that roughly doubled the per-frame reduction cost.
+        flame_length_max = self.compute_flame_length_max(
+            fli_max=fireline_intensity_max
+        )
         flame_length_mean = self.compute_flame_length_mean()
         stats = self.compute_stats(fire_probability)
-        poi_arrival = self.sample_cells(sample_cells) if sample_cells else ()
+        poi_arrival = (
+            self.sample_cells(
+                sample_cells,
+                fire_probability=fire_probability,
+                min_arrival=min_arrival_time,
+                mean_arrival=mean_arrival_time,
+            )
+            if sample_cells
+            else ()
+        )
 
         return PropagatorOutput(
             time=int(self.time),

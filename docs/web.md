@@ -6,12 +6,10 @@ without writing a config file or GeoTIFFs by hand. It is built on top of the
 same `Propagator` engine and the public-data pipeline described in
 [Getting Started](getting-started.md), not a separate implementation.
 
-The server binds to all interfaces (`0.0.0.0:8765`), so it is reachable
-from other machines on the LAN, but it is still a **single-user,
-unauthenticated** tool: there is no login and the whole server runs one
-simulation job at a time (`JobBusyError`/429 if two people start a run at
-once). Only run it on a trusted network — don't expose it directly to the
-internet.
+It is a **single-user, unauthenticated** tool: there is no login and the
+whole server runs one simulation job at a time (`JobBusyError`/429 if two
+people start a run at once). It therefore binds to `127.0.0.1:8765` by
+default, reachable only from the machine running it.
 
 ## Install and Run
 
@@ -20,8 +18,20 @@ uv sync --extra web
 uv run propagator-web
 ```
 
-Then open <http://127.0.0.1:8765> in a browser, or
-`http://<host-ip>:8765` from another machine on the same LAN.
+Then open <http://127.0.0.1:8765> in a browser.
+
+To reach it from another machine on the LAN, opt in explicitly by binding
+to all interfaces (and pick a different port with `PROPAGATOR_WEB_PORT` if
+needed):
+
+```bash
+PROPAGATOR_WEB_HOST=0.0.0.0 uv run propagator-web
+```
+
+then open `http://<host-ip>:8765`. Since there is no authentication,
+anyone who can reach that address can start, cancel, and view runs — only
+do this on a trusted network, and never expose it directly to the
+internet.
 
 The UI is available in English and Italian: it auto-detects your browser
 language on first visit and can be switched anytime via the EN/IT control

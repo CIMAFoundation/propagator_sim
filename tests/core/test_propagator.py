@@ -357,6 +357,76 @@ def test_sample_cells_reports_reached_and_unreached_and_out_of_bounds():
     assert np.isnan(by_key["outside"].min_arrival_time)
 
 
+def test_passing_precomputed_grids_does_not_change_results():
+    """`get_output` hands its already-reduced grids to `sample_cells` and
+    `compute_flame_length_max` instead of letting them redo the full
+    (rows, cols, realizations) reductions. That is purely an
+    optimization: results must be identical either way."""
+    propagator = make_propagator(realizations=2)
+    propagator.fire = np.array(
+        [[[1, 0], [0, 1]], [[1, 1], [0, 0]]], dtype=np.int8
+    )
+    propagator.arrival_time = np.array(
+        [[[10, 0], [0, 20]], [[15, 25], [0, 0]]], dtype=np.int32
+    )
+    propagator.fireline_int = np.array(
+        [[[10.0, 0.0], [0.0, 20.0]], [[5.0, 15.0], [0.0, 0.0]]],
+        dtype=np.float32,
+    )
+    cells = [("a", 0, 0), ("b", 1, 1), ("outside", 99, 99)]
+
+    np.testing.assert_allclose(
+        propagator.compute_flame_length_max(
+            fli_max=propagator.compute_fireline_int_max()
+        ),
+        propagator.compute_flame_length_max(),
+    )
+    with_precomputed = propagator.sample_cells(
+        cells,
+        fire_probability=propagator.compute_fire_probability(),
+        min_arrival=propagator.compute_arrival_time_min(),
+        mean_arrival=propagator.compute_arrival_time_mean(),
+    )
+    without = propagator.sample_cells(cells)
+
+    # compared field by field: an unreached cell reports NaN arrival
+    # times, and NaN != NaN would make plain dataclass equality fail even
+    # for identical results
+    assert len(with_precomputed) == len(without)
+    for a, b in zip(with_precomputed, without):
+        assert (a.key, a.row, a.col, a.reached) == (
+            b.key,
+            b.row,
+            b.col,
+            b.reached,
+        )
+        np.testing.assert_allclose(
+            [a.min_arrival_time, a.mean_arrival_time],
+            [b.min_arrival_time, b.mean_arrival_time],
+            equal_nan=True,
+        )
+
+
+def test_byram_flame_length_does_not_mutate_its_input():
+    """It computes in place inside one transient buffer to avoid a second
+    full copy of the 3D intensity array; that buffer must be its own, not
+    the caller's array."""
+    from propagator.core.propagator import _byram_flame_length
+
+    fireline_int = np.array([-5.0, 0.0, 10.0, 20.0], dtype=np.float32)
+    original = fireline_int.copy()
+
+    result = _byram_flame_length(fireline_int)
+
+    np.testing.assert_array_equal(fireline_int, original)
+    assert result is not fireline_int
+    np.testing.assert_allclose(
+        result,
+        np.array([0.0, 0.0, 0.0775 * 10.0**0.46, 0.0775 * 20.0**0.46]),
+        rtol=1e-6,
+    )
+
+
 def test_get_output_sample_cells_defaults_to_empty():
     propagator = make_propagator(realizations=1)
     propagator.fire = np.zeros((2, 2, 1), dtype=np.int8)

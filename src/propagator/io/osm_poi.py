@@ -108,6 +108,13 @@ class OverpassError(Exception):
     """Raised when the Overpass API request fails after retries."""
 
 
+class _OverpassRemark(Exception):
+    """A 200 response whose body carries a `remark` (Overpass reports
+    query timeouts and rate limiting this way). Internal: it exists only
+    to route such responses through the same retry path as transport
+    errors, and never escapes `fetch_overpass`."""
+
+
 @dataclass(frozen=True)
 class POI:
     """One OpenStreetMap element of interest."""
@@ -232,11 +239,22 @@ def fetch_overpass(
             )
             response.raise_for_status()
             data = response.json()
+            # Overpass reports a query timeout or rate limiting with HTTP
+            # 200 plus a `remark` and a partial (often empty) `elements`
+            # list, so raise_for_status() sees nothing wrong. Retry it
+            # like a transport error -- and, crucially, never fall through
+            # to the cache write below, which would otherwise freeze that
+            # truncated POI set for this bbox until the cache is deleted
+            # by hand.
+            remark = data.get("remark")
+            if remark:
+                raise _OverpassRemark(str(remark))
             break
         except (
             requests.HTTPError,
             requests.ConnectionError,
             requests.Timeout,
+            _OverpassRemark,
         ) as e:
             last_error = e
             if attempt < max_retries - 1:
@@ -384,13 +402,20 @@ def fetch_area_pois(
         wanted = set(categories)
         pois = [p for p in pois if _category_group(p.category) in wanted]
 
-    seen: set[tuple[str, int]] = set()
-    deduped = []
+    # An element can legitimately come back twice: the query emits an
+    # `out center tags` block and an `out geom tags` block, so a feature
+    # matching both (a substation tagged power=* *and* building=*, say) is
+    # returned by each -- and only one of the two copies carries
+    # `geometry`. Keep the copy that has it, otherwise exactly those
+    # features fall back to a single centroid cell, defeating the
+    # per-vertex sampling `build_sample_cells` exists for. A dict keeps
+    # insertion order, so replacing a value preserves the original
+    # position.
+    by_key: dict[tuple[str, int], POI] = {}
     for poi in pois:
         dedup_key = (poi.osm_type, poi.osm_id)
-        if dedup_key in seen:
-            continue
-        seen.add(dedup_key)
-        deduped.append(poi)
+        existing = by_key.get(dedup_key)
+        if existing is None or (not existing.geometry and poi.geometry):
+            by_key[dedup_key] = poi
 
-    return _truncate(deduped, lat, lon, max_pois)
+    return _truncate(list(by_key.values()), lat, lon, max_pois)

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 import numpy as np
+import pytest
 import rasterio as rio
 from pyproj import CRS, Transformer
 
@@ -302,8 +303,23 @@ def test_run_job_reports_pois_and_arrival(monkeypatch, tmp_path):
     assert fetch_calls[0]["categories"] == ["hospital", "power"]
 
 
+@pytest.mark.parametrize(
+    "poi_error",
+    [
+        OverpassError("boom"),
+        # The POI overlay is best-effort, so *any* failure below it must
+        # degrade to a warning rather than failing the whole run: a
+        # malformed Overpass body (JSONDecodeError), a requests error
+        # other than the three fetch_overpass retries on (SSL,
+        # TooManyRedirects), a corrupted cache entry, or an OSError
+        # writing the cache.
+        ValueError("boom"),
+        OSError("boom"),
+    ],
+    ids=["overpass-error", "unexpected-value-error", "os-error"],
+)
 def test_run_job_continues_with_warning_when_overpass_fails(
-    monkeypatch, tmp_path
+    monkeypatch, tmp_path, poi_error
 ):
     size = 20
     transform = rio.Affine(30.0, 0.0, 500000.0, 0.0, -30.0, 4700000.0)
@@ -335,7 +351,7 @@ def test_run_job_continues_with_warning_when_overpass_fails(
         )
 
     def fake_fetch_area_pois(*args, **kwargs):
-        raise OverpassError("boom")
+        raise poi_error
 
     monkeypatch.setattr(
         "propagator.web.runner.prepare_area_data", fake_prepare_area_data

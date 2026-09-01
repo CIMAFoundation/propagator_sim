@@ -453,7 +453,13 @@
       const tooltip = poi.reached
         ? i18n.t("poi.tooltip.reachedAt", { label, hours: poi.arrival_time_h.toFixed(1) })
         : i18n.t("poi.tooltip.notReached", { label });
-      shape.bindTooltip(tooltip);
+      // `label` embeds OpenStreetMap tags (name/operator/voltage) verbatim,
+      // and Leaflet parses a string tooltip as HTML. Hand it an element
+      // whose text is set via textContent instead, so a POI named
+      // "<img src=x onerror=...>" renders as text rather than executing.
+      const tooltipEl = document.createElement("span");
+      tooltipEl.textContent = tooltip;
+      shape.bindTooltip(tooltipEl);
       shape.addTo(poiGroup);
     }
     state.poiLayer = poiGroup.addTo(map);

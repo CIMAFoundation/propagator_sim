@@ -35,6 +35,16 @@ class JobStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+# Statuses a job never leaves. Everything else counts as "in flight", so
+# `submit`'s one-job-at-a-time guard is derived by negation: a status added
+# later is treated as active until it is explicitly listed as terminal,
+# rather than silently opening a window where a second job is accepted
+# (which is how FETCHING_POIS slipped past the guard when it was added).
+TERMINAL_STATUSES = frozenset(
+    {JobStatus.DONE, JobStatus.FAILED, JobStatus.CANCELLED}
+)
+
+
 @dataclass
 class FrameData:
     time_s: int
@@ -89,12 +99,7 @@ class JobManager:
             active = [
                 j
                 for j in self._jobs.values()
-                if j.status
-                in (
-                    JobStatus.PENDING,
-                    JobStatus.PREPARING_DATA,
-                    JobStatus.RUNNING,
-                )
+                if j.status not in TERMINAL_STATUSES
             ]
             if active:
                 raise JobBusyError(
@@ -107,11 +112,7 @@ class JobManager:
             # in memory, unfreed, for the lifetime of the process across a
             # normal "tweak params, rerun" session.
             for old_id, old_job in list(self._jobs.items()):
-                if old_job.status in (
-                    JobStatus.DONE,
-                    JobStatus.FAILED,
-                    JobStatus.CANCELLED,
-                ):
+                if old_job.status in TERMINAL_STATUSES:
                     del self._jobs[old_id]
 
             job_id = uuid.uuid4().hex

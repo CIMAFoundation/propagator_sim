@@ -270,6 +270,109 @@ def test_fetch_overpass_raises_after_exhausting_retries(monkeypatch, tmp_path):
         pass
 
 
+def test_fetch_overpass_retries_a_remark_response_and_never_caches_it(
+    monkeypatch, tmp_path
+):
+    """Overpass reports query timeouts/rate limiting with HTTP 200 plus a
+    `remark` and a partial `elements` list, which raise_for_status() lets
+    through. Caching that would freeze a truncated POI set for this bbox
+    permanently, so it must be retried like a transport error."""
+    attempts = {"n": 0}
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self._payload
+
+    def fake_post(url, data, headers, timeout):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            return FakeResponse(
+                {"remark": "runtime error: Query timed out", "elements": []}
+            )
+        return FakeResponse({"elements": [{"type": "node", "id": 1}]})
+
+    monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setattr("propagator.io.osm_poi.time.sleep", lambda s: None)
+
+    result = fetch_overpass(
+        "q", cache_dir=tmp_path, max_retries=3, backoff_s=0
+    )
+
+    assert attempts["n"] == 2
+    assert "remark" not in result
+    # only the good response reached the cache: a re-fetch is served from
+    # disk without another request, and still has no remark
+    cached = fetch_overpass("q", cache_dir=tmp_path)
+    assert attempts["n"] == 2
+    assert "remark" not in cached
+
+
+def test_fetch_overpass_raises_when_every_attempt_has_a_remark(
+    monkeypatch, tmp_path
+):
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"remark": "runtime error: out of memory", "elements": []}
+
+    monkeypatch.setattr(
+        requests, "post", lambda url, data, headers, timeout: FakeResponse()
+    )
+    monkeypatch.setattr("propagator.io.osm_poi.time.sleep", lambda s: None)
+
+    try:
+        fetch_overpass("q", cache_dir=tmp_path, max_retries=2, backoff_s=0)
+        assert False, "expected OverpassError"
+    except OverpassError:
+        pass
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_fetch_area_pois_dedup_keeps_the_copy_carrying_geometry(
+    monkeypatch, tmp_path
+):
+    """A feature tagged both power=* and building=* is returned by the
+    query's `out center tags` block *and* its `out geom tags` block; only
+    the latter carries `geometry`. Dedup used to keep whichever came
+    first, silently reducing those features to a single centroid cell."""
+    element_center = {
+        "type": "way",
+        "id": 42,
+        "center": {"lat": 42.0, "lon": 12.0},
+        "tags": {"power": "substation", "building": "yes"},
+    }
+    element_geom = {
+        "type": "way",
+        "id": 42,
+        "center": {"lat": 42.0, "lon": 12.0},
+        "geometry": [
+            {"lat": 42.0, "lon": 12.0},
+            {"lat": 42.001, "lon": 12.001},
+            {"lat": 42.002, "lon": 12.0},
+        ],
+        "tags": {"power": "substation", "building": "yes"},
+    }
+
+    monkeypatch.setattr(
+        "propagator.io.osm_poi.fetch_overpass",
+        lambda *a, **k: {"elements": [element_center, element_geom]},
+    )
+
+    pois = fetch_area_pois(42.0, 12.0, 1.0, cache_dir=tmp_path)
+
+    assert len(pois) == 1
+    assert pois[0].geometry is not None
+    assert len(pois[0].geometry) == 3
+
+
 def test_fetch_area_pois_truncates_by_priority(monkeypatch, tmp_path):
     elements = []
     for i in range(10):

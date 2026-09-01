@@ -31,9 +31,12 @@ PoiCategory = Literal[
     "building",
     "power",
 ]
-assert set(PoiCategory.__args__) == set(POI_CATEGORIES), (
-    "PoiCategory has drifted from propagator.io.osm_poi.POI_CATEGORIES"
-)
+if set(PoiCategory.__args__) != set(POI_CATEGORIES):
+    # Not an `assert`: that would be stripped under `python -O`, silently
+    # dropping the very guarantee this check exists to enforce.
+    raise RuntimeError(
+        "PoiCategory has drifted from propagator.io.osm_poi.POI_CATEGORIES"
+    )
 
 # Byte-accurate memory budget, mirroring the arrays
 # `Propagator.__post_init__` allocates (core/propagator.py): the
