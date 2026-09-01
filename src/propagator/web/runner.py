@@ -17,6 +17,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from pyproj import Transformer
 from shapely import LineString
 
 from propagator.core import FUEL_SYSTEM_LEGACY, BoundaryConditions, Propagator
@@ -86,6 +87,10 @@ def build_sample_cells(
     """
     cells = []
     height, width = geo_info.shape
+    # One transformer for every vertex of every POI: building one costs
+    # ~0.2 ms, and a run with many geometry-bearing POIs (power lines,
+    # substation footprints) converts thousands of vertices here.
+    to_utm = Transformer.from_crs("EPSG:4326", utm_epsg, always_xy=True)
     for poi in pois:
         points = (
             poi.geometry
@@ -95,7 +100,9 @@ def build_sample_cells(
         seen: set[tuple[int, int]] = set()
         idx = 0
         for lat, lon in points:
-            row, col = latlon_to_rowcol(geo_info.trans, utm_epsg, lat, lon)
+            row, col = latlon_to_rowcol(
+                geo_info.trans, utm_epsg, lat, lon, to_utm=to_utm
+            )
             if not (0 <= row < height and 0 <= col < width):
                 continue
             if (row, col) in seen:

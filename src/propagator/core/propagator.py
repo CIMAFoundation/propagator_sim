@@ -52,14 +52,16 @@ def _byram_flame_length(
 ) -> npt.NDArray[np.floating]:
     """Vectorized Byram (1959) flame length (m) from fireline
     intensity (kW/m)."""
-    # Reuse one transient buffer. `compute_flame_length_mean` calls this
-    # on the full (rows, cols, realizations) intensity array once per
-    # `get_output()`, so computing it as
-    # `COEFF * np.power(np.maximum(x, 0), EXP)` would allocate two copies
-    # of that array rather than one -- an unbudgeted spike of the same
-    # order as the per-realization state itself at the top of the grid
-    # sizes `web.schemas` allows. `np.maximum` already copies, so the
-    # in-place steps never touch the caller's array.
+    # Computed inside a single transient buffer: `np.maximum` already
+    # copies, so the power and scale steps run in place on that copy and
+    # never touch the caller's array. `compute_flame_length_mean` calls
+    # this on the full (rows, cols, realizations) intensity grid once per
+    # `get_output()`, where the naive
+    # `COEFF * np.power(np.maximum(x, 0), EXP)` would hold two such
+    # copies at once. One full-size transient is irreducible here (the
+    # per-realization flame lengths have to exist to be averaged); it is
+    # *not* covered by `web.schemas.MAX_ESTIMATED_MEMORY_BYTES`, which
+    # budgets only the arrays `__post_init__` allocates.
     out = np.maximum(fireline_int, 0.0)
     np.power(out, BYRAM_FLAME_LENGTH_EXPONENT, out=out)
     out *= BYRAM_FLAME_LENGTH_COEFF
@@ -460,8 +462,13 @@ class Propagator:
 
         mask = self.fire > 0
 
-        # accumulate in float64 to reduce precision loss
-        s = np.nansum(np.where(mask, the_var, 0.0), axis=2, dtype=np.float64)
+        # accumulate in float64 to reduce precision loss. `where=` masks
+        # the reduction in place of `np.nansum(np.where(mask, the_var,
+        # 0.0), ...)`, which allocated a second full
+        # (rows, cols, realizations) copy of `the_var` on every call --
+        # significant here because every reporting frame reduces the ros,
+        # fireline-intensity and flame-length grids this way.
+        s = np.nansum(the_var, axis=2, dtype=np.float64, where=mask)
         c = np.sum(mask, axis=2)
 
         # mean where count>0; NaN otherwise

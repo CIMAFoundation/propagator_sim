@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import time
@@ -108,13 +109,6 @@ class OverpassError(Exception):
     """Raised when the Overpass API request fails after retries."""
 
 
-class _OverpassRemark(Exception):
-    """A 200 response whose body carries a `remark` (Overpass reports
-    query timeouts and rate limiting this way). Internal: it exists only
-    to route such responses through the same retry path as transport
-    errors, and never escapes `fetch_overpass`."""
-
-
 @dataclass(frozen=True)
 class POI:
     """One OpenStreetMap element of interest."""
@@ -142,7 +136,11 @@ class POI:
 
 
 def build_overpass_query(
-    west: float, south: float, east: float, north: float
+    west: float,
+    south: float,
+    east: float,
+    north: float,
+    categories: Sequence[str] | None = None,
 ) -> str:
     """Return an Overpass QL query for critical buildings/infrastructure
     in the given WGS84 bbox: hospitals/schools/fire stations/police,
@@ -150,27 +148,46 @@ def build_overpass_query(
     reduced to a representative point via `out center`); power
     infrastructure is queried separately with `out geom` so lines and
     polygonal elements (substations, plants) keep their full geometry
-    for accurate fire-arrival sampling along their whole extent."""
+    for accurate fire-arrival sampling along their whole extent.
+
+    `categories` (a subset of `POI_CATEGORIES`; `None` means all) selects
+    which clauses are emitted, so a narrowed selection doesn't make the
+    server collect, and this client parse and cache, elements that will
+    be filtered out immediately afterwards -- `way["building"]` alone
+    returns tens of thousands of elements for a 10 km radius over a city.
+    The cache key is the query text, so a different selection
+    transparently gets its own cache entry.
+    """
+    wanted = set(POI_CATEGORIES if categories is None else categories)
     bbox = f"{south},{west},{north},{east}"
-    amenities = "|".join(CRITICAL_AMENITIES)
     highways = "|".join(MAJOR_HIGHWAYS)
-    return (
-        "[out:json][timeout:25];\n"
-        "(\n"
-        f'  node["amenity"~"^({amenities})$"]({bbox});\n'
-        f'  way["amenity"~"^({amenities})$"]({bbox});\n'
-        f'  node["emergency"]({bbox});\n'
-        f'  way["emergency"]({bbox});\n'
-        f'  way["highway"~"^({highways})$"]({bbox});\n'
-        f'  way["building"]({bbox});\n'
-        ");\n"
-        "out center tags;\n"
-        "(\n"
-        f'  node["power"]({bbox});\n'
-        f'  way["power"]({bbox});\n'
-        ");\n"
-        "out geom tags;\n"
-    )
+
+    point_clauses = []
+    amenities = [a for a in CRITICAL_AMENITIES if a in wanted]
+    if amenities:
+        pattern = "|".join(amenities)
+        point_clauses.append(f'  node["amenity"~"^({pattern})$"]({bbox});\n')
+        point_clauses.append(f'  way["amenity"~"^({pattern})$"]({bbox});\n')
+    if "emergency" in wanted:
+        point_clauses.append(f'  node["emergency"]({bbox});\n')
+        point_clauses.append(f'  way["emergency"]({bbox});\n')
+    if "road" in wanted:
+        point_clauses.append(f'  way["highway"~"^({highways})$"]({bbox});\n')
+    if "building" in wanted:
+        point_clauses.append(f'  way["building"]({bbox});\n')
+
+    query = "[out:json][timeout:25];\n"
+    if point_clauses:
+        query += "(\n" + "".join(point_clauses) + ");\n" + "out center tags;\n"
+    if "power" in wanted:
+        query += (
+            "(\n"
+            f'  node["power"]({bbox});\n'
+            f'  way["power"]({bbox});\n'
+            ");\n"
+            "out geom tags;\n"
+        )
+    return query
 
 
 def _cache_path(cache_dir: Path, query: str) -> Path:
@@ -239,22 +256,28 @@ def fetch_overpass(
             )
             response.raise_for_status()
             data = response.json()
-            # Overpass reports a query timeout or rate limiting with HTTP
-            # 200 plus a `remark` and a partial (often empty) `elements`
-            # list, so raise_for_status() sees nothing wrong. Retry it
-            # like a transport error -- and, crucially, never fall through
-            # to the cache write below, which would otherwise freeze that
-            # truncated POI set for this bbox until the cache is deleted
-            # by hand.
+            # Overpass reports a server-side query timeout or an
+            # out-of-memory abort with HTTP 200 plus a `remark` and a
+            # partial (often empty) `elements` list, so
+            # raise_for_status() sees nothing wrong. Fail immediately
+            # rather than retrying: the outcome is a property of this
+            # query over this bbox, so re-sending it unchanged just
+            # burns another full server-side timeout (~25 s each) before
+            # failing the same way. Raising here also skips the cache
+            # write below, which would otherwise freeze that truncated
+            # POI set for this bbox until the cache is deleted by hand.
             remark = data.get("remark")
             if remark:
-                raise _OverpassRemark(str(remark))
+                raise OverpassError(
+                    f"Overpass could not complete the query: {remark}. "
+                    "The area is likely too large or too dense — reduce "
+                    "the radius, or select fewer POI categories."
+                )
             break
         except (
             requests.HTTPError,
             requests.ConnectionError,
             requests.Timeout,
-            _OverpassRemark,
         ) as e:
             last_error = e
             if attempt < max_retries - 1:
@@ -362,9 +385,17 @@ def _truncate(
     if len(pois) <= max_pois:
         return pois
 
+    # A degree of longitude is shorter than a degree of latitude away
+    # from the equator (~0.71x at 45 deg), so comparing raw squared
+    # degrees would rank east/west POIs as ~1.4x farther than equally
+    # distant north/south ones and bias the retained set along the N-S
+    # axis whenever the cap bites. One cos(lat) scale factor for the
+    # whole (small, at these radii) area is enough here.
+    lon_scale = math.cos(math.radians(lat))
+
     def sort_key(poi: POI) -> tuple[int, float]:
         priority = _category_priority(poi.category)
-        distance = (poi.lat - lat) ** 2 + (poi.lon - lon) ** 2
+        distance = (poi.lat - lat) ** 2 + ((poi.lon - lon) * lon_scale) ** 2
         return priority, distance
 
     return sorted(pois, key=sort_key)[:max_pois]
@@ -381,20 +412,22 @@ def fetch_area_pois(
 ) -> list[POI]:
     """Fetch critical-building/infrastructure POIs from OpenStreetMap for
     the same square bbox `data_prep.prepare_area_data` uses for DEM/fuel,
-    deduplicated, optionally filtered to `categories` (a subset of
-    `POI_CATEGORIES`; `None` keeps every category, matching the previous
-    default behavior), and capped to `max_pois` (keeping higher-priority
-    categories and those closest to the center first).
+    deduplicated, restricted to `categories` (a subset of
+    `POI_CATEGORIES`; `None` keeps every category), and capped to
+    `max_pois` (keeping higher-priority categories and those closest to
+    the center first).
 
-    The Overpass query itself always fetches every category (so the
-    on-disk response cache stays valid across different `categories`
-    selections for the same area) — filtering happens after parsing,
-    before truncation, so `max_pois` only bites into the categories the
-    caller actually wants."""
+    `categories` narrows the Overpass query itself, not just the parsed
+    result, so a narrowed selection is materially cheaper end to end
+    (`way["building"]` alone dominates the response for a city-sized
+    bbox). The parsed result is filtered again before truncation, so
+    `max_pois` only ever bites into the requested categories. Each
+    distinct selection gets its own cache entry, since the cache is keyed
+    by the query text."""
     west, south, east, north, _utm_epsg = wgs84_bbox_from_center(
         lat, lon, radius_km
     )
-    query = build_overpass_query(west, south, east, north)
+    query = build_overpass_query(west, south, east, north, categories)
     data = fetch_overpass(query, cache_dir=cache_dir)
     pois = parse_overpass_elements(data)
 

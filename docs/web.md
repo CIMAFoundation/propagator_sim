@@ -87,13 +87,22 @@ Which of those eight categories (hospitals, fire stations, police,
 schools, other emergency, major roads, buildings, power infrastructure)
 are actually fetched/reported is configurable via the checkboxes under
 "Points of interest" (`poi_categories` in the API, defaulting to every
-category); unchecking a category never re-queries Overpass — the query
-always fetches every category so the on-disk response cache stays valid,
-and category filtering happens server-side afterward, so re-running the
-same area with a different category selection doesn't hit the network
-again. The overall POI count is capped by "Max POIs" (`max_pois`, default
-1000, 1–5000), applied after category filtering so it only bites into
-the categories actually selected.
+category). The selection narrows the Overpass query itself, not just the
+reported result, so unchecking categories makes the fetch materially
+cheaper — `building` alone accounts for the large majority of elements
+returned over a built-up area. Each distinct selection gets its own
+on-disk cache entry (the cache is keyed by the query), so switching
+selection re-queries once and is then served from cache like any other.
+The overall POI count is capped by "Max POIs" (`max_pois`, default 1000,
+1–5000), applied after category filtering so it only bites into the
+categories actually selected.
+
+If Overpass cannot finish the query within its own server-side budget
+(too large a radius over a dense area), it answers with a `remark`
+instead of results. That is reported as a non-fatal warning and the run
+continues without POIs; narrowing the radius or the category selection
+is what makes it succeed — retrying the identical query would just hit
+the same timeout.
 
 Power infrastructure is reported with a specific subtype category
 (`power_line`, `power_tower`, `power_pole`, `power_substation`,

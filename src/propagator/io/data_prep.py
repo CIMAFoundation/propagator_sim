@@ -19,6 +19,7 @@ Shared by `example/italy/prepare_area_data.py` (CLI) and `propagator.web`
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterator
@@ -163,14 +164,29 @@ def remap_worldcover_to_fuel(
 
 
 def latlon_to_rowcol(
-    transform: Affine, utm_epsg: str, lat: float, lon: float
+    transform: Affine,
+    utm_epsg: str,
+    lat: float,
+    lon: float,
+    to_utm: Transformer | None = None,
 ) -> tuple[int, int]:
     """Return the (row, col) grid indices of (lat, lon) for a grid with
-    the given affine transform, projected onto `utm_epsg`."""
-    to_utm = Transformer.from_crs("EPSG:4326", utm_epsg, always_xy=True)
+    the given affine transform, projected onto `utm_epsg`.
+
+    `to_utm` lets a caller converting many points reuse one transformer
+    (building one costs ~0.2 ms, which dominates when sampling every
+    vertex of many POI geometries); one is built per call when omitted.
+    Pass only a transformer from EPSG:4326 to `utm_epsg` built with
+    `always_xy=True`.
+    """
+    if to_utm is None:
+        to_utm = Transformer.from_crs("EPSG:4326", utm_epsg, always_xy=True)
     x, y = to_utm.transform(lon, lat)
-    col = int((x - transform.c) / transform.a)
-    row = int((y - transform.f) / transform.e)
+    # floor, not int(): int() truncates toward zero, so a point up to one
+    # cell outside the north/west edge (a true index in (-1, 0)) would
+    # land on row/col 0 and read as inside the grid.
+    col = math.floor((x - transform.c) / transform.a)
+    row = math.floor((y - transform.f) / transform.e)
     return row, col
 
 

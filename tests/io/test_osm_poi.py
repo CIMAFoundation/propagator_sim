@@ -4,6 +4,7 @@ import requests
 
 from propagator.io.osm_poi import (
     OVERPASS_URL,
+    POI_CATEGORIES,
     OverpassError,
     build_overpass_query,
     default_overpass_url,
@@ -33,6 +34,69 @@ def test_build_overpass_query_isolates_power_in_its_own_geom_block():
     power_idx = query.index('"power"')
     geom_idx = query.index("out geom tags;")
     assert center_idx < power_idx < geom_idx
+
+
+def test_build_overpass_query_emits_only_the_requested_categories():
+    """A narrowed selection must narrow the query itself: `way["building"]`
+    alone dominates the response for a city-sized bbox, so fetching it
+    only to filter it out afterwards is pure waste."""
+    query = build_overpass_query(
+        12.0, 42.0, 12.2, 42.2, categories=["hospital", "power"]
+    )
+    assert '"amenity"~"^(hospital)$"' in query
+    assert "school" not in query
+    assert '"building"' not in query
+    assert '"emergency"' not in query
+    assert "motorway" not in query
+    assert '"power"' in query
+    assert query.count("out center tags;") == 1
+    assert query.count("out geom tags;") == 1
+
+
+def test_build_overpass_query_omits_empty_blocks():
+    only_power = build_overpass_query(
+        12.0, 42.0, 12.2, 42.2, categories=["power"]
+    )
+    assert "out center tags;" not in only_power
+    assert only_power.count("out geom tags;") == 1
+
+    no_power = build_overpass_query(
+        12.0, 42.0, 12.2, 42.2, categories=["building"]
+    )
+    assert "out geom tags;" not in no_power
+    assert no_power.count("out center tags;") == 1
+
+
+def test_build_overpass_query_default_is_every_category():
+    assert build_overpass_query(
+        12.0, 42.0, 12.2, 42.2
+    ) == build_overpass_query(
+        12.0, 42.0, 12.2, 42.2, categories=list(POI_CATEGORIES)
+    )
+
+
+def test_fetch_area_pois_caches_each_category_selection_separately(
+    monkeypatch, tmp_path
+):
+    """The cache is keyed by query text, so narrowing the query must not
+    make a narrower selection reuse (or clobber) the full response."""
+    queries = []
+
+    def fake_fetch_overpass(query, **kwargs):
+        queries.append(query)
+        return {"elements": []}
+
+    monkeypatch.setattr(
+        "propagator.io.osm_poi.fetch_overpass", fake_fetch_overpass
+    )
+
+    fetch_area_pois(42.0, 12.0, 1.0, cache_dir=tmp_path)
+    fetch_area_pois(
+        42.0, 12.0, 1.0, cache_dir=tmp_path, categories=["hospital"]
+    )
+
+    assert len(queries) == 2
+    assert queries[0] != queries[1]
 
 
 def test_parse_overpass_elements_node_and_way_center():
@@ -270,70 +334,39 @@ def test_fetch_overpass_raises_after_exhausting_retries(monkeypatch, tmp_path):
         pass
 
 
-def test_fetch_overpass_retries_a_remark_response_and_never_caches_it(
+def test_fetch_overpass_fails_fast_on_a_remark_and_never_caches_it(
     monkeypatch, tmp_path
 ):
-    """Overpass reports query timeouts/rate limiting with HTTP 200 plus a
-    `remark` and a partial `elements` list, which raise_for_status() lets
-    through. Caching that would freeze a truncated POI set for this bbox
-    permanently, so it must be retried like a transport error."""
+    """Overpass reports a server-side query timeout / out-of-memory abort
+    with HTTP 200 plus a `remark` and a partial `elements` list, which
+    raise_for_status() lets through. That outcome is deterministic for
+    the same query, so re-sending it just burns another server-side
+    timeout; and caching it would freeze a truncated POI set for this
+    bbox permanently."""
     attempts = {"n": 0}
 
     class FakeResponse:
-        def __init__(self, payload):
-            self._payload = payload
-
         def raise_for_status(self):
             pass
 
         def json(self):
-            return self._payload
+            return {"remark": "runtime error: Query timed out", "elements": []}
 
     def fake_post(url, data, headers, timeout):
         attempts["n"] += 1
-        if attempts["n"] == 1:
-            return FakeResponse(
-                {"remark": "runtime error: Query timed out", "elements": []}
-            )
-        return FakeResponse({"elements": [{"type": "node", "id": 1}]})
+        return FakeResponse()
 
     monkeypatch.setattr(requests, "post", fake_post)
     monkeypatch.setattr("propagator.io.osm_poi.time.sleep", lambda s: None)
 
-    result = fetch_overpass(
-        "q", cache_dir=tmp_path, max_retries=3, backoff_s=0
-    )
-
-    assert attempts["n"] == 2
-    assert "remark" not in result
-    # only the good response reached the cache: a re-fetch is served from
-    # disk without another request, and still has no remark
-    cached = fetch_overpass("q", cache_dir=tmp_path)
-    assert attempts["n"] == 2
-    assert "remark" not in cached
-
-
-def test_fetch_overpass_raises_when_every_attempt_has_a_remark(
-    monkeypatch, tmp_path
-):
-    class FakeResponse:
-        def raise_for_status(self):
-            pass
-
-        def json(self):
-            return {"remark": "runtime error: out of memory", "elements": []}
-
-    monkeypatch.setattr(
-        requests, "post", lambda url, data, headers, timeout: FakeResponse()
-    )
-    monkeypatch.setattr("propagator.io.osm_poi.time.sleep", lambda s: None)
-
     try:
-        fetch_overpass("q", cache_dir=tmp_path, max_retries=2, backoff_s=0)
+        fetch_overpass("q", cache_dir=tmp_path, max_retries=3, backoff_s=0)
         assert False, "expected OverpassError"
-    except OverpassError:
-        pass
-    assert list(tmp_path.iterdir()) == []
+    except OverpassError as e:
+        assert "Query timed out" in str(e)
+
+    assert attempts["n"] == 1, "a remark must not be retried"
+    assert not (tmp_path / "osm").exists()
 
 
 def test_fetch_area_pois_dedup_keeps_the_copy_carrying_geometry(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import requests
+from pyproj import Transformer
 from rasterio import Affine
 
 from propagator.io.data_prep import (
@@ -11,6 +12,7 @@ from propagator.io.data_prep import (
     dem_tile_urls,
     download_italy_tiles,
     ignition_cell_fuel,
+    latlon_to_rowcol,
     remap_worldcover_to_fuel,
     utm_epsg_for,
     wgs84_bbox_from_center,
@@ -150,6 +152,42 @@ def test_ignition_cell_fuel_inside_and_outside_grid():
     # far outside the grid must be None
     code_outside = ignition_cell_fuel(fuel, transform, 10.0, 10.0, utm_epsg)
     assert code_outside is None
+
+
+def test_latlon_to_rowcol_rejects_points_just_past_the_north_west_edge():
+    """Regression test: the conversion used int(), which truncates toward
+    zero, so a true index in (-1, 0) -- a point up to one cell north or
+    west of the grid -- came back as 0 and passed every caller's
+    `0 <= row < height` bounds check, silently snapping onto the first
+    row/column."""
+    utm_epsg = "EPSG:32633"
+    cellsize = 30.0
+    transform, width, height = build_target_grid(
+        42.4207, 12.1077, 5.0, cellsize, utm_epsg
+    )
+    to_utm = Transformer.from_crs("EPSG:4326", utm_epsg, always_xy=True)
+
+    # a point half a cell outside the north-west corner
+    x0, y0 = transform.c, transform.f
+    lon, lat = to_utm.transform(
+        x0 - cellsize / 2, y0 + cellsize / 2, direction="INVERSE"
+    )
+    row, col = latlon_to_rowcol(transform, utm_epsg, lat, lon)
+
+    assert row == -1 and col == -1
+    assert not (0 <= row < height and 0 <= col < width)
+
+
+def test_latlon_to_rowcol_accepts_a_prebuilt_transformer():
+    utm_epsg = "EPSG:32633"
+    transform, _width, _height = build_target_grid(
+        42.4207, 12.1077, 5.0, 30.0, utm_epsg
+    )
+    to_utm = Transformer.from_crs("EPSG:4326", utm_epsg, always_xy=True)
+
+    assert latlon_to_rowcol(
+        transform, utm_epsg, 42.4207, 12.1077, to_utm=to_utm
+    ) == latlon_to_rowcol(transform, utm_epsg, 42.4207, 12.1077)
 
 
 def test_download_italy_tiles_covers_expected_tile_counts(monkeypatch, tmp_path):
