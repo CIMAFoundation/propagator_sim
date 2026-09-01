@@ -587,6 +587,37 @@ def test_set_boundary_conditions_enqueue_event():
     )
 
 
+def test_ignition_realization_out_of_range_raises():
+    propagator = make_propagator(realizations=2)
+
+    with pytest.raises(ValueError, match="realization index out of range"):
+        propagator.set_boundary_conditions(
+            BoundaryConditions(time=0, ignitions=[(0, 0, 2)])
+        )
+
+
+def test_negative_ignition_realization_raises_instead_of_wrapping():
+    # A negative index would silently address the last realization
+    # through NumPy's wrap-around rather than the intended one.
+    propagator = make_propagator(realizations=2)
+
+    with pytest.raises(ValueError, match="realization index out of range"):
+        propagator.set_boundary_conditions(
+            BoundaryConditions(time=0, ignitions=[(0, 0, -1)])
+        )
+
+
+def test_ignition_mask_with_mismatched_realization_axis_raises():
+    propagator = make_propagator(realizations=2)
+    mask = np.zeros((2, 2, 3), dtype=bool)
+    mask[0, 0, 2] = True
+
+    with pytest.raises(ValueError, match="realization index out of range"):
+        propagator.set_boundary_conditions(
+            BoundaryConditions(time=0, ignitions=mask)
+        )
+
+
 def test_decay_actions_moisture_exponential():
     propagator = make_propagator(realizations=1)
     propagator.actions_moisture = np.full((2, 2), 0.5, dtype=np.float32)
@@ -763,6 +794,28 @@ def test_unburnable_fuel_does_not_propagate_outward():
 
     assert np.all(propagator.fire[4, 4, :] == 1)
     assert np.all(propagator.fire[4, 5, :] == 0)
+
+
+def test_fuel_system_without_a_non_vegetated_fuel_raises():
+    # `_non_vegetated` is the fallback for unknown fuel codes; leaving it
+    # unset turns that fallback into a KeyError inside jitted code.
+    from propagator.core.numba.models import (
+        PropagatorError,
+        fuelsystem_from_dict,
+    )
+
+    fuels = {
+        1: {
+            "name": "burnable",
+            "v0": 60.0,
+            "d0": 1.0,
+            "hhv": 18000.0,
+            "spread_probability": {1: 0.5},
+        }
+    }
+
+    with pytest.raises(PropagatorError, match="no non-vegetated fuel"):
+        fuelsystem_from_dict(fuels)
 
 
 def test_step_applies_event():

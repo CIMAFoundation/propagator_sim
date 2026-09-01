@@ -85,6 +85,11 @@ the top level, the CLI merges them into the first boundary-condition block.
 
 ### Optional inputs
 - Provide a custom fuel model with `--fuel-config example/fuel_config.yaml`.
+  The fuel set must declare at least one non-combustible fuel
+  (`burn: false`, fuel `3` in the example file): it is both the
+  fallback for vegetation codes the fuel system does not know and the
+  code written into the vegetation grid by waterline and firebreak
+  actions. A fuel set without one is rejected when it is loaded.
 - Switch to tiles mode by supplying `--mode tiles --tilespath <tiles_dir>
   [--tileset <name>]` when using staged tiled rasters instead of GeoTIFFs.
 - Add `--verbose` to print progress tables and boundary-condition details.

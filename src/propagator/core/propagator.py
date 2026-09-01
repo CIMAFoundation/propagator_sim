@@ -630,6 +630,23 @@ class Propagator:
                     "If providing a numpy array, expected a 2D or 3D ignition mask."
                 )
 
+            # The realization index addresses the first axis of the
+            # per-realization front arrays. NumPy would either raise an
+            # opaque IndexError mid-run or, for a negative index, wrap
+            # around and silently ignite the wrong realization, so reject
+            # out-of-range values here where the offending input is still
+            # in hand.
+            realizations = np.asarray(realizations)
+            if realizations.size and (
+                int(realizations.min()) < 0
+                or int(realizations.max()) >= self.realizations
+            ):
+                raise ValueError(
+                    "Invalid ignitions in BoundaryConditions: realization "
+                    f"index out of range for {self.realizations} "
+                    "realization(s)."
+                )
+
             fireline_intensity = np.zeros_like(
                 points_repeated[:, 0], dtype=np.float32
             )

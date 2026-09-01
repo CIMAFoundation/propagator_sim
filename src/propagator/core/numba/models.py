@@ -261,6 +261,15 @@ def fuelsystem_from_dict(fuels: dict[int, dict]) -> FuelSystem:
             fuel.get("prob_ign_by_embers", 0.0),
             fuel.get("burn", True),
         )
+    # Unknown fuel codes fall back to the non-vegetated fuel; without one
+    # `_non_vegetated` stays -1 and that fallback becomes a KeyError deep
+    # inside jitted code, so fail here with a legible message instead.
+    if fuelsystem.get_non_vegetated() < 0:
+        raise PropagatorError(
+            "Fuel system defines no non-vegetated fuel: at least one fuel "
+            'must set "burn": false to act as the fallback for unknown '
+            "fuel codes."
+        )
     for from_id, fuel in fuels.items():
         for to_id, prob in fuel["spread_probability"].items():
             fuelsystem.add_transition_probability(from_id, to_id, prob)
