@@ -654,10 +654,10 @@ realizations, while keeping the current public API and event-driven behavior.</p
     - store <code>actions_moisture</code> at reference time <code>t0</code>
     - current value when working on a cell/realization is <code>actions_moisture * decay_factor**(t_now - t0)</code>
     - when adding moisture at <code>t_now</code>, add <code>delta / scale</code> to the stored array</p>
-<p>Session notes and implementation direction
-- Current hot path: <code>Propagator.step()</code> pops a single event time, applies BC, and calls <code>next_updates_fn</code> to generate new updates.
+<p>Session notes and implementation direction (historical: pre-refactor design)
+- Previous hot path: <code>Propagator.step()</code> popped a single event time, applied BC, and called <code>next_updates_fn</code> to generate new updates.
 - The existing <code>Scheduler</code> is Python-side and groups <code>UpdateBatchWithTime</code> by time; this adds overhead at high event counts.
-- <code>next_updates_fn</code> is numba-jitted but works on batches; it returns arrays that then get split/queued in Python.
+- <code>next_updates_fn</code> was numba-jitted but worked on batches; it returned arrays that then got split/queued in Python. It has since been superseded by the front-tracking kernel below (<code>advance_front_until</code>) and no longer exists in the codebase.
 - For performance, the propagation loop should avoid <code>UpdateBatch*</code> in the core loop and run as a numba front-tracking kernel.
 - Proposed kernel structure:
   - Per-realization min-heap (arrays of times/rows/cols/ros/fli, plus size).
