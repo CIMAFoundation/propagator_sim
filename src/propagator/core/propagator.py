@@ -472,7 +472,8 @@ class Propagator:
         Returns
         -------
         numpy.ndarray
-            2D array with mean values where fire has spread; 0 otherwise.
+            2D array with mean values where fire has spread; NaN
+            otherwise (unlike `_compute_variable_max`, which uses 0).
         """
 
         mask = self.fire > 0
@@ -565,8 +566,10 @@ class Propagator:
             )
             event.moisture = (moisture / 100.0).astype(np.float32, copy=True)
         if boundary_condition.wind_dir is not None:
-            # wind direction is given in degrees clockwise, north is 0
-            # we need to transform it to radians, counter-clockwise east is 0
+            # Wind direction is given in degrees clockwise from north;
+            # the kernel uses the same meteorological convention (see
+            # NEIGHBOURS_ANGLE in core/numba/propagation.py), so only the
+            # degrees-to-radians conversion is needed here.
             wind_dir_radians = upcast_to_ndarray(
                 np.radians(boundary_condition.wind_dir), self.dem.shape
             )

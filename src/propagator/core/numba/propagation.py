@@ -386,7 +386,9 @@ def single_cell_updates(
     moisture: npt.NDArray[np.floating]
         The 2D moisture array (units: fraction [0, 1])
     wind_dir: npt.NDArray[np.floating]
-        The 2D wind direction array (units: radians between [-π, π], 0 is east->west)
+        The 2D wind direction array (units: radians, meteorological
+        convention matching NEIGHBOURS_ANGLE: 0 is north->south,
+        increasing clockwise)
     wind_speed: npt.NDArray[np.floating]
         The 2D wind speed array (units: km/h)
     fuels: FuelSystem
