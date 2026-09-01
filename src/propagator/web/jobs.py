@@ -57,6 +57,12 @@ class FrameData:
     # wasted work.
     png_cache: bytes | None = None
     isochrone_cache: list | None = None
+    # Per-sampled-cell results, one entry per POI vertex sampled. Only
+    # needed until they are aggregated per POI into `poi_arrival_cache`,
+    # which is what the API serves and is an order of magnitude smaller
+    # (one entry per POI, not per cell); the router clears this once that
+    # aggregation is done, since these are retained per frame for the
+    # life of the job.
     poi_arrival: tuple[CellArrivalSample, ...] = field(default_factory=tuple)
     poi_arrival_cache: list | None = None
 

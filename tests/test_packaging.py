@@ -21,12 +21,22 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+STATIC_DIR = REPO_ROOT / "src" / "propagator" / "web" / "static"
+
+# A minimum set, asserted by name so the test still fails loudly if the
+# source tree itself were empty/missing. The real check below compares
+# against every file actually present under static/, including
+# subdirectories -- a fixed list is what let the locales/ bundles ship
+# broken: they were added under a new subdirectory that the
+# (non-recursive) `static/*` package-data glob silently skipped, and no
+# expectation here mentioned them.
 EXPECTED_STATIC_FILES = {
     "index.html",
     "app.js",
     "style.css",
     "manual.html",
     "manual.css",
+    "i18n.js",
 }
 
 
@@ -64,4 +74,32 @@ def test_wheel_includes_web_static_assets(built_wheel: Path) -> None:
     assert not missing, (
         f"wheel is missing web UI static assets: {sorted(missing)} "
         f"(found under static/: {sorted(static_files)})"
+    )
+
+
+def test_wheel_includes_every_static_asset_including_subdirectories(
+    built_wheel: Path,
+) -> None:
+    """Compare against the source tree rather than a hand-kept list, so a
+    newly added asset -- or a whole new asset subdirectory -- is covered
+    automatically. `static/locales/{en,it}.json` shipped missing exactly
+    because nothing enumerated them: the app then 404s on every locale
+    fetch and renders raw i18n keys instead of text."""
+    expected = {
+        p.relative_to(STATIC_DIR).as_posix()
+        for p in STATIC_DIR.rglob("*")
+        if p.is_file()
+    }
+    assert expected, f"no static assets found under {STATIC_DIR}"
+
+    with zipfile.ZipFile(built_wheel) as zf:
+        names = [n.replace("\\", "/") for n in zf.namelist()]
+
+    prefix = "propagator/web/static/"
+    shipped = {n[len(prefix) :] for n in names if n.startswith(prefix)}
+
+    missing = expected - shipped
+    assert not missing, (
+        f"wheel is missing web UI static assets: {sorted(missing)} "
+        f"(shipped: {sorted(shipped)})"
     )

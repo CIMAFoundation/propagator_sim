@@ -36,18 +36,20 @@ from propagator.web.schemas import SimulateRequest
 
 logger = logging.getLogger(__name__)
 
-# Sampling budget for POI fire-arrival. Every sampled cell is re-checked
-# each frame and its CellArrivalSample retained for the life of the job,
-# so the cost scales with cells x frames: at the limits `web.schemas`
-# accepts (5000 POIs, 96 frames) an uncapped expansion runs into
-# millions of live dataclasses and a per-frame Python loop to match --
-# none of it covered by CELL_REALIZATION_BUDGET or
-# MAX_ESTIMATED_MEMORY_BYTES, which only budget the simulation arrays.
+# Sampling budget for POI fire-arrival, bounding the *cells* axis only:
+# MAX_VERTICES_PER_POI limits the detail of any one geometry, and
+# MAX_SAMPLE_CELLS the total across them, since the per-POI cap alone
+# still multiplies by the POI count. With the default 1000 POIs both
+# stay clear of the budget, so a typical run is unaffected.
 #
-# MAX_VERTICES_PER_POI bounds the detail of any one geometry;
-# MAX_SAMPLE_CELLS bounds the total, since the per-POI cap alone still
-# multiplies by the POI count. With the default 1000 POIs both stay
-# comfortably clear of the total budget, so the usual run is unaffected.
+# The frames axis is bounded separately, by the router releasing each
+# frame's per-cell samples once it has aggregated them per POI (see
+# `FrameData.poi_arrival`): every sampled cell is otherwise re-checked
+# each frame and retained for the life of the job, so at the limits
+# `web.schemas` accepts (96 frames) cells x frames alone would reach
+# ~10^6 live dataclasses. Neither axis is covered by
+# CELL_REALIZATION_BUDGET or MAX_ESTIMATED_MEMORY_BYTES, which budget
+# the simulation arrays only.
 MAX_VERTICES_PER_POI = 64
 MAX_SAMPLE_CELLS = 10000
 

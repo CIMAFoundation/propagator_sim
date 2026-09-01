@@ -101,6 +101,11 @@ def _poi_arrival_out_list(
                 )
             )
         frame.poi_arrival_cache = out
+        # The per-cell samples were only needed to build the per-POI
+        # aggregate above; keeping both means every frame retains up to
+        # `MAX_SAMPLE_CELLS` dataclasses for the life of the job, on top
+        # of its fire_probability grid.
+        frame.poi_arrival = ()
     return frame.poi_arrival_cache
 
 

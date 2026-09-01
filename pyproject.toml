@@ -117,7 +117,12 @@ where = ["src"]
 # disk from `propagator.web.app`'s `STATIC_DIR`, so it has to ship inside
 # the wheel too, not just the source tree.
 [tool.setuptools.package-data]
-"propagator.web" = ["static/*"]
+# Recursive: `static/*` alone is not, so files in a subdirectory (the
+# i18n locale bundles under static/locales/) were silently left out of
+# the wheel, 404ing at runtime. Keep this a `**` glob so a new asset
+# subdirectory doesn't reintroduce that -- tests/test_packaging.py
+# builds a wheel and asserts the assets are really in it.
+"propagator.web" = ["static/**"]
 
 
 [tool.pytest.ini_options]

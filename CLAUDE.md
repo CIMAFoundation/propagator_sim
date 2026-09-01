@@ -9,30 +9,19 @@ Foundation. It models fire propagation as a stochastic cellular automaton over
 a DEM/vegetation grid, driven by wind, slope, moisture, and fuel-type
 probabilities, with an optional ember-spotting model.
 
-## Git Remotes and Branching
+## Working From a Fork
 
-This checkout is a fork of `CIMAFoundation/propagator_sim`, with three
-remotes configured:
-
-- `origin` — internal repo (`ssh://git@10.196.1.1/...`), VPN-only; the
-  working branch tracks this.
-- `github` — this fork on GitHub (`angelostefani/propagator_sim`); used to
-  open PRs against `upstream`.
-- `upstream` — the original CIMA repo (`CIMAFoundation/propagator_sim`);
-  contributions back to CIMA target `upstream/main`.
-
-Active development branch: `feat/web-ui-enhancements` (web UI: firefighting
-actions, POI reporting, EN/IT localization, Italian manual). It was rebuilt
-from a clean `upstream/main` base *after* PR #33/#34 were merged there,
-specifically so a future PR from this branch shows only the real
-incremental diff. `upstream/main` has continued to evolve independently in
-the meantime (docs, CI workflows) on files this branch doesn't touch —
-**do not `git merge upstream/main` into this branch** without first
-diffing file-by-file: the two histories share no direct common ancestor
-past PR #33, so a full merge produces spurious "add/add" conflicts across
-the entire web package instead of a clean incremental diff. To pick up
-new `upstream/main` changes, cherry-pick or selectively `git checkout
-upstream/main -- <path>` specific files instead.
+When this checkout is a fork of `CIMAFoundation/propagator_sim` (run
+`git remote -v` to see what is configured), be careful merging the
+upstream default branch into a feature branch: the web UI was
+contributed through PRs that were **squash-merged** upstream, so a
+branch carrying the original per-commit history shares no direct common
+ancestor with them. `git merge upstream/main` then reports spurious
+"add/add" conflicts across the whole web package instead of a clean
+incremental diff. Prefer cherry-picking, or `git checkout
+upstream/main -- <path>` for the specific files you want; check
+`git diff --stat upstream/main...HEAD` (three dots — what a PR would
+show) before opening one.
 
 ## Commands
 

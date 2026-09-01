@@ -13,6 +13,8 @@
     waterline_action: "#0e7490",
     heavy_action: "#7c5a24",
   };
+  // Mirrors the #max-pois input's default and io.osm_poi.DEFAULT_MAX_POIS.
+  const DEFAULT_MAX_POIS = 1000;
 
   const state = {
     mode: "center",
@@ -233,7 +235,10 @@
       time_resolution_h: Number(resolutionInput.value),
       isochrone_thresholds: parseIsochroneThresholds(),
       include_pois: includePoisInput.checked,
-      max_pois: Number(maxPoisInput.value),
+      // A cleared number input reads as "", and Number("") is 0, which
+      // trips the server's `ge=1` bound and fails the run with a raw 422
+      // validation blob. Fall back to the field's own default instead.
+      max_pois: Number(maxPoisInput.value) || DEFAULT_MAX_POIS,
       poi_categories: poiCategoryInputs
         .filter((el) => el.checked)
         .map((el) => el.dataset.poiCategory),
@@ -450,9 +455,18 @@
       const label =
         (poi.name ? `${poi.name} (${categoryLabel})` : categoryLabel) +
         (details.length ? ` [${details.join(", ")}]` : "");
-      const tooltip = poi.reached
-        ? i18n.t("poi.tooltip.reachedAt", { label, hours: poi.arrival_time_h.toFixed(1) })
-        : i18n.t("poi.tooltip.notReached", { label });
+      // Keyed on arrival_time_h, not on `reached`: the two are computed
+      // separately server-side (arrival_time_h additionally drops
+      // non-finite values), and calling .toFixed on a null would throw
+      // here and stop the whole frame from rendering, not just this
+      // tooltip.
+      const tooltip =
+        poi.reached && poi.arrival_time_h != null
+          ? i18n.t("poi.tooltip.reachedAt", {
+              label,
+              hours: poi.arrival_time_h.toFixed(1),
+            })
+          : i18n.t("poi.tooltip.notReached", { label });
       // `label` embeds OpenStreetMap tags (name/operator/voltage) verbatim,
       // and Leaflet parses a string tooltip as HTML. Hand it an element
       // whose text is set via textContent instead, so a POI named

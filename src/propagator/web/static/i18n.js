@@ -56,10 +56,16 @@
     return dicts[lang];
   }
 
-  function t(key, vars) {
+  // Returns undefined when no locale defines the key, so callers can
+  // tell "not translated" from "translated to something".
+  function lookup(key) {
     const dict = dicts[currentLang] || {};
     const enDict = dicts.en || {};
-    let str = dict[key] ?? enDict[key] ?? key;
+    return dict[key] ?? enDict[key];
+  }
+
+  function t(key, vars) {
+    let str = lookup(key) ?? key;
     if (vars) {
       for (const [name, value] of Object.entries(vars)) {
         str = str.replaceAll(`{${name}}`, value);
@@ -69,11 +75,19 @@
   }
 
   function applyTranslations() {
+    // Only overwrite when the key actually resolves. index.html ships
+    // readable English in the markup, so if no dictionary loaded (the
+    // locale files 404, the network is down, a proxy returns HTML)
+    // assigning t()'s raw-key fallback would *destroy* that text and
+    // leave the UI reading "run.button" -- strictly worse than leaving
+    // the markup alone.
     document.querySelectorAll("[data-i18n]").forEach((el) => {
-      el.textContent = t(el.dataset.i18n);
+      const text = lookup(el.dataset.i18n);
+      if (text !== undefined) el.textContent = text;
     });
     document.querySelectorAll("[data-i18n-title]").forEach((el) => {
-      el.title = t(el.dataset.i18nTitle);
+      const title = lookup(el.dataset.i18nTitle);
+      if (title !== undefined) el.title = title;
     });
     document.querySelectorAll("[data-lang-btn]").forEach((el) => {
       el.classList.toggle("active", el.dataset.langBtn === currentLang);
