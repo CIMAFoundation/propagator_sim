@@ -5,7 +5,7 @@ on:
         branches:
             - main
         tags:
-            - v*
+            - "v*"
 
 jobs:
     mirror:
@@ -18,10 +18,12 @@ jobs:
                   fetch-depth: 0
                   persist-credentials: false
 
-            - name: Push main to downstream repository
+            - name: Push ref to downstream repository
               env:
                   TARGET_REPO: pcm-dpc/propagator.git
                   PUSH_TOKEN: ${{ secrets.PROPAGATOR_PUSH_TO_PCMDPC_REPO_TOKEN }}
+                  REF_NAME: ${{ github.ref_name }}
+                  REF_TYPE: ${{ github.ref_type }}
               run: |
                   set -euo pipefail
                   if [ -z "${PUSH_TOKEN}" ]; then
@@ -36,7 +38,9 @@ jobs:
                   # Probe access early
                   git ls-remote --heads downstream >/dev/null || { echo "No access to pcm-dpc/propagator with provided token"; exit 1; }
 
-                  # Make lease meaningful
-                  git fetch downstream main || true
-                  git push downstream HEAD:main --force-with-lease=refs/heads/main
-                  git push downstream --prune --tags
+                  if [ "${REF_TYPE}" = "branch" ]; then
+                    git fetch downstream main || true
+                    git push downstream HEAD:main --force-with-lease=refs/heads/main
+                  else
+                    git push downstream "refs/tags/${REF_NAME}:refs/tags/${REF_NAME}"
+                  fi

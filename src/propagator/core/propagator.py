@@ -314,6 +314,10 @@ class Propagator:
             dtype=np.float32,
         )
         if not self.do_spotting:
+            # Fuel systems are mutable jitclasses. Never disable spotting on
+            # the shared module-level default or on an object owned by the
+            # caller: doing so would affect later numba simulations.
+            self.fuels = self.fuels.copy()
             self.fuels.disable_spotting()
         self._fuel_idx = build_fuel_index_grid(self.fuels, self.veg)
         if self.freeze_dir is not None:
@@ -640,49 +644,6 @@ class Propagator:
 
         self.scheduler.add_event(boundary_condition.time, event)
 
-    def _apply_updates(
-        self,
-        updates: UpdateBatch,
-        new_time: int | None = None,
-    ) -> None:
-        """Apply a batch of burning updates to the state.
-        Parameters
-        ----------
-        updates : UpdateBatch
-            Batch of updates to apply at the current time step.
-        new_time : int | None
-            Optional simulation time to set.
-        Returns
-        -------
-        None
-        """
-
-        if new_time is not None:
-            self.time = new_time
-        rows = updates.rows
-        cols = updates.cols
-        realizations = updates.realizations
-        ros = updates.rates_of_spread
-        fireline_intensity = updates.fireline_intensities
-
-        for index in range(len(rows)):
-            realization = int(realizations[index])
-            tile, local_row, local_col = self._state_tile_slot(
-                realization, int(rows[index]), int(cols[index])
-            )
-            self._tile_flags[realization, tile, local_row, local_col] |= (
-                FLAG_FIRE
-            )
-            self._tile_arrival[realization, tile, local_row, local_col] = int(
-                self.time
-            )
-            self._tile_ros[realization, tile, local_row, local_col] = ros[
-                index
-            ]
-            self._tile_fli[realization, tile, local_row, local_col] = (
-                fireline_intensity[index]
-            )
-
     def _schedule_ignitions(
         self, time: int, updates: UpdateBatch | None
     ) -> None:
@@ -823,34 +784,6 @@ class Propagator:
         moisture = np.clip(moisture, 0.0, 1.0).astype(np.float32, copy=False)
 
         return moisture
-
-    def _get_simulation_bbox(self) -> tuple[int, int, int, int]:
-        """Get the bounding box of the simulation area.
-
-        Returns:
-            tuple[int, int, int, int]: (row_min, col_min, row_max, col_max)
-        """
-        n_rows, n_cols = self.veg.shape
-        return (0, 0, n_rows - 1, n_cols - 1)
-
-    def _check_out_of_bounds(self, updates: UpdateBatch) -> None:
-        # check that all updates are within bounds
-        bbox = updates.get_bbox()
-        if bbox is None:
-            return
-
-        update_r0, update_c0, update_r1, update_c1 = bbox
-        sim_bbox = self._get_simulation_bbox()
-        sim_r0, sim_c0, sim_r1, sim_c1 = sim_bbox
-        n_rows, n_cols = self.veg.shape
-        if (
-            update_r0 <= sim_r0
-            or update_c0 <= sim_c0
-            or update_r1 >= n_rows - 1
-            or update_c1 >= n_cols - 1
-        ):
-            raise PropagatorOutOfBoundsError("""Simulation reached the edge of the grid.
-                             To ignore this error, set out_of_bounds_mode to 'ignore'.""")
 
     def _update_boundary_conditions(
         self, time_delta: int, scheduler_event: SchedulerEvent

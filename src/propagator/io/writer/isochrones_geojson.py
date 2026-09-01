@@ -7,16 +7,68 @@ import geopandas as gpd
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from propagator_rust import extract_isochrone as _extract_isochrone_rust
 from pyproj import CRS
+from rasterio.features import shapes  # type: ignore
 from rasterio.transform import Affine  # type: ignore
-from shapely.geometry import MultiLineString
+from scipy.ndimage import binary_dilation, binary_erosion, gaussian_filter1d
+from scipy.signal import medfilt2d
+from shapely.geometry import LineString, MultiLineString, shape
 
 from propagator.core.models import PropagatorOutput
 from propagator.io.geo import GeographicInfo, reproject
 from propagator.io.writer.protocol import IsochronesWriterProtocol
 
 TIME_TAG = "time"
+
+try:
+    from propagator_rust import extract_isochrone as _extract_isochrone_rust
+except ModuleNotFoundError as exc:
+    if exc.name != "propagator_rust":
+        raise
+    _extract_isochrone_rust = None
+
+
+def _smooth_linestring(linestring, smooth_sigma: float) -> LineString:
+    smooth_x = np.asarray(gaussian_filter1d(linestring.xy[0], smooth_sigma))
+    smooth_y = np.asarray(gaussian_filter1d(linestring.xy[1], smooth_sigma))
+    smooth_x[-1] = smooth_x[0]
+    smooth_y[-1] = smooth_y[0]
+    return LineString(zip(smooth_x, smooth_y))
+
+
+def _extract_isochrone_python(
+    values: npt.NDArray[np.floating],
+    transf: Affine,
+    thresholds,
+    med_filt_val: int,
+    min_length: float,
+    smooth_sigma: float,
+) -> dict[float, MultiLineString]:
+    """Portable contour extraction used when the Rust extension is absent."""
+    filt_values = (
+        values
+        if np.sum(values > 0) <= 100
+        else medfilt2d(values, med_filt_val)
+    )
+    results: dict[float, MultiLineString] = {}
+    for threshold in thresholds:
+        mask = (filt_values >= threshold).astype("uint8")
+        mask = binary_dilation(binary_erosion(mask)).astype("uint8")
+        if not np.any(mask):
+            continue
+        lines = []
+        for geometry, value in shapes(mask, transform=transf):
+            if value != 0:
+                continue
+            polygon = shape(geometry)
+            lines.extend(
+                _smooth_linestring(interior, smooth_sigma)
+                for interior in polygon.interiors
+                if interior.length > min_length
+            )
+        if lines:
+            results[float(threshold)] = MultiLineString(lines)
+    return results
 
 
 def extract_isochrone(
@@ -28,27 +80,33 @@ def extract_isochrone(
     smooth_sigma=0.8,
     simp_fact=0.00001,
 ) -> dict[float, MultiLineString]:
-    """Extract filtered probability isochrones through ``propagator_rust``.
+    """Extract filtered probability isochrones.
 
-    ``values`` must be a two-dimensional floating-point array and ``transf``
-    maps pixel-boundary coordinates into the output CRS. The remaining
-    arguments retain the historical Python API; filtering, contour topology,
-    and smoothing are implemented by the mandatory ``propagator-geo`` Rust
-    crate. Thresholds with no surviving pixels are omitted from the mapping.
+    The optional Rust extension is preferred when installed; otherwise a
+    portable SciPy/rasterio implementation provides the same public contract.
     """
-    coords = _extract_isochrone_rust(
-        np.ascontiguousarray(values),
-        (transf.a, transf.b, transf.c, transf.d, transf.e, transf.f),
-        thresholds=[float(threshold) for threshold in thresholds],
-        med_filt_val=int(med_filt_val),
-        min_length=float(min_length),
-        smooth_sigma=float(smooth_sigma),
-        simp_fact=float(simp_fact),
+    if _extract_isochrone_rust is not None:
+        coords = _extract_isochrone_rust(
+            np.ascontiguousarray(values),
+            (transf.a, transf.b, transf.c, transf.d, transf.e, transf.f),
+            thresholds=[float(threshold) for threshold in thresholds],
+            med_filt_val=int(med_filt_val),
+            min_length=float(min_length),
+            smooth_sigma=float(smooth_sigma),
+            simp_fact=float(simp_fact),
+        )
+        return {
+            float(threshold): MultiLineString(lines)
+            for threshold, lines in coords.items()
+        }
+    return _extract_isochrone_python(
+        values,
+        transf,
+        thresholds,
+        int(med_filt_val),
+        float(min_length),
+        float(smooth_sigma),
     )
-    return {
-        float(threshold): MultiLineString(lines)
-        for threshold, lines in coords.items()
-    }
 
 
 @dataclass

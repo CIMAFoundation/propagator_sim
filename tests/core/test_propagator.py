@@ -50,6 +50,25 @@ def test_spotting_probabilities_default_to_zero():
         assert not propagator.get_spotting_receiving().any()
 
 
+def test_disabling_spotting_does_not_mutate_shared_fuels():
+    from propagator.core import FUEL_SYSTEM_LEGACY
+
+    veg = np.full((2, 2), 5, dtype=np.int32)
+    dem = np.zeros((2, 2), dtype=np.float32)
+    spotting_before = FUEL_SYSTEM_LEGACY.spotting.copy()
+
+    without_spotting = Propagator(
+        veg=veg, dem=dem, realizations=1, do_spotting=False
+    )
+
+    np.testing.assert_array_equal(FUEL_SYSTEM_LEGACY.spotting, spotting_before)
+    assert without_spotting.fuels is not FUEL_SYSTEM_LEGACY
+    with_spotting = Propagator(
+        veg=veg, dem=dem, realizations=1, do_spotting=True
+    )
+    assert np.any(with_spotting.fuels.spotting)
+
+
 def ignite_cell(
     propagator: Propagator,
     realization: int,
@@ -59,15 +78,15 @@ def ignite_cell(
     ros: float,
     fli: float,
 ) -> None:
-    """Burn a single cell at a given time through the update machinery."""
-    updates = UpdateBatch(
-        rows=np.array([row], dtype=np.int32),
-        cols=np.array([col], dtype=np.int32),
-        realizations=np.array([realization], dtype=np.int32),
-        rates_of_spread=np.array([ros], dtype=np.float32),
-        fireline_intensities=np.array([fli], dtype=np.float32),
+    """Burn a single cell directly through the sparse-state test seam."""
+    propagator.time = time
+    tile, local_row, local_col = propagator._state_tile_slot(
+        realization, row, col
     )
-    propagator._apply_updates(updates, new_time=time)
+    propagator._tile_flags[realization, tile, local_row, local_col] |= 1
+    propagator._tile_arrival[realization, tile, local_row, local_col] = time
+    propagator._tile_ros[realization, tile, local_row, local_col] = ros
+    propagator._tile_fli[realization, tile, local_row, local_col] = fli
 
 
 def mark_spotting(
@@ -435,29 +454,6 @@ def test_decay_actions_moisture_exponential():
     propagator.actions_moisture = None
     propagator._decay_actions_moisture(time_delta=5, decay_factor=0.1)
     assert propagator.actions_moisture is None
-
-
-def test_apply_updates_updates_state():
-    propagator = make_propagator(realizations=1)
-
-    updates = UpdateBatch(
-        rows=np.array([0], dtype=np.int32),
-        cols=np.array([1], dtype=np.int32),
-        realizations=np.array([0], dtype=np.int32),
-        rates_of_spread=np.array([2.5], dtype=np.float32),
-        fireline_intensities=np.array([7.5], dtype=np.float32),
-    )
-
-    future_time = 5
-    propagator._apply_updates(updates, new_time=future_time)
-
-    assert propagator.get_fire()[0, 0, 1] == 1
-    assert propagator.get_arrival_time()[0, 0, 1] == future_time
-    assert propagator.get_ros()[0, 0, 1] == pytest.approx(2.5)
-    assert propagator.get_fireline_int()[0, 0, 1] == pytest.approx(7.5)
-
-    time = propagator.time
-    assert time == future_time
 
 
 def test_step_applies_event():

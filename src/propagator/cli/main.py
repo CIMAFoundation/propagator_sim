@@ -433,6 +433,7 @@ def main() -> None:
             veg=veg,
             realizations=cfg.realizations,
             fuels=fuel_system,
+            cellsize=cfg.cellsize,
             do_spotting=cfg.do_spotting,
             origin=origin,
             seed=cli.seed,

@@ -19,6 +19,7 @@
 - **Simulation engine**: the `propagator.core` package evolves ignition grids, applies stochastic spread models, and handles boundary conditions.
 - **Data access**: helpers under `propagator.io` prepare GeoTIFFs or tiled rasters and emit GeoTIFF, GeoJSON, and JSON outputs.
 - **Command line tools**: the `propagator` CLI orchestrates runs, handles configuration files, and writes time-stepped products to disk.
+- **Local web demo**: an optional debug and demonstration interface for trying scenarios, firefighting actions, and animated outputs in a browser.
 - **Documentation + API reference**: MkDocs pages provide operator guides, while mkdocstrings renders the public Python API.
 
 ## Typical Workflow
@@ -31,6 +32,7 @@
 - [Getting started](getting-started.md): prerequisites, install, first simulation, and programmatic API tips
 - [Programmatic Workflow](programmatic.md): end-to-end scripting with loaders and writers
 - [CLI](cli.md): command options, modes, and logging
+- [Local Web Demo](web.md): optional map-based debugging and demonstration interface
 - [Simulation Outputs](outputs.md): output fields, units, and aggregation across realizations
 - [Fire Spotting](spotting.md): ember-transport model, configuration, and outputs
 - [API](reference/index.md): Python package and Numba backend reference

@@ -135,6 +135,12 @@ work/
 
 .DS_Store
 
+output/
+results/
+example/*.xml
 benchmarks/results/
 example/*/output*/
 example/*/freeze/
+
+# Generated public-data tiles and prepared rasters.
+example/italy/*/

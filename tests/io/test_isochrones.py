@@ -1,9 +1,10 @@
 import numpy as np
-import propagator_rust
 import pytest
 from affine import Affine
 
 from propagator.io.writer.isochrones_geojson import extract_isochrone
+
+propagator_rust = pytest.importorskip("propagator_rust")
 
 
 def _block(dtype=np.float64):

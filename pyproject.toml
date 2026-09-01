@@ -41,10 +41,36 @@ io = [
     "utm>=0.8.1",
     "affine>=2.4.0",
     "geopandas>=1.1.1",
+    "requests>=2.32",
 ]
 
 ff = [
     "netCDF4>=1.7.2",
+]
+
+# Optional local map-based debugging and demonstration interface.
+web = [
+    "angles>=2.0",
+    "fiona>=1.10.1",
+    "pyproj>=3.7.2",
+    "rasterio>=1.4.3",
+    "shapely>=2.1.1",
+    "utm>=0.8.1",
+    "affine>=2.4.0",
+    "geopandas>=1.1.1",
+    "requests>=2.32",
+    "pydantic>=2.12.3",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pillow>=11.0",
+]
+
+docs = [
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.6.22",
+    "mkdocstrings[python]>=0.30.1",
+    "mike>=2.1.3",
+    "matplotlib>=3.10.7",
 ]
 
 [dependency-groups]
@@ -86,6 +112,9 @@ include-package-data = false
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"propagator.web" = ["static/*"]
+
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -103,6 +132,7 @@ ignore = ["E203", "E501"]
 [project.scripts]
 propagator = "propagator.cli.main:main"
 propagator-ff = "propagator.cli.ff_main:main"
+propagator-web = "propagator.web.server:main"
 
 [project.urls]
 Homepage = "https://github.com/CIMAFoundation/propagator_sim"

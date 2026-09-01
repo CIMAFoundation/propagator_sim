@@ -9,7 +9,7 @@ def test_parse_actions_accepts_canonical_waterline():
     assert data == {}
     assert len(actions) == 1
     assert isinstance(actions[0], WaterlineAction)
-    assert actions[0].action_type == ActionType.WATERLINE
+    assert actions[0].action_type == ActionType.WATERLINE_ACTION
 
 
 def test_parse_actions_accepts_legacy_waterline_action():
@@ -20,7 +20,7 @@ def test_parse_actions_accepts_legacy_waterline_action():
     assert data == {}
     assert len(actions) == 1
     assert isinstance(actions[0], WaterlineAction)
-    assert actions[0].action_type == ActionType.WATERLINE
+    assert actions[0].action_type == ActionType.WATERLINE_ACTION
 
 
 def test_parse_actions_combines_waterline_aliases():

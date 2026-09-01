@@ -23,6 +23,7 @@ nav:
   - Interactive Demo: demo.md
   - Programmatic Workflow: programmatic.md
   - CLI Usage: cli.md
+  - Local Web Demo: web.md
   - Simulation Outputs: outputs.md
   - Fire Spotting: spotting.md
   - Checkpoints & Domain Growth: checkpoints.md

@@ -14,11 +14,7 @@ from typing import Dict, Iterator, List, Optional, Tuple
 import numpy as np
 import numpy.typing as npt
 
-from propagator.core.constants import NO_FUEL
-from propagator.core.models import (
-    UpdateBatch,
-    UpdateBatchWithTime,
-)
+from propagator.core.models import UpdateBatch
 
 PopResult = Tuple[int, "SchedulerEvent"]
 
@@ -62,7 +58,7 @@ class SchedulerEvent:
             self.vegetation_changes = other.vegetation_changes
         elif other.vegetation_changes is not None:
             self.vegetation_changes = np.where(
-                other.vegetation_changes == NO_FUEL,
+                np.isnan(other.vegetation_changes),
                 self.vegetation_changes,
                 other.vegetation_changes,
             )
@@ -98,12 +94,8 @@ class SortedDict:
     def __setitem__(self, key: int, value: SchedulerEvent) -> None:
         """Insert or update an event at a given time.
 
-        OPTIMIZATION: Uses bisect.insort for O(n) insertion into sorted list
-        instead of append + sort which would be O(n log n). This matters
-        because push_updates is called for every burning cell at every time step.
-
-        The 'if key not in self._order' check prevents duplicate keys in the
-        sorted list when updating an existing time slot.
+        Uses bisect.insort for ordered insertion. The membership check prevents
+        duplicate keys when an existing time slot is updated.
         """
         self._data[key] = value
         if key not in self._order:
@@ -167,49 +159,6 @@ class Scheduler:
 
     # --- Basic queue ops -----------------------------------------------------
 
-    def push_updates(self, updates: UpdateBatchWithTime) -> None:
-        """Add a batch of time-stamped updates to the scheduler.
-
-        This is the HOT PATH of the simulation - called once per step with
-        all new fire spread updates. Optimizations here have outsized impact.
-
-        OPTIMIZATION NOTES:
-        1. split_by_time() creates separate UpdateBatch per time value
-           - Fast path when all updates at same time (common case)
-           - Lazy bbox calculation avoids min/max overhead
-
-        2. SortedDict uses bisect.insort() for O(n) insertion vs O(n log n)
-           - Critical because we insert many events per step
-
-        3. extend() merges updates efficiently without redundant bbox calculation
-
-        The flow is:
-        UpdateBatchWithTime -> split by time -> UpdateBatch per time slot
-                            -> merge into existing events or create new ones
-                            -> bisect.insort into sorted event queue
-
-        Parameters
-        ----------
-        updates : UpdateBatchWithTime
-            Batch of updates with associated ignition times
-        """
-        event: SchedulerEvent | None
-        # Split updates by time (optimized - see split_by_time comments)
-        updates_at_time_dict = updates.split_by_time()
-
-        # Merge updates into existing time slots or create new ones
-        for time, update in updates_at_time_dict.items():
-            if time in self._queue:
-                # Time slot exists - merge updates via extend()
-                event = self._queue.get(time)
-            else:
-                event = SchedulerEvent()
-                self._queue[time] = event
-            if event is None:
-                raise ValueError("SchedulerEvent should not be None here")
-
-            event.updates.extend(update)
-
     def pop(self) -> PopResult:
         if not self:
             raise IndexError("pop from empty Scheduler")
@@ -232,13 +181,6 @@ class Scheduler:
             self._queue[time] = event
         else:
             entry.update(event)
-
-    def active(self) -> npt.NDArray[np.integer]:
-        arrays = [event.updates.realizations for event in self._queue.values()]
-        if len(arrays) == 0:
-            return np.array([], dtype=np.int32)
-        stacked = np.concatenate(arrays)
-        return np.unique(stacked)
 
     def __len__(self) -> int:
         return len(self._queue)
