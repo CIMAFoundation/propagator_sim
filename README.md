@@ -3,9 +3,9 @@
 PROPAGATOR is an operational wildfire spread model developed by
 [CIMA Research Foundation](https://www.cimafoundation.org). The project couples
 a Numba-accelerated cellular automata core (`propagator.core`), reusable I/O
-pipelines (`propagator.io`), and a configurable CLI for stochastic
-fire propagation modeling. Comprehensive documentation lives under `docs/`, covering quick starts, API reference, and
-programmatic guides.
+pipelines (`propagator.io`), and a configurable CLI for stochastic fire
+propagation modeling. Comprehensive documentation lives under `docs/`, covering
+quick starts, API reference, and programmatic guides.
 
 ## Quick Start
 
@@ -25,6 +25,26 @@ pip install -e '.[cli,io]'
 
 This installs the PROPAGATOR package in editable mode together with the optional
 extras required for raster handling, the CLI, and documentation tooling.
+
+### Optional Local Web Demo
+
+For debugging or demonstrations, launch the optional map-based interface:
+
+```bash
+uv sync --extra web
+uv run propagator-web
+```
+
+Open <http://127.0.0.1:8765>, choose the area and ignition on the map, set the
+weather and simulation parameters, then run the scenario. Before starting, you
+can draw and schedule Canadair, helicopter, waterline, and heavy-vehicle
+interventions. Results update frame by frame with probability heatmaps,
+isochrones, area statistics, and a growth chart. The **Manual** link in
+the app explains inputs, outputs, wildfire behaviour, and model limits in plain
+English.
+
+See [`docs/web.md`](docs/web.md) for the full guide. The server binds to
+`127.0.0.1` and is intended for local use only.
 
 ## Running Simulations
 
@@ -94,6 +114,8 @@ The MkDocs site covers:
   setup, quick run instructions, and programmatic usage tips.
 - **CLI Usage** (`docs/cli.md`): operating modes, flag reference, output
   products, and troubleshooting.
+- **Local Web Demo** (`docs/web.md`): optional map-based debugging and
+  demonstration interface with firefighting actions and animated results.
 - **Programmatic Workflow** (`docs/programmatic.md`): loader/writer pipeline
   example with `propagator.io`.
 - **API Reference** (`docs/reference/`): mkdocstrings pages for the core,

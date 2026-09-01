@@ -34,7 +34,34 @@ pip install -e '.[cli,io]'
 If you only need the simulation engine (without CLI/I/O helpers) drop the
 extras from the install command.
 
-## First Simulation
+To use the interactive browser interface, install the `web` extra instead:
+
+```bash
+pip install -e '.[web]'
+```
+
+`uv sync --dev --all-extras` already includes it.
+
+## Optional Local Web Demo
+
+For debugging and demonstrations, run the local web server and open the
+address it prints:
+
+```bash
+uv run propagator-web
+```
+
+The demo is available at <http://127.0.0.1:8765>. Pick the simulation center
+and ignition on the map, configure the weather and duration, and select
+**Run simulation**. You can also draw intervention lines and schedule
+Canadair, helicopter, waterline, or heavy-vehicle actions before starting.
+
+The first run in an area downloads terrain and land-cover data. See the
+[Local Web Demo](web.md) guide for the complete workflow, result
+interpretation, cache details, and the link to the built-in plain-English
+manual.
+
+## First CLI Simulation
 
 The repository ships with small GeoTIFF datasets and configuration files under
 `example/`. Run a simulation in GeoTIFF mode with:
