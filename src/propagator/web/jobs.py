@@ -19,13 +19,16 @@ from typing import Callable
 import numpy as np
 import numpy.typing as npt
 
+from propagator.core.models import CellArrivalSample
 from propagator.io.geo import GeographicInfo
+from propagator.io.osm_poi import POI
 from propagator.web.schemas import SimulateRequest
 
 
 class JobStatus(str, Enum):
     PENDING = "pending"
     PREPARING_DATA = "preparing_data"
+    FETCHING_POIS = "fetching_pois"
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
@@ -44,6 +47,8 @@ class FrameData:
     # wasted work.
     png_cache: bytes | None = None
     isochrone_cache: list | None = None
+    poi_arrival: tuple[CellArrivalSample, ...] = field(default_factory=tuple)
+    poi_arrival_cache: list | None = None
 
 
 @dataclass
@@ -58,8 +63,11 @@ class JobState:
     frames: dict[int, FrameData] = field(default_factory=dict)
     geo_info: GeographicInfo | None = None
     warning: str | None = None
+    poi_warning: str | None = None
     error: str | None = None
     cancel_requested: bool = False
+    pois: list[POI] = field(default_factory=list)
+    poi_cells: list[tuple[str, int, int]] = field(default_factory=list)
 
 
 class JobBusyError(Exception):
@@ -81,7 +89,12 @@ class JobManager:
             active = [
                 j
                 for j in self._jobs.values()
-                if j.status in (JobStatus.PENDING, JobStatus.PREPARING_DATA, JobStatus.RUNNING)
+                if j.status
+                in (
+                    JobStatus.PENDING,
+                    JobStatus.PREPARING_DATA,
+                    JobStatus.RUNNING,
+                )
             ]
             if active:
                 raise JobBusyError(

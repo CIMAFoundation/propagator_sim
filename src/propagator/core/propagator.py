@@ -15,6 +15,8 @@ import numpy as np
 import numpy.typing as npt
 
 from propagator.core.constants import (
+    BYRAM_FLAME_LENGTH_COEFF,
+    BYRAM_FLAME_LENGTH_EXPONENT,
     CELLSIZE,
     MOISTURE_MODEL_DEFAULT,
     REALIZATIONS,
@@ -22,6 +24,7 @@ from propagator.core.constants import (
 )
 from propagator.core.models import (
     BoundaryConditions,
+    CellArrivalSample,
     PropagatorOutput,
     PropagatorStats,
     UpdateBatch,
@@ -42,6 +45,17 @@ class PropagatorOutOfBoundsError(Exception):
     """Custom error for out-of-bounds updates in the Propagator."""
 
     pass
+
+
+def _byram_flame_length(
+    fireline_int: npt.NDArray[np.floating],
+) -> npt.NDArray[np.floating]:
+    """Vectorized Byram (1959) flame length (m) from fireline
+    intensity (kW/m)."""
+    safe = np.maximum(fireline_int, 0.0)
+    return BYRAM_FLAME_LENGTH_COEFF * np.power(
+        safe, BYRAM_FLAME_LENGTH_EXPONENT
+    )
 
 
 @dataclass
@@ -318,6 +332,82 @@ class Propagator:
             2D array of mean intensity values.
         """
         return self._compute_variable_mean(self.fireline_int)
+
+    def compute_flame_length_max(self) -> npt.NDArray[np.floating]:
+        """Return per-cell maximum Byram flame length (m) across
+        realizations, derived from the maximum fireline intensity.
+
+        Byram's flame-length relation is monotonically increasing in
+        intensity, so max(flame_length) == flame_length(max(intensity)).
+
+        Returns
+        -------
+        numpy.ndarray
+            2D array of max flame length values (m).
+        """
+        fli_max = self.compute_fireline_int_max()
+        return _byram_flame_length(fli_max).astype(np.float32)
+
+    def compute_flame_length_mean(self) -> npt.NDArray[np.floating]:
+        """Return per-cell mean Byram flame length (m), ignoring zeros
+        as no-spread.
+
+        Computed as the true per-realization mean of flame length (not
+        the flame length of the mean intensity), consistent with
+        compute_fireline_int_mean.
+
+        Returns
+        -------
+        numpy.ndarray
+            2D array of mean flame length values (m).
+        """
+        return self._compute_variable_mean(
+            _byram_flame_length(self.fireline_int)
+        )
+
+    def sample_cells(
+        self, cells: list[tuple[str, int, int]]
+    ) -> tuple[CellArrivalSample, ...]:
+        """Sample already-computed per-cell arrival time at arbitrary
+        (row, col) locations, keyed by an opaque caller-supplied id.
+
+        Generic, grid-index-only utility with no knowledge of lat/lon or
+        POI semantics — that mapping is an io/web-layer concern.
+
+        Returns
+        -------
+        tuple[CellArrivalSample, ...]
+            One sample per requested cell, in the same order. A cell
+            outside the grid bounds is reported as unreached rather than
+            raising.
+        """
+        if not cells:
+            return ()
+        fire_probability = self.compute_fire_probability()
+        min_arrival = self.compute_arrival_time_min()
+        mean_arrival = self.compute_arrival_time_mean()
+        height, width = fire_probability.shape
+        samples = []
+        for key, row, col in cells:
+            if not (0 <= row < height and 0 <= col < width):
+                samples.append(
+                    CellArrivalSample(
+                        key, row, col, False, float("nan"), float("nan")
+                    )
+                )
+                continue
+            reached = bool(fire_probability[row, col] > 0)
+            samples.append(
+                CellArrivalSample(
+                    key,
+                    row,
+                    col,
+                    reached,
+                    float(min_arrival[row, col]) if reached else float("nan"),
+                    float(mean_arrival[row, col]) if reached else float("nan"),
+                )
+            )
+        return tuple(samples)
 
     def _compute_variable_mean(
         self, the_var: npt.NDArray[np.floating]
@@ -775,8 +865,16 @@ class Propagator:
                 min_time = time
         return min_time
 
-    def get_output(self) -> PropagatorOutput:
+    def get_output(
+        self, sample_cells: list[tuple[str, int, int]] | None = None
+    ) -> PropagatorOutput:
         """Assemble the current outputs and summary stats into a dataclass.
+
+        Args:
+            sample_cells: optional list of (key, row, col) to sample the
+                arrival-time grid at, e.g. for reporting when named
+                points of interest are reached by the fire front. See
+                `sample_cells`.
 
         Returns:
             PropagatorOutput: Snapshot of fire probability,
@@ -795,7 +893,10 @@ class Propagator:
         ros_mean = self.compute_ros_mean()
         fireline_intensity_max = self.compute_fireline_int_max()
         fireline_intensity_mean = self.compute_fireline_int_mean()
+        flame_length_max = self.compute_flame_length_max()
+        flame_length_mean = self.compute_flame_length_mean()
         stats = self.compute_stats(fire_probability)
+        poi_arrival = self.sample_cells(sample_cells) if sample_cells else ()
 
         return PropagatorOutput(
             time=int(self.time),
@@ -808,7 +909,10 @@ class Propagator:
             ros_max=ros_max,
             fli_mean=fireline_intensity_mean,
             fli_max=fireline_intensity_max,
+            flame_length_mean=flame_length_mean,
+            flame_length_max=flame_length_max,
             stats=stats,
+            poi_arrival=poi_arrival,
         )
 
     def next_time(self) -> int | None:

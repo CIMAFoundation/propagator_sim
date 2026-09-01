@@ -257,6 +257,8 @@ def main() -> None:
         "fireline_intensity_max": lambda output: output.fli_max,
         "ros_mean": lambda output: output.ros_mean,
         "ros_max": lambda output: output.ros_max,
+        "flame_length_mean": lambda output: output.flame_length_mean,
+        "flame_length_max": lambda output: output.flame_length_max,
     }
     if cfg.do_spotting:
         raster_variables_mapping.update(

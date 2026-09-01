@@ -11,8 +11,16 @@
   <header>
     <h1>PROPAGATOR</h1>
     <span class="subtitle">user manual</span>
+    <a class="manual-lang-link" href="manual.it.html" data-set-lang="it">IT</a>
     <a class="back-link" href="/index.html">&larr; Back to the simulation</a>
   </header>
+  <script>
+    document.querySelectorAll("[data-set-lang]").forEach((el) => {
+      el.addEventListener("click", () => {
+        try { localStorage.setItem("propagator_lang", el.dataset.setLang); } catch {}
+      });
+    });
+  </script>
 
   <main class="manual">
     <nav class="manual-toc" aria-label="Table of contents">
@@ -25,6 +33,7 @@
         <li><a href="#algorithm">How the algorithm works (in plain terms)</a></li>
         <li><a href="#outputs">The outputs and how to read them</a></li>
         <li><a href="#actions">Firefighting actions</a></li>
+        <li><a href="#api">Using the API directly</a></li>
         <li><a href="#limits">Limits of the model</a></li>
       </ol>
     </nav>
@@ -418,8 +427,113 @@
         </dl>
       </section>
 
+      <section id="api">
+        <h2>8. Using the API directly</h2>
+        <p>
+          Everything the web interface does goes through a plain REST
+          API, which you can call directly from a script, `curl`, or any
+          HTTP client &mdash; useful for automating runs or integrating
+          PROPAGATOR into another tool. The server has <strong>no
+          login</strong> and runs <strong>one simulation job at a
+          time</strong> for the whole server (a second request while one
+          is running gets an HTTP 429), so treat it as a shared,
+          trusted-network tool, not a multi-tenant service.
+        </p>
+        <p>
+          An interactive OpenAPI explorer is always available at
+          <code>/docs</code> (Swagger UI) and <code>/redoc</code>, with
+          the full request/response schema at <code>/openapi.json</code>.
+        </p>
+        <h3>Endpoints</h3>
+        <table>
+          <thead>
+            <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>POST</td>
+              <td><code>/api/simulate</code></td>
+              <td>Start a new simulation job; returns <code>{"id": "..."}</code> (HTTP 202)</td>
+            </tr>
+            <tr>
+              <td>GET</td>
+              <td><code>/api/simulate/{job_id}</code></td>
+              <td>Job status/progress (pending, preparing_data, running, done, failed, cancelled)</td>
+            </tr>
+            <tr>
+              <td>GET</td>
+              <td><code>/api/simulate/{job_id}/frames</code></td>
+              <td>Bounds and the list of available time frames, with their stats history</td>
+            </tr>
+            <tr>
+              <td>GET</td>
+              <td><code>/api/simulate/{job_id}/frame/{time_s}</code></td>
+              <td>Isochrones (GeoJSON-style coordinates) and stats for one frame</td>
+            </tr>
+            <tr>
+              <td>GET</td>
+              <td><code>/api/simulate/{job_id}/frame/{time_s}/image.png</code></td>
+              <td>The fire-probability heatmap for that frame, as a PNG</td>
+            </tr>
+            <tr>
+              <td>POST</td>
+              <td><code>/api/simulate/{job_id}/cancel</code></td>
+              <td>Request cancellation of a running job</td>
+            </tr>
+            <tr>
+              <td>DELETE</td>
+              <td><code>/api/simulate/{job_id}</code></td>
+              <td>Remove a finished job's state from the server</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Request body</h3>
+        <p>
+          <code>POST /api/simulate</code> takes a JSON body with the
+          same fields described in section 4 (<code>center_lat</code>,
+          <code>center_lon</code>, <code>radius_km</code>,
+          <code>cellsize</code>, <code>ignition_lat</code>,
+          <code>ignition_lon</code>, <code>wind_dir</code>,
+          <code>wind_speed</code>, <code>moisture</code>,
+          <code>realizations</code>, <code>do_spotting</code>,
+          <code>time_limit_h</code>, <code>time_resolution_h</code>,
+          <code>isochrone_thresholds</code>, and an optional
+          <code>actions</code> list &mdash; see section 7 for the
+          action fields). The same guardrails described throughout this
+          manual apply and are enforced server-side: an out-of-range or
+          overly expensive combination is rejected with HTTP 422 before
+          a job is even created.
+        </p>
+        <h3>Example: run a simulation end to end with curl</h3>
+        <pre><code>BASE=http://127.0.0.1:8765
+
+# 1. Start the job
+JOB_ID=$(curl -s -X POST "$BASE/api/simulate" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "center_lat": 44.40, "center_lon": 8.93,
+        "radius_km": 10, "cellsize": 30,
+        "ignition_lat": 44.42, "ignition_lon": 8.95,
+        "wind_dir": 45, "wind_speed": 25, "moisture": 10,
+        "realizations": 10, "time_limit_h": 6,
+        "time_resolution_h": 1
+      }' | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+# 2. Poll status until it's done
+until [ "$(curl -s $BASE/api/simulate/$JOB_ID | python3 -c \
+    "import sys,json; print(json.load(sys.stdin)['status'])")" = "done" ]; do
+  sleep 5
+done
+
+# 3. List the available frames
+curl -s "$BASE/api/simulate/$JOB_ID/frames"
+
+# 4. Fetch the last frame's heatmap image
+curl -s "$BASE/api/simulate/$JOB_ID/frame/21600/image.png" -o frame.png</code></pre>
+      </section>
+
       <section id="limits">
-        <h2>8. Limits of the model</h2>
+        <h2>9. Limits of the model</h2>
         <p>
           PROPAGATOR relies on real data (terrain relief, land cover)
           and on fire-behavior models calibrated on observations and

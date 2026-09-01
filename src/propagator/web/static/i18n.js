@@ -1,0 +1,74 @@
+(() => {
+  "use strict";
+
+  const LANGS = ["en", "it"];
+  const STORAGE_KEY = "propagator_lang";
+  const dicts = {};
+  let currentLang = "en";
+
+  function detectLang() {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored && LANGS.includes(stored)) return stored;
+    const browserLang = (navigator.language || navigator.languages?.[0] || "en").slice(0, 2);
+    return LANGS.includes(browserLang) ? browserLang : "en";
+  }
+
+  async function loadDict(lang) {
+    if (dicts[lang]) return dicts[lang];
+    try {
+      const res = await fetch(`/locales/${lang}.json`);
+      dicts[lang] = await res.json();
+    } catch {
+      dicts[lang] = {};
+    }
+    return dicts[lang];
+  }
+
+  function t(key, vars) {
+    const dict = dicts[currentLang] || {};
+    const enDict = dicts.en || {};
+    let str = dict[key] ?? enDict[key] ?? key;
+    if (vars) {
+      for (const [name, value] of Object.entries(vars)) {
+        str = str.replaceAll(`{${name}}`, value);
+      }
+    }
+    return str;
+  }
+
+  function applyTranslations() {
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      el.textContent = t(el.dataset.i18n);
+    });
+    document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+      el.title = t(el.dataset.i18nTitle);
+    });
+    document.querySelectorAll("[data-lang-btn]").forEach((el) => {
+      el.classList.toggle("active", el.dataset.langBtn === currentLang);
+    });
+  }
+
+  async function setLang(lang) {
+    if (!LANGS.includes(lang)) return;
+    currentLang = lang;
+    localStorage.setItem(STORAGE_KEY, lang);
+    document.documentElement.lang = lang;
+    await loadDict(lang);
+    applyTranslations();
+    window.dispatchEvent(new CustomEvent("langchange", { detail: { lang } }));
+  }
+
+  function getLang() {
+    return currentLang;
+  }
+
+  async function init() {
+    currentLang = detectLang();
+    document.documentElement.lang = currentLang;
+    await Promise.all([loadDict("en"), currentLang !== "en" ? loadDict(currentLang) : null]);
+    applyTranslations();
+    window.dispatchEvent(new CustomEvent("langchange", { detail: { lang: currentLang } }));
+  }
+
+  window.i18n = { t, setLang, getLang, applyTranslations, ready: init() };
+})();

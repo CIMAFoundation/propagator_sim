@@ -11,11 +11,29 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from propagator.io.osm_poi import DEFAULT_MAX_POIS, POI_CATEGORIES
+
 # Rough compute budget: grid cells (width * height) times realizations.
 # A 15 km-radius/30 m-cellsize grid (1000x1000) at 10 realizations is
 # ~1e7 and runs in well under a minute; this caps combinations an order
 # of magnitude above that, which already take several minutes locally.
 CELL_REALIZATION_BUDGET = 2.5e8
+
+# Kept in sync manually with `propagator.io.osm_poi.POI_CATEGORIES`
+# (Literal needs a static value list, so it can't just reuse the tuple).
+PoiCategory = Literal[
+    "hospital",
+    "fire_station",
+    "police",
+    "school",
+    "emergency",
+    "road",
+    "building",
+    "power",
+]
+assert set(PoiCategory.__args__) == set(POI_CATEGORIES), (
+    "PoiCategory has drifted from propagator.io.osm_poi.POI_CATEGORIES"
+)
 
 # Byte-accurate memory budget, mirroring the arrays
 # `Propagator.__post_init__` allocates (core/propagator.py): the
@@ -63,7 +81,7 @@ class ActionRequest(BaseModel):
 class SimulateRequest(BaseModel):
     center_lat: float = Field(..., ge=-90, le=90)
     center_lon: float = Field(..., ge=-180, le=180)
-    radius_km: float = Field(15.0, gt=0, le=50)
+    radius_km: float = Field(10.0, gt=0, le=50)
     cellsize: float = Field(30.0, ge=20, le=100)
 
     ignition_lat: float = Field(..., ge=-90, le=90)
@@ -78,7 +96,7 @@ class SimulateRequest(BaseModel):
     realizations: int = Field(10, ge=1, le=50)
     do_spotting: bool = False
 
-    time_limit_h: float = Field(6.0, gt=0, le=48)
+    time_limit_h: float = Field(12.0, gt=0, le=48)
     time_resolution_h: float = Field(1.0, gt=0, le=6)
 
     isochrone_thresholds: list[float] = Field(
@@ -86,6 +104,26 @@ class SimulateRequest(BaseModel):
     )
 
     actions: list[ActionRequest] = Field(default_factory=list)
+
+    include_pois: bool = Field(
+        True,
+        description="Fetch OpenStreetMap points of interest (hospitals, "
+        "schools, fire/police stations, power infrastructure, major "
+        "roads, buildings) in the area and report fire arrival at each.",
+    )
+    max_pois: int = Field(
+        DEFAULT_MAX_POIS,
+        ge=1,
+        le=5000,
+        description="Cap on the number of POIs fetched for the area "
+        "(higher-priority categories and those closest to the center "
+        "are kept first when there would be more).",
+    )
+    poi_categories: list[PoiCategory] = Field(
+        default_factory=lambda: list(POI_CATEGORIES),
+        description="Which POI categories to fetch/report. Defaults to "
+        "every category.",
+    )
 
     @model_validator(mode="after")
     def _check_compute_budget(self) -> "SimulateRequest":
@@ -143,6 +181,7 @@ class JobSummary(BaseModel):
     current_time_s: int
     time_limit_s: int
     warning: str | None = None
+    poi_warning: str | None = None
     error: str | None = None
 
 
@@ -155,12 +194,27 @@ class FrameStats(BaseModel):
     area_90: float
 
 
+class POIOut(BaseModel):
+    id: str
+    name: str | None
+    category: str
+    lat: float
+    lon: float
+    voltage: str | None = None
+    operator: str | None = None
+    # Full (lat, lon) vertex list for a line/polygon POI (e.g. a power
+    # line), so the map can draw its actual path instead of a single
+    # point; None for a plain point POI.
+    geometry: list[tuple[float, float]] | None = None
+
+
 class JobFrames(BaseModel):
     id: str
     status: str
     bounds_wgs84: tuple[float, float, float, float] | None = None
     frame_times_s: list[int]
     stats_history: list[FrameStats]
+    pois: list[POIOut] = Field(default_factory=list)
 
 
 class Isochrone(BaseModel):
@@ -168,7 +222,20 @@ class Isochrone(BaseModel):
     coordinates: list[list[list[float]]]  # MultiLineString coordinates
 
 
+class POIArrivalOut(BaseModel):
+    id: str
+    name: str | None
+    category: str
+    lat: float
+    lon: float
+    voltage: str | None = None
+    operator: str | None = None
+    reached: bool
+    arrival_time_h: float | None
+
+
 class FrameOut(BaseModel):
     time_s: int
     isochrones: list[Isochrone]
     stats: FrameStats
+    poi_arrival: list[POIArrivalOut] = Field(default_factory=list)

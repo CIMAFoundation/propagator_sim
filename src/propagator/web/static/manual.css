@@ -11,8 +11,22 @@ body.manual-page header {
   z-index: 1;
 }
 
-body.manual-page .back-link {
+body.manual-page .manual-lang-link {
   margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+  text-decoration: none;
+  white-space: nowrap;
+  border: 1px solid var(--line);
+  padding: 2px 6px;
+}
+
+body.manual-page .manual-lang-link:hover {
+  color: var(--accent-fire);
+  border-color: var(--accent-fire);
+}
+
+body.manual-page .back-link {
   color: var(--accent-fire);
   font-size: 12px;
   text-decoration: none;
@@ -118,6 +132,56 @@ body.manual-page .back-link:hover {
 
 .manual dd {
   margin: 4px 0 0;
+}
+
+.manual code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.manual pre {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 0 0 12px;
+  overflow-x: auto;
+}
+
+.manual pre code {
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.manual table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 16px;
+  font-size: 13.5px;
+}
+
+.manual th,
+.manual td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.manual th {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
 }
 
 @media (max-width: 820px) {

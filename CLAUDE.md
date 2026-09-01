@@ -27,6 +27,9 @@ uv run ruff format src tests        # format
 
 uv run mkdocs serve                 # docs with live reload
 uv run mkdocs build                 # static docs site
+
+uv sync --extra web                 # add the web UI's extra deps
+uv run propagator-web               # serve the web UI on 0.0.0.0:8765 (LAN-reachable)
 ```
 
 Tests are configured in `pyproject.toml` ([tool.pytest.ini_options]) with
@@ -35,7 +38,7 @@ install for test runs.
 
 ## Architecture
 
-Three packages under `src/propagator/`:
+Four packages under `src/propagator/`:
 
 - **`propagator.core`** — the simulation engine.
   - `propagator.py` — the `Propagator` dataclass: the main simulation object.
@@ -82,11 +85,46 @@ Three packages under `src/propagator/`:
   - `actions.py`, `boundary_conditions.py`, `geo.py`, `geometry.py` — action
     (firefighting) parsing, boundary-condition assembly, and geospatial
     helpers (CRS reprojection, geometry-to-grid rasterization).
+  - `data_prep.py` — downloads Copernicus DEM GLO-30 and ESA WorldCover 10 m
+    tiles (public COGs on AWS S3, no API key) for an area around a point,
+    reprojects/merges them onto one aligned grid, and remaps WorldCover
+    classes onto PROPAGATOR's legacy fuel codes; shared by the web app and
+    `example/italy/prepare_area_data.py`. See its docstring for the
+    limitations of the default land-cover-to-fuel mapping.
 
 - **`propagator.cli`** — `main.py` backs the `propagator` console script
   (`[project.scripts]` in `pyproject.toml`); wires config parsing, loaders,
   the `Propagator` simulation loop, and writers together. `console.py`/
   `logging_config.py` handle Rich-based terminal output and logging setup.
+
+- **`propagator.web`** — a single-user, unauthenticated FastAPI app
+  (`propagator-web` console script, binds to `0.0.0.0:8765` so it's
+  LAN-reachable) exposing an interactive map UI for running simulations
+  without hand-authoring a config/GeoTIFFs. No login and one job at a time
+  server-wide — only run it on a trusted network. See `docs/web.md` for
+  usage and guardrails.
+  - `app.py`/`server.py` — FastAPI app factory and the `propagator-web` entry
+    point; `static/` holds the vanilla-JS/HTML/CSS frontend
+    (`index.html`/`app.js`, plus `manual.html` for the in-app user manual).
+  - `routers/simulate.py` — REST endpoints (`POST /api/simulate`,
+    `GET .../{job_id}`, `.../frames`, `.../frame/{time_s}[/image.png]`,
+    `POST .../cancel`, `DELETE .../{job_id}`) backing job lifecycle and
+    frame retrieval.
+  - `jobs.py` — `JobManager`/`JobState`/`JobStatus`/`FrameData`: in-memory
+    (no database, doesn't survive a restart) tracking of one simulation at a
+    time, running in a background thread; raises `JobBusyError` if a second
+    run is started while one is in flight.
+  - `runner.py` — `build_simulator`/`schedule_actions`/`run_loop`/`run_job`:
+    builds a `Propagator` from `data_prep`'s grid, schedules firefighting
+    actions, and steps the simulation one `time_resolution_h` at a time,
+    capturing a `fire_probability` frame per step into the `JobState`.
+  - `render.py` — turns a frame's `fire_probability` array and isochrones
+    into map-ready PNG/GeoJSON (isochrones reuse
+    `propagator.io.writer.isochrones_geojson.extract_isochrone`,
+    reprojected to WGS84).
+  - `schemas.py` — Pydantic request/response models, notably
+    `SimulateRequest`, which enforces the interactive-run guardrails
+    (radius/cellsize/realizations/time bounds) documented in `docs/web.md`.
 
 ### Simulation loop shape
 
@@ -104,8 +142,12 @@ while (t := sim.next_time()) is not None and t <= time_limit:
 event and the next fire-front pop time; `None` means the simulation is
 finished. Per-cell outputs (`compute_fire_probability`,
 `compute_ros_mean/max`, `compute_arrival_time_min/mean`,
-`compute_fireline_int_mean/max`) aggregate across `realizations` (the third
-array axis) and are bundled into `PropagatorOutput` via `get_output()`.
+`compute_fireline_int_mean/max`, `compute_flame_length_mean/max`) aggregate
+across `realizations` (the third array axis) and are bundled into
+`PropagatorOutput` via `get_output()`. `compute_flame_length_mean/max` derive
+Byram (1959) flame length (m) from `fireline_int` after the fact — no new
+per-realization accumulator array or Numba kernel change was needed, since
+the relation is monotonic in intensity.
 
 ## Notes
 

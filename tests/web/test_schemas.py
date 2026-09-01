@@ -19,9 +19,37 @@ def base_kwargs(**overrides):
 
 def test_defaults_are_accepted():
     req = SimulateRequest(**base_kwargs())
-    assert req.radius_km == 15.0
-    assert req.time_limit_s == 6 * 3600
+    assert req.radius_km == 10.0
+    assert req.time_limit_s == 12 * 3600
     assert req.time_resolution_s == 3600
+    assert req.max_pois == 1000
+    assert set(req.poi_categories) == {
+        "hospital",
+        "fire_station",
+        "police",
+        "school",
+        "emergency",
+        "road",
+        "building",
+        "power",
+    }
+
+
+def test_rejects_max_pois_out_of_range():
+    with pytest.raises(ValidationError):
+        SimulateRequest(**base_kwargs(max_pois=0))
+    with pytest.raises(ValidationError):
+        SimulateRequest(**base_kwargs(max_pois=5001))
+
+
+def test_rejects_unknown_poi_category():
+    with pytest.raises(ValidationError):
+        SimulateRequest(**base_kwargs(poi_categories=["not_a_category"]))
+
+
+def test_accepts_a_subset_of_poi_categories():
+    req = SimulateRequest(**base_kwargs(poi_categories=["hospital", "power"]))
+    assert req.poi_categories == ["hospital", "power"]
 
 
 def test_rejects_huge_radius_realizations_combo():

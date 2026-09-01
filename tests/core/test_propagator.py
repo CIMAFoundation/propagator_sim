@@ -245,6 +245,34 @@ def test_compute_fire_probability_and_means():
         ),
     )
 
+    def byram(intensity):
+        return 0.0775 * intensity**0.46 if intensity > 0 else 0.0
+
+    flame_length_max = propagator.compute_flame_length_max()
+    np.testing.assert_allclose(
+        flame_length_max,
+        np.array(
+            [
+                [byram(10.0), byram(20.0)],
+                [byram(15.0), 0.0],
+            ],
+            dtype=np.float32,
+        ),
+    )
+
+    flame_length_mean = propagator.compute_flame_length_mean()
+    np.testing.assert_allclose(
+        flame_length_mean,
+        np.array(
+            [
+                [byram(10.0), byram(20.0)],
+                [(byram(5.0) + byram(15.0)) / 2, np.nan],
+            ],
+            dtype=np.float32,
+        ),
+        equal_nan=True,
+    )
+
     fli_mean = propagator.compute_fireline_int_mean()
     np.testing.assert_allclose(
         fli_mean,
@@ -294,6 +322,52 @@ def test_get_output_includes_spotting_probabilities():
         np.array([[5.0, np.nan], [9.0, np.nan]], dtype=np.float32),
         equal_nan=True,
     )
+
+
+def test_sample_cells_reports_reached_and_unreached_and_out_of_bounds():
+    propagator = make_propagator(realizations=2)
+    propagator.time = 60
+    propagator.fire = np.array(
+        [[[1, 0], [0, 0]], [[0, 1], [0, 0]]], dtype=np.int8
+    )
+    propagator.arrival_time = np.array(
+        [[[5, 0], [0, 0]], [[0, 9], [0, 0]]], dtype=np.int32
+    )
+
+    samples = propagator.sample_cells(
+        [
+            ("burned", 0, 0),
+            ("unburned", 1, 1),
+            ("outside", 99, 99),
+        ]
+    )
+    by_key = {s.key: s for s in samples}
+
+    assert by_key["burned"].reached is True
+    assert by_key["burned"].row == 0
+    assert by_key["burned"].col == 0
+    np.testing.assert_allclose(by_key["burned"].min_arrival_time, 5.0)
+    np.testing.assert_allclose(by_key["burned"].mean_arrival_time, 5.0)
+
+    assert by_key["unburned"].reached is False
+    assert np.isnan(by_key["unburned"].min_arrival_time)
+    assert np.isnan(by_key["unburned"].mean_arrival_time)
+
+    assert by_key["outside"].reached is False
+    assert np.isnan(by_key["outside"].min_arrival_time)
+
+
+def test_get_output_sample_cells_defaults_to_empty():
+    propagator = make_propagator(realizations=1)
+    propagator.fire = np.zeros((2, 2, 1), dtype=np.int8)
+    propagator.arrival_time = np.zeros((2, 2, 1), dtype=np.int32)
+
+    output = propagator.get_output()
+    assert output.poi_arrival == ()
+
+    output_with_samples = propagator.get_output(sample_cells=[("p", 0, 0)])
+    assert len(output_with_samples.poi_arrival) == 1
+    assert output_with_samples.poi_arrival[0].key == "p"
 
 
 def test_compute_stats_counts_active_and_thresholds():

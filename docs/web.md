@@ -1,14 +1,17 @@
-# Local Web Demo
+# Web UI
 
-A local, interactive debug and demonstration interface lets you pick an area
-on a map, set weather and simulation parameters, and watch the fire spread
-animate — without writing a config file or GeoTIFFs by hand. It is built on
-top of the same `Propagator` engine and the public-data pipeline described in
+A local, interactive web interface lets you pick an area on a map, set
+weather and simulation parameters, and watch the fire spread animate —
+without writing a config file or GeoTIFFs by hand. It is built on top of the
+same `Propagator` engine and the public-data pipeline described in
 [Getting Started](getting-started.md), not a separate implementation.
 
-It is an **optional, local-only debug/demo tool**, not the primary operational
-interface. The server binds to `127.0.0.1` and is meant to run on your own
-machine, not to be exposed on a network.
+The server binds to all interfaces (`0.0.0.0:8765`), so it is reachable
+from other machines on the LAN, but it is still a **single-user,
+unauthenticated** tool: there is no login and the whole server runs one
+simulation job at a time (`JobBusyError`/429 if two people start a run at
+once). Only run it on a trusted network — don't expose it directly to the
+internet.
 
 ## Install and Run
 
@@ -17,35 +20,25 @@ uv sync --extra web
 uv run propagator-web
 ```
 
-Then open <http://127.0.0.1:8765> in a browser.
+Then open <http://127.0.0.1:8765> in a browser, or
+`http://<host-ip>:8765` from another machine on the same LAN.
 
-The server is deliberately local and binds only to `127.0.0.1`. The demo is
-not an internet-hosted service and should not be exposed as an operational
-multi-user server.
-
-## In-app Manual
-
-Select **Manual** in the app header to open the built-in guide. It
-explains wildfire behaviour, every input and output, the simulation algorithm,
-and the limits of interpreting model results in plain English. The guide is
-served locally at <http://127.0.0.1:8765/manual.html> while the app is running.
+The UI is available in English and Italian: it auto-detects your browser
+language on first visit and can be switched anytime via the EN/IT control
+in the header (the choice is remembered for future visits, via
+`localStorage`).
 
 ## Using It
 
 1. Click the map to place the simulation area's center, then click again to
    place the ignition point (the two "pick" modes switch automatically after
    the first click).
-2. Adjust radius, cell size, wind, moisture, duration, output frequency, and
-   number of realizations in the sidebar. Enable spotting if the scenario
-   should include wind-carried embers.
-3. Optionally add one or more firefighting actions. Choose the action and its
-   scheduled time, select **Draw line**, click points on the map, and select
-   **Finish line**. The queued actions appear below the controls and can be
-   removed before starting the run.
-4. Click **Run simulation**. The server downloads DEM (Copernicus
+2. Adjust radius, cellsize, wind, moisture, duration, and number of
+   realizations in the sidebar.
+3. Click **Run simulation**. The server downloads DEM (Copernicus
    GLO-30) and land-cover (ESA WorldCover 10 m) tiles for the area, builds
    the fuel grid, and runs the simulation, reporting progress as it goes.
-5. Once done, scrub the time slider to see the fire-probability heatmap and
+4. Once done, scrub the time slider to see the fire-probability heatmap and
    isochrone lines for each hour, alongside area/active-realization stats
    and a growth chart.
 
@@ -53,45 +46,6 @@ If the ignition point falls on a non-burnable fuel class (fuel code 3,
 non-vegetated — typically urban areas), a warning is shown but the run still
 completes (it will simply show no spread). If the ignition point falls
 outside the selected area, the run fails immediately with a clear error.
-
-## Firefighting Actions
-
-Actions are scheduled relative to the start of the simulation and applied
-when that simulation time is reached. Each drawn WGS84 line is rasterized on
-the scenario grid through the same `TimedInput` boundary-condition machinery
-used by the CLI.
-
-| Action | Simulated effect |
-| --- | --- |
-| Canadair | Adds 25 percentage points of fuel moisture on the line and 22 points in its one-cell buffer. |
-| Helicopter | Adds 22 percentage points at deterministic scattered drop points near the line and 20 points in their one-cell buffer. |
-| Waterline | Adds 27 percentage points of fuel moisture across the line and its one-cell buffer. |
-| Heavy vehicles | Replaces fuel across the line and its one-cell buffer with the non-vegetated fuel class, creating a persistent firebreak. |
-
-Moisture effects are added only inside the affected cells, stack on top of
-the scenario's existing moisture, and then decay according to the simulation's
-moisture-relief model. Heavy-vehicle actions change the fuel rather than its
-moisture.
-
-Actions are scenario inputs, not live controls: add or remove them before
-selecting **Run simulation**. To compare intervention strategies, run the
-same scenario again with a different action type, line, or scheduled time.
-
-## Reading the Results
-
-- The heatmap shows the fraction of realizations in which each cell burned.
-- Isochrones outline the selected probability thresholds at the displayed
-  time; the defaults are 50%, 75%, and 90%.
-- Expected burned area sums each cell's probability multiplied by its area.
-- Threshold areas report how much land reached at least 50%, 75%, or 90%
-  probability.
-- Active realizations count the simulations whose fire front is still moving.
-- The growth chart compares expected area with the area above the 50%
-  threshold through time.
-
-These products describe a stochastic scenario, not a precise fire perimeter.
-Use them to compare likely trends and intervention assumptions, never as the
-sole basis for operational decisions.
 
 ## How It Works
 
@@ -109,9 +63,70 @@ sole basis for operational decisions.
 - Isochrone lines reuse `propagator.io.writer.isochrones_geojson.extract_isochrone`
   (the same code the CLI uses to write `isochrones_*.json`), reprojected to
   WGS84 for the map.
-- Firefighting actions are converted to `CanadairAction`, `HelicopterAction`,
-  `WaterlineAction`, or `HeavyAction` objects and scheduled as future
-  `BoundaryConditions`. This keeps Web UI and CLI action semantics aligned.
+
+## Points of Interest
+
+If "Points of interest" is checked (default on), `propagator.io.osm_poi`
+queries the public [Overpass API](https://overpass-api.de) for hospitals,
+schools, fire/police stations, other emergency features, power
+infrastructure, major roads (motorway/trunk/primary/secondary), and
+buildings — using the exact same area bbox already used for the DEM/fuel
+download (`radius_km` around the center), not a separate polygon.
+
+Which of those eight categories (hospitals, fire stations, police,
+schools, other emergency, major roads, buildings, power infrastructure)
+are actually fetched/reported is configurable via the checkboxes under
+"Points of interest" (`poi_categories` in the API, defaulting to every
+category); unchecking a category never re-queries Overpass — the query
+always fetches every category so the on-disk response cache stays valid,
+and category filtering happens server-side afterward, so re-running the
+same area with a different category selection doesn't hit the network
+again. The overall POI count is capped by "Max POIs" (`max_pois`, default
+1000, 1–5000), applied after category filtering so it only bites into
+the categories actually selected.
+
+Power infrastructure is reported with a specific subtype category
+(`power_line`, `power_tower`, `power_pole`, `power_substation`,
+`power_plant`, `power_transformer`, ...) instead of a generic "power"
+label, and includes `voltage`/`operator` in the tooltip when OSM has
+them tagged. Lines and polygonal elements (substations, plants) keep
+their full geometry — fire arrival is sampled along their entire extent,
+not just a single centroid point, so a long line is reported as reached
+as soon as the fire front hits it anywhere along its path. Roads are
+still reduced to a single centroid point (a known limitation, not yet
+addressed).
+
+Each POI is sampled against the simulation's arrival-time grid every
+frame, so on the map, markers (or, for a line/polygon POI, its actual
+path) start grey (not yet reached) and turn red once the fire front
+reaches any of their sampled cells, with the arrival time shown on
+hover. To bound response size and keep the map responsive, at most
+`max_pois` are kept per run (1000 by default), prioritizing critical
+categories (hospitals, fire/police stations, substations, plants) over
+generic buildings when there would be more.
+
+Overpass responses are cached under `~/.propagator/cache/osm` (same
+`PROPAGATOR_CACHE_DIR` override as the DEM/land-cover cache), keyed by the
+query, so re-running the same area doesn't repeat the request. While the
+fetch is in progress the status panel shows "Fetching OpenStreetMap
+points of interest…", distinct from the earlier DEM/land-cover download
+phase, so a slow or unreachable Overpass endpoint isn't mistaken for a
+stuck DEM download. The connection uses a short (5 s) connect timeout so
+an unreachable endpoint is retried and given up on quickly rather than
+stalling the run for minutes; the read timeout (30 s) stays generous
+enough for the query's own execution budget. If the Overpass request
+ultimately fails (e.g. the public endpoint is rate-limiting or
+unreachable), the run still completes using the already-downloaded
+DEM/fuel data — a non-fatal warning is shown and no POIs are reported for
+that run.
+
+If the default endpoint (`overpass-api.de`) isn't reachable from your
+network, set `PROPAGATOR_OVERPASS_URL` to a different mirror (e.g.
+`https://z.overpass-api.de/api/interpreter`, another IP of the same
+official service) — no code change needed. Not every public mirror
+accepts unregistered traffic (some require prior whitelisting and
+otherwise reject requests), so confirm a candidate mirror actually
+answers your queries before relying on it.
 
 ## Guardrails
 
@@ -119,12 +134,11 @@ Request parameters are validated by `propagator.web.schemas.SimulateRequest`:
 
 | Parameter | Range | Default |
 | --- | --- | --- |
-| `radius_km` | >0–50 | 15 |
+| `radius_km` | 0–50 | 10 |
 | `cellsize` | 20–100 m | 30 m |
 | `realizations` | 1–50 | 10 |
-| `time_limit_h` | >0–48 | 6 |
-| `time_resolution_h` | >0–6, ≤ `time_limit_h` | 1 |
-| action time | 0–`time_limit_h` | 1 h in the UI |
+| `time_limit_h` | 0–48 | 12 |
+| `time_resolution_h` | 0–6, ≤ `time_limit_h` | 1 |
 
 Combinations of radius/cellsize/realizations that would produce an
 unreasonably large grid for an interactive local run are rejected outright

@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title>Manuale &mdash; PROPAGATOR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/manual.css">
+</head>
+<body class="manual-page">
+  <header>
+    <h1>PROPAGATOR</h1>
+    <span class="subtitle">manuale utente</span>
+    <a class="manual-lang-link" href="manual.html" data-set-lang="en">EN</a>
+    <a class="back-link" href="/index.html">&larr; Torna alla simulazione</a>
+  </header>
+  <script>
+    document.querySelectorAll("[data-set-lang]").forEach((el) => {
+      el.addEventListener("click", () => {
+        try { localStorage.setItem("propagator_lang", el.dataset.setLang); } catch {}
+      });
+    });
+  </script>
+
+  <main class="manual">
+    <nav class="manual-toc" aria-label="Indice">
+      <strong>Indice</strong>
+      <ol>
+        <li><a href="#what-is">Cos'è PROPAGATOR</a></li>
+        <li><a href="#phenomenon">Come si comporta un incendio boschivo</a></li>
+        <li><a href="#usage">Guida all'uso della web app</a></li>
+        <li><a href="#inputs">Le variabili di input, spiegate</a></li>
+        <li><a href="#algorithm">Come funziona l'algoritmo (in termini semplici)</a></li>
+        <li><a href="#outputs">Gli output e come leggerli</a></li>
+        <li><a href="#actions">Interventi antincendio</a></li>
+        <li><a href="#api">Usare l'API direttamente</a></li>
+        <li><a href="#limits">Limiti del modello</a></li>
+      </ol>
+    </nav>
+
+    <article>
+      <section id="what-is">
+        <h2>1. Cos'è PROPAGATOR</h2>
+        <p>
+          PROPAGATOR è un simulatore di propagazione di incendi boschivi
+          sviluppato dalla Fondazione CIMA Research. Dato un punto di
+          innesco, uno scenario meteorologico e un'area geografica reale
+          (rilievo del terreno e copertura vegetale), PROPAGATOR stima
+          come un incendio potrebbe propagarsi nelle ore successive: dove
+          è più probabile che il fuoco arrivi, con quale velocità e con
+          quale intensità.
+        </p>
+        <p>
+          Vale la pena chiarire subito una cosa: il fuoco non si comporta
+          mai in modo perfettamente prevedibile, perché dipende da molti
+          fattori piccoli e in parte casuali (una raffica di vento, una
+          chiazza di combustibile più secco, un tizzone trasportato più
+          lontano del previsto). Per questo PROPAGATOR non produce
+          un'unica previsione fissa, ma una <strong>probabilità</strong>:
+          esegue lo stesso scenario molte volte, lasciando che il caso
+          giochi un ruolo leggermente diverso ogni volta, e mostra poi
+          quante volte il fuoco ha raggiunto ogni punto della mappa. È
+          uno strumento di supporto alle decisioni &mdash; utile per
+          capire dove concentrare attenzione e risorse &mdash; non una
+          previsione esatta.
+        </p>
+      </section>
+
+      <section id="phenomenon">
+        <h2>2. Come si comporta un incendio boschivo</h2>
+        <p>
+          Perché un incendio si propaga nel modo in cui è noto
+          propagarsi? Quattro fattori principali governano il
+          comportamento del fuoco, e sono esattamente quelli che l'app
+          chiede di impostare prima di avviare una simulazione.
+        </p>
+        <h3>Vento</h3>
+        <p>
+          Il vento spinge fiamme e calore verso il combustibile non
+          ancora bruciato davanti al fronte, preriscaldandolo e facendolo
+          incendiare più rapidamente: il fronte del fuoco avanza molto
+          più velocemente <em>sottovento</em> (nella direzione verso cui
+          soffia il vento) rispetto alle altre direzioni. Più forte è il
+          vento, più questo effetto si accentua, e più l'incendio assume
+          una forma allungata, "a lingua", nella direzione del vento.
+        </p>
+        <h3>Pendenza del terreno</h3>
+        <p>
+          Il fuoco sale più velocemente di quanto scenda. In salita, le
+          fiamme si trovano più vicine al combustibile sovrastante
+          (preriscaldandolo ancor prima di raggiungerlo), mentre in
+          discesa le fiamme si allontanano dal pendio e il calore si
+          disperde maggiormente. Una pendenza ripida può quindi far
+          correre un incendio molto più velocemente verso una cresta che
+          verso una valle.
+        </p>
+        <h3>Umidità del combustibile</h3>
+        <p>
+          Legno, erba e arbusti umidi sono più difficili da bruciare:
+          parte del calore serve a far evaporare l'acqua contenuta nel
+          combustibile invece di alimentare la combustione. Il
+          combustibile secco (dopo giorni senza pioggia, con bassa
+          umidità) si incendia più facilmente e brucia più velocemente;
+          il combustibile umido rallenta o può addirittura fermare
+          l'avanzata del fronte. Bagnare il combustibile davanti
+          all'incendio (ad esempio con acqua sganciata da aeromobili) è
+          esattamente una delle tattiche antincendio che si possono
+          simulare in PROPAGATOR &mdash; vedi la sezione sugli interventi
+          antincendio.
+        </p>
+        <h3>Tipo di vegetazione</h3>
+        <p>
+          Non tutta la vegetazione brucia allo stesso modo. Una foresta
+          di conifere (pino, abete) contiene resine altamente
+          infiammabili e brucia con fiamme alte e intense; un prato si
+          incendia facilmente ma brucia rapidamente e con minore
+          intensità rispetto a una foresta; un terreno agricolo o non
+          vegetato può non bruciare affatto, o può rallentare
+          notevolmente l'incendio, agendo quasi come una barriera
+          naturale. PROPAGATOR conosce diverse categorie di vegetazione
+          (foreste di latifoglie, foreste di conifere, arbusteti,
+          terreni agricoli, prati, aree non vegetate...) e assegna a
+          ciascuna un comportamento diverso in termini di velocità e
+          probabilità di propagazione.
+        </p>
+        <h3>Tizzoni trasportati dal vento (spotting)</h3>
+        <p>
+          Negli incendi più intensi, specialmente nelle foreste di
+          conifere, il vento può sollevare frammenti in combustione
+          (tizzoni, aghi di pino accesi, piccoli rametti) e trasportarli
+          centinaia di metri davanti al fronte principale. Se un tizzone
+          atterra su combustibile secco può innescare un nuovo focolaio
+          isolato, che poi cresce autonomamente e può ricongiungersi al
+          fronte principale o addirittura superarlo. Questo fenomeno si
+          chiama <strong>spotting</strong> ed è uno dei motivi per cui
+          gli incendi boschivi possono "saltare" ostacoli come strade o
+          corsi d'acqua che altrimenti li fermerebbero. PROPAGATOR può
+          opzionalmente simulare anche questo effetto.
+        </p>
+      </section>
+
+      <section id="usage">
+        <h2>3. Guida all'uso della web app</h2>
+        <p>
+          L'interfaccia è divisa in un pannello di controllo a sinistra e
+          una mappa a destra. I passaggi per eseguire una simulazione
+          sono:
+        </p>
+        <ol>
+          <li>
+            <strong>1. Scegli il centro</strong> &mdash; clicca il
+            pulsante e poi clicca sulla mappa, nel punto intorno al
+            quale vuoi analizzare l'area (tipicamente il paese o la zona
+            a rischio). Poi regola il <strong>Raggio</strong> (quanto
+            estesa è l'area da scaricare e simulare, fino a 50&nbsp;km)
+            e la <strong>Dimensione cella</strong> (la risoluzione della
+            griglia).
+          </li>
+          <li>
+            <strong>2. Scegli l'innesco</strong> &mdash; clicca il
+            pulsante e poi clicca sulla mappa nel punto in cui
+            l'incendio dovrebbe iniziare. Deve trovarsi su terreno
+            vegetato (foresta, arbusteto, prato...), non su un'area
+            edificata o su terreno non infiammabile: in tal caso l'app
+            mostra un avviso.
+          </li>
+          <li>
+            <strong>Meteo</strong> &mdash; imposta <strong>Direzione del
+            vento</strong>, <strong>Velocità del vento</strong> e
+            <strong>Umidità</strong> del combustibile, per lo scenario
+            che vuoi analizzare.
+          </li>
+          <li>
+            <strong>Simulazione</strong> &mdash; imposta quante ore
+            simulare (<strong>Durata</strong>), ogni quanto salvare un
+            risultato (<strong>Risoluzione temporale</strong>), quante
+            volte ripetere la simulazione
+            (<strong>Realizzazioni</strong>), se includere i tizzoni
+            (<strong>Spotting</strong>) e le soglie di probabilità
+            disegnate come linee sulla mappa (<strong>Soglie
+            isocrone</strong>).
+          </li>
+          <li>
+            <strong>Interventi antincendio</strong> (opzionale) &mdash;
+            se vuoi simulare un intervento antincendio attivo, scegli il
+            <strong>Tipo</strong> di mezzo, quando avviene
+            (<strong>Tempo dell'azione</strong>), poi clicca
+            <strong>Disegna linea</strong>, traccia il percorso sulla
+            mappa e premi <strong>Termina linea</strong>. Puoi mettere in
+            coda più interventi e rimuoverli dalla lista.
+          </li>
+          <li>
+            <strong>Avvia simulazione</strong> &mdash; il pulsante
+            diventa attivo una volta impostati sia il centro che
+            l'innesco. Durante l'esecuzione della simulazione, una barra
+            di avanzamento mostra la fase corrente (scaricamento dati,
+            esecuzione...).
+          </li>
+          <li>
+            Al termine, la mappa mostra l'incendio simulato e appare un
+            pannello con le statistiche, un grafico di crescita dell'area
+            e uno slider <strong>Tempo</strong> per scorrere i risultati
+            ora per ora. Vedi la sezione sugli output per come
+            interpretarli.
+          </li>
+        </ol>
+      </section>
+
+      <section id="inputs">
+        <h2>4. Le variabili di input, spiegate</h2>
+        <dl>
+          <dt>Raggio</dt>
+          <dd>
+            Il raggio, in km, dell'area intorno al centro scelto che
+            verrà scaricata e simulata. Un'area più estesa copre più
+            territorio ma richiede più tempo di calcolo e più dati da
+            scaricare.
+          </dd>
+          <dt>Dimensione cella</dt>
+          <dd>
+            La dimensione, in metri, di ogni cella della griglia usata
+            per la simulazione: è il "pixel" con cui viene rappresentato
+            il terreno. Valori più piccoli (ad es. 20&nbsp;m) danno una
+            mappa più dettagliata ma richiedono più tempo di calcolo;
+            valori più grandi (ad es. 100&nbsp;m) sono più veloci ma meno
+            precisi.
+          </dd>
+          <dt>Direzione del vento</dt>
+          <dd>
+            La direzione da cui soffia il vento, in gradi dal nord
+            (0&deg;=Nord, 90&deg;=Est, 180&deg;=Sud, 270&deg;=Ovest).
+            L'incendio tenderà ad avanzare più velocemente nella
+            direzione opposta, ossia la direzione verso cui soffia il
+            vento.
+          </dd>
+          <dt>Velocità del vento</dt>
+          <dd>
+            Intensità del vento, in km/h. Più è alta, più velocemente
+            avanza il fronte sottovento, e più allungata diventa la
+            forma dell'incendio.
+          </dd>
+          <dt>Umidità</dt>
+          <dd>
+            Umidità del combustibile, in percentuale. Valori alti
+            rappresentano combustibile più umido (ad es. dopo la
+            pioggia) e rallentano la propagazione; valori bassi
+            rappresentano combustibile secco e la accelerano.
+          </dd>
+          <dt>Durata</dt>
+          <dd>
+            Quante ore simulare l'evoluzione dell'incendio a partire
+            dall'innesco.
+          </dd>
+          <dt>Risoluzione temporale</dt>
+          <dd>
+            Ogni quante ore viene salvato un "fotogramma" dei risultati
+            (mappa e statistiche), da scorrere in seguito con lo slider
+            <strong>Tempo</strong>. Non influisce sulla precisione della
+            simulazione, solo sulla frequenza con cui vedi un
+            aggiornamento.
+          </dd>
+          <dt>Realizzazioni</dt>
+          <dd>
+            Quante volte viene simulato lo stesso scenario, lasciando
+            che gli elementi casuali del modello (vedi la sezione
+            successiva) diano un esito leggermente diverso ogni volta.
+            Il risultato finale è la frazione di realizzazioni in cui
+            l'incendio ha raggiunto ogni punto, ossia una probabilità.
+            Più realizzazioni danno una stima più affidabile ma
+            richiedono più tempo di calcolo.
+          </dd>
+          <dt>Spotting (tizzoni)</dt>
+          <dd>
+            Se abilitato, il modello genera tizzoni trasportati dal
+            vento (vedi sezione 2) che possono innescare nuovi focolai
+            davanti al fronte principale, in particolare nelle foreste
+            di conifere.
+          </dd>
+          <dt>Soglie isocrone</dt>
+          <dd>
+            Una o più soglie di probabilità (tra 0 e 1) per cui viene
+            disegnata una linea di contorno (isocrona) sulla mappa: ad
+            esempio "0.5" disegna il confine dell'area in cui l'incendio
+            è arrivato in almeno metà delle realizzazioni.
+          </dd>
+        </dl>
+      </section>
+
+      <section id="algorithm">
+        <h2>5. Come funziona l'algoritmo (in termini semplici)</h2>
+        <p>
+          PROPAGATOR rappresenta il terreno come una griglia di celle
+          (la dimensione della cella è la <strong>Dimensione
+          cella</strong> scelta). All'inizio, solo la cella (o le celle)
+          di innesco è "in fiamme". Da lì, l'incendio può propagarsi a
+          ogni cella vicina: per ogni coppia di celle vicine, il modello
+          calcola due cose:
+        </p>
+        <ul>
+          <li>
+            <strong>Quanto è probabile</strong> che l'incendio si
+            propaghi da una cella all'altra;
+          </li>
+          <li>
+            <strong>Quanto tempo impiega</strong>, cioè quanto
+            velocemente si propaga (la cosiddetta velocità di
+            propagazione, o ROS).
+          </li>
+        </ul>
+        <p>
+          Entrambi i valori partono da un comportamento base che dipende
+          dal <strong>tipo di vegetazione</strong> delle due celle
+          coinvolte (ogni categoria di vegetazione ha una propria
+          velocità e probabilità di propagazione tipiche, calibrate su
+          osservazioni reali), e vengono poi corretti in base al
+          <strong>vento</strong>, alla <strong>pendenza</strong> tra le
+          due celle e all'<strong>umidità del combustibile</strong>,
+          esattamente come descritto nella sezione 2: propagarsi verso
+          una cella sottovento o in salita diventa più probabile e più
+          veloce, propagarsi verso una cella sopravento, in discesa o
+          più umida diventa meno probabile e più lento.
+        </p>
+        <p>
+          Questo processo si ripete cella per cella, seguendo il fronte
+          dell'incendio mentre avanza nel tempo: questo è ciò che si
+          chiama <em>automa cellulare</em>. Poiché probabilità e
+          casualità intervengono a ogni passo, una singola simulazione è
+          solo uno dei tanti modi in cui l'incendio potrebbe evolvere.
+          Per questo PROPAGATOR ripete l'intera simulazione tante volte
+          quante sono le <strong>Realizzazioni</strong> scelte (una
+          tecnica chiamata simulazione Monte Carlo), e conta in quante di
+          queste ripetizioni l'incendio ha raggiunto ogni cella. Quel
+          conteggio, diviso per il numero di realizzazioni, è la mappa
+          di probabilità che vedi come risultato finale.
+        </p>
+        <p>
+          Se lo <strong>spotting</strong> è abilitato, a ogni passo le
+          celle in fiamme di tipi di vegetazione "soggetti a spotting"
+          (tipicamente le conifere) possono anche generare tizzoni che
+          volano nella direzione del vento e, se atterrano su
+          combustibile infiammabile, innescano un nuovo focolaio
+          piccolo e indipendente, che poi si propaga secondo le stesse
+          regole del fronte principale.
+        </p>
+      </section>
+
+      <section id="outputs">
+        <h2>6. Gli output e come leggerli</h2>
+        <dl>
+          <dt>Mappa di probabilità</dt>
+          <dd>
+            La colorazione sulla mappa rappresenta, per ogni cella, in
+            quante delle realizzazioni simulate l'incendio ha raggiunto
+            quel punto: più intenso è il colore, più è probabile che
+            l'incendio raggiunga quell'area, dato lo scenario impostato.
+          </dd>
+          <dt>Isocrone</dt>
+          <dd>
+            Le linee disegnate sulla mappa in corrispondenza delle
+            <strong>Soglie isocrone</strong> scelte: delimitano l'area
+            in cui la probabilità di incendio è almeno pari alla soglia.
+            Utili per individuare rapidamente, ad esempio, "l'area ad
+            alto rischio" (soglia 0.9) rispetto a "l'area a possibile
+            rischio" (soglia 0.5).
+          </dd>
+          <dt>Slider Tempo / fotogramma</dt>
+          <dd>
+            Scorrendo lo slider si vede come cambiano mappa e statistiche
+            ora per ora, negli istanti salvati in base alla
+            <strong>Risoluzione temporale</strong> scelta: questo
+            permette di capire non solo dove, ma anche quando l'incendio
+            potrebbe raggiungere un dato punto.
+          </dd>
+          <dt>Area media (ha)</dt>
+          <dd>
+            L'area bruciata attesa, in ettari, calcolata sommando la
+            probabilità di incendio di ogni cella. È una stima "media"
+            che tiene conto dell'incertezza: non l'area di un singolo
+            scenario, ma l'area attesa su tutte le realizzazioni.
+          </dd>
+          <dt>Area prob&ge;50%</dt>
+          <dd>
+            L'area, in ettari, in cui l'incendio ha raggiunto almeno
+            metà delle realizzazioni simulate: una stima più
+            "prudenziale" e concreta di dove l'incendio è più probabile
+            che sia effettivamente passato.
+          </dd>
+          <dt>Realizzazioni attive</dt>
+          <dd>
+            Quante delle simulazioni ripetute hanno ancora un fronte di
+            fuoco in movimento in quell'istante (le altre si sono già
+            fermate, ad esempio perché l'incendio ha esaurito il
+            combustibile raggiungibile).
+          </dd>
+          <dt>Fotogrammi disponibili</dt>
+          <dd>
+            Quanti istanti temporali sono stati salvati e sono
+            disponibili da scorrere con lo slider.
+          </dd>
+          <dt>Grafico di crescita dell'area</dt>
+          <dd>
+            Mostra come l'area media attesa (linea continua) e l'area
+            con probabilità almeno del 50% (linea tratteggiata) crescono
+            nel tempo: utile per farsi un'idea di quanto velocemente si
+            espande l'incendio nello scenario impostato.
+          </dd>
+        </dl>
+      </section>
+
+      <section id="actions">
+        <h2>7. Interventi antincendio</h2>
+        <p>
+          PROPAGATOR permette di simulare l'effetto di un intervento
+          antincendio attivo, disegnando una linea sulla mappa (il
+          percorso del mezzo, o dove avviene l'intervento) e scegliendo
+          quando avviene, rispetto all'inizio della simulazione:
+        </p>
+        <dl>
+          <dt>Canadair</dt>
+          <dd>
+            Simula uno sgancio d'acqua aereo: aumenta l'umidità del
+            combustibile lungo la linea disegnata (e in un buffer di
+            sicurezza intorno ad essa), rendendo più difficile per
+            l'incendio proseguire in quell'area. L'effetto non è
+            permanente: l'umidità aggiunta decade nel tempo, circa l'1%
+            al minuto, come l'acqua che evapora o si infiltra nel
+            terreno.
+          </dd>
+          <dt>Elicottero</dt>
+          <dd>
+            Simile allo sgancio del Canadair ma con sganci puntuali più
+            sparsi lungo la linea, con un effetto leggermente minore
+            sull'umidità.
+          </dd>
+          <dt>Linea d'acqua</dt>
+          <dd>
+            Simula un intervento a terra con manichette (una linea
+            d'acqua continua): aumenta l'umidità lungo l'intera linea
+            disegnata e il suo buffer circostante, con l'effetto più
+            forte tra gli interventi a base d'acqua disponibili.
+          </dd>
+          <dt>Mezzi pesanti</dt>
+          <dd>
+            Simula la creazione di una fascia tagliafuoco (ad esempio
+            con un bulldozer): non bagna il combustibile, ma lo rimuove
+            fisicamente lungo la linea disegnata, rendendo quella fascia
+            permanentemente non infiammabile per il resto della
+            simulazione.
+          </dd>
+        </dl>
+      </section>
+
+      <section id="api">
+        <h2>8. Usare l'API direttamente</h2>
+        <p>
+          Tutto ciò che fa l'interfaccia web passa attraverso una comune
+          API REST, che puoi chiamare direttamente da uno script, da
+          `curl` o da qualsiasi client HTTP &mdash; utile per automatizzare
+          le esecuzioni o integrare PROPAGATOR in un altro strumento. Il
+          server <strong>non ha login</strong> ed esegue <strong>un solo
+          lavoro di simulazione alla volta</strong> per l'intero server
+          (una seconda richiesta mentre una è in esecuzione riceve un
+          HTTP 429), quindi trattalo come uno strumento condiviso, su
+          rete fidata, non come un servizio multi-tenant.
+        </p>
+        <p>
+          Un esploratore OpenAPI interattivo è sempre disponibile su
+          <code>/docs</code> (Swagger UI) e <code>/redoc</code>, con lo
+          schema completo di richiesta/risposta su
+          <code>/openapi.json</code>.
+        </p>
+        <h3>Endpoint</h3>
+        <table>
+          <thead>
+            <tr><th>Metodo</th><th>Percorso</th><th>Scopo</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>POST</td>
+              <td><code>/api/simulate</code></td>
+              <td>Avvia un nuovo lavoro di simulazione; restituisce <code>{"id": "..."}</code> (HTTP 202)</td>
+            </tr>
+            <tr>
+              <td>GET</td>
+              <td><code>/api/simulate/{job_id}</code></td>
+              <td>Stato/avanzamento del lavoro (pending, preparing_data, running, done, failed, cancelled)</td>
+            </tr>
+            <tr>
+              <td>GET</td>
+              <td><code>/api/simulate/{job_id}/frames</code></td>
+              <td>Confini e lista dei fotogrammi temporali disponibili, con la loro cronologia statistica</td>
+            </tr>
+            <tr>
+              <td>GET</td>
+              <td><code>/api/simulate/{job_id}/frame/{time_s}</code></td>
+              <td>Isocrone (coordinate in stile GeoJSON) e statistiche per un fotogramma</td>
+            </tr>
+            <tr>
+              <td>GET</td>
+              <td><code>/api/simulate/{job_id}/frame/{time_s}/image.png</code></td>
+              <td>La mappa di calore della probabilità di incendio per quel fotogramma, come PNG</td>
+            </tr>
+            <tr>
+              <td>POST</td>
+              <td><code>/api/simulate/{job_id}/cancel</code></td>
+              <td>Richiede l'annullamento di un lavoro in esecuzione</td>
+            </tr>
+            <tr>
+              <td>DELETE</td>
+              <td><code>/api/simulate/{job_id}</code></td>
+              <td>Rimuove dallo stato del server un lavoro terminato</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Corpo della richiesta</h3>
+        <p>
+          <code>POST /api/simulate</code> accetta un corpo JSON con gli
+          stessi campi descritti nella sezione 4
+          (<code>center_lat</code>, <code>center_lon</code>,
+          <code>radius_km</code>, <code>cellsize</code>,
+          <code>ignition_lat</code>, <code>ignition_lon</code>,
+          <code>wind_dir</code>, <code>wind_speed</code>,
+          <code>moisture</code>, <code>realizations</code>,
+          <code>do_spotting</code>, <code>time_limit_h</code>,
+          <code>time_resolution_h</code>,
+          <code>isochrone_thresholds</code>, e un elenco opzionale
+          <code>actions</code> &mdash; vedi la sezione 7 per i campi
+          dell'azione). Le stesse limitazioni descritte in questo
+          manuale sono applicate lato server: una combinazione fuori
+          intervallo o eccessivamente onerosa viene rifiutata con HTTP
+          422 prima ancora che venga creato un lavoro.
+        </p>
+        <h3>Esempio: eseguire una simulazione end-to-end con curl</h3>
+        <pre><code>BASE=http://127.0.0.1:8765
+
+# 1. Avvia il lavoro
+JOB_ID=$(curl -s -X POST "$BASE/api/simulate" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "center_lat": 44.40, "center_lon": 8.93,
+        "radius_km": 10, "cellsize": 30,
+        "ignition_lat": 44.42, "ignition_lon": 8.95,
+        "wind_dir": 45, "wind_speed": 25, "moisture": 10,
+        "realizations": 10, "time_limit_h": 6,
+        "time_resolution_h": 1
+      }' | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+# 2. Interroga lo stato finché non è completato
+until [ "$(curl -s $BASE/api/simulate/$JOB_ID | python3 -c \
+    "import sys,json; print(json.load(sys.stdin)['status'])")" = "done" ]; do
+  sleep 5
+done
+
+# 3. Elenca i fotogrammi disponibili
+curl -s "$BASE/api/simulate/$JOB_ID/frames"
+
+# 4. Scarica la mappa di calore dell'ultimo fotogramma
+curl -s "$BASE/api/simulate/$JOB_ID/frame/21600/image.png" -o frame.png</code></pre>
+      </section>
+
+      <section id="limits">
+        <h2>9. Limiti del modello</h2>
+        <p>
+          PROPAGATOR si basa su dati reali (rilievo del terreno,
+          copertura del suolo) e su modelli del comportamento del fuoco
+          calibrati su osservazioni ed esperienza, ma resta una
+          semplificazione della realtà: non conosce condizioni molto
+          locali (una chiazza di combustibile particolarmente secca o
+          densa, una raffica di vento improvvisa e non prevista), e
+          anche i dati di input stessi (mappa della vegetazione, rilievo
+          del terreno) portano un certo margine di approssimazione.
+        </p>
+        <p>
+          Per questo motivo, i risultati vanno letti come
+          <strong>probabilità e tendenze</strong>, utili per farsi
+          un'idea di dove e con quale velocità un incendio potrebbe
+          evolvere in un dato scenario meteorologico, e come supporto per
+          chi deve decidere dove concentrare attenzione o risorse &mdash;
+          non come una previsione esatta, né come unica base per
+          decisioni operative.
+        </p>
+      </section>
+    </article>
+  </main>
+</body>
+</html>

@@ -29,6 +29,7 @@ from propagator.io.data_prep import (
 )
 from propagator.io.geo import GeographicInfo
 from propagator.io.loader.geotiff import load_data_from_files
+from propagator.io.osm_poi import POI, OverpassError, fetch_area_pois
 from propagator.web.jobs import FrameData, JobManager, JobState, JobStatus
 from propagator.web.schemas import SimulateRequest
 
@@ -66,6 +67,43 @@ def build_simulator(
         )
     )
     return simulator
+
+
+def build_sample_cells(
+    pois: list[POI], geo_info: GeographicInfo, utm_epsg: str
+) -> list[tuple[str, int, int]]:
+    """Convert each POI to one or more (row, col) grid cells via the same
+    transform used for the ignition point, dropping any that fall outside
+    the grid.
+
+    A POI with a `geometry` (a line or polygon way, e.g. a power line or
+    a substation footprint) is sampled at every vertex rather than a
+    single representative point, so fire arrival is detected anywhere
+    along its extent, not just at its centroid. Each sample gets a
+    `"{poi.key}#{i}"` key (grid cells revisited by the geometry are
+    deduplicated); a plain point POI still gets a single `"...#0"` key,
+    for a uniform key scheme regardless of geometry.
+    """
+    cells = []
+    height, width = geo_info.shape
+    for poi in pois:
+        points = (
+            poi.geometry
+            if poi.geometry and len(poi.geometry) > 1
+            else [(poi.lat, poi.lon)]
+        )
+        seen: set[tuple[int, int]] = set()
+        idx = 0
+        for lat, lon in points:
+            row, col = latlon_to_rowcol(geo_info.trans, utm_epsg, lat, lon)
+            if not (0 <= row < height and 0 <= col < width):
+                continue
+            if (row, col) in seen:
+                continue
+            seen.add((row, col))
+            cells.append((f"{poi.key}#{idx}", row, col))
+            idx += 1
+    return cells
 
 
 def schedule_actions(
@@ -107,14 +145,17 @@ def run_loop(simulator: Propagator, job: JobState) -> None:
         # requested window, so the last step must be clamped to the
         # remaining budget or the run would always overshoot
         # time_limit_s by up to one time_resolution_h.
-        step_s = min(request.time_resolution_s, request.time_limit_s - simulator.time)
+        step_s = min(
+            request.time_resolution_s, request.time_limit_s - simulator.time
+        )
         simulator.step(seconds=step_s)
-        output = simulator.get_output()
+        output = simulator.get_output(sample_cells=job.poi_cells)
         stats = output.stats.to_dict(output.time, ref_date)
         job.frames[output.time] = FrameData(
             time_s=output.time,
             fire_probability=output.fire_probability,
             stats=stats,
+            poi_arrival=output.poi_arrival,
         )
         job.frame_times.append(output.time)
         job.current_time_s = output.time
@@ -160,6 +201,24 @@ def run_job(job: JobState, manager: JobManager) -> None:
             request.ignition_lat,
             request.ignition_lon,
         )
+
+        if request.include_pois:
+            job.status = JobStatus.FETCHING_POIS
+            try:
+                job.pois = fetch_area_pois(
+                    request.center_lat,
+                    request.center_lon,
+                    request.radius_km,
+                    cache_dir=cache_dir(),
+                    max_pois=request.max_pois,
+                    categories=request.poi_categories,
+                )
+            except OverpassError as e:
+                job.poi_warning = f"Could not fetch OpenStreetMap POIs: {e}"
+                job.pois = []
+            job.poi_cells = build_sample_cells(
+                job.pois, geo_info, area.utm_epsg
+            )
 
         simulator = build_simulator(veg, dem, request, ign_row, ign_col)
         schedule_actions(simulator, request, geo_info)

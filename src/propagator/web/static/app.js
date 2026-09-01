@@ -1,11 +1,11 @@
 (() => {
   "use strict";
 
-  const ACTION_LABELS = {
-    canadair: "Canadair",
-    helicopter: "Helicopter",
-    waterline_action: "Waterline",
-    heavy_action: "Heavy vehicles",
+  const ACTION_LABEL_KEYS = {
+    canadair: "actions.canadair",
+    helicopter: "actions.helicopter",
+    waterline_action: "actions.waterline",
+    heavy_action: "actions.heavy",
   };
   const ACTION_COLORS = {
     canadair: "#2b6cb0",
@@ -18,7 +18,7 @@
     mode: "center",
     center: null,
     ignition: null,
-    radiusKm: 15,
+    radiusKm: 10,
     circle: null,
     centerMarker: null,
     ignitionMarker: null,
@@ -29,6 +29,10 @@
     statsByTime: {},
     isoLayer: null,
     overlayLayer: null,
+    poiLayer: null,
+    pois: [],
+    poisById: {},
+    frameRequestId: 0,
     actions: [],
     drawingLayer: null,
     drawingPoints: null,
@@ -42,6 +46,23 @@
   }).addTo(map);
 
   const $ = (id) => document.getElementById(id);
+
+  function refreshManualLink() {
+    $("manual-link").href = i18n.getLang() === "it" ? "manual.it.html" : "manual.html";
+  }
+
+  document.querySelectorAll("#lang-switch button").forEach((btn) => {
+    btn.addEventListener("click", () => i18n.setLang(btn.dataset.langBtn));
+  });
+
+  window.addEventListener("langchange", () => {
+    refreshManualLink();
+    renderActionsList();
+  });
+
+  i18n.ready.then(() => {
+    refreshManualLink();
+  });
 
   function bindRange(id, labelId, formatter) {
     const input = $(id);
@@ -65,6 +86,17 @@
   const actionTimeInput = bindRange("action-time", "action-time-value", (v) => `${v} h`);
   const spottingInput = $("do-spotting");
   const isochroneInput = $("isochrone-thresholds");
+  const includePoisInput = $("include-pois");
+  const maxPoisInput = $("max-pois");
+  const poiCategoryInputs = Array.from(
+    document.querySelectorAll("[data-poi-category]")
+  );
+
+  function updatePoiOptionsEnabled() {
+    $("poi-options").classList.toggle("disabled", !includePoisInput.checked);
+  }
+  includePoisInput.addEventListener("change", updatePoiOptionsEnabled);
+  updatePoiOptionsEnabled();
 
   radiusInput.addEventListener("input", () => {
     state.radiusKm = Number(radiusInput.value);
@@ -160,11 +192,11 @@
     for (const action of state.actions) {
       const li = document.createElement("li");
       const label = document.createElement("span");
-      label.textContent = `${ACTION_LABELS[action.action_type]} — ${action.time_h} h`;
+      label.textContent = `${i18n.t(ACTION_LABEL_KEYS[action.action_type])} — ${action.time_h} h`;
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
-      removeBtn.textContent = "Remove";
-      removeBtn.title = "Removes this action from the simulation";
+      removeBtn.textContent = i18n.t("actions.remove");
+      removeBtn.title = i18n.t("actions.remove.title");
       removeBtn.addEventListener("click", () => {
         map.removeLayer(action.layer);
         state.actions = state.actions.filter((a) => a.id !== action.id);
@@ -200,6 +232,11 @@
       time_limit_h: Number(durationInput.value),
       time_resolution_h: Number(resolutionInput.value),
       isochrone_thresholds: parseIsochroneThresholds(),
+      include_pois: includePoisInput.checked,
+      max_pois: Number(maxPoisInput.value),
+      poi_categories: poiCategoryInputs
+        .filter((el) => el.checked)
+        .map((el) => el.dataset.poiCategory),
       actions: state.actions.map((a) => ({
         action_type: a.action_type,
         time_h: a.time_h,
@@ -231,7 +268,7 @@
     $("warning-banner").classList.remove("visible");
     $("result-panel").classList.remove("visible");
     $("status-panel").classList.add("visible");
-    $("status-text").textContent = "Starting…";
+    $("status-text").textContent = i18n.t("status.starting");
     $("progress-fill").style.width = "0%";
     clearResults();
 
@@ -242,7 +279,9 @@
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      $("status-text").textContent = `Error: ${formatErrorDetail(body.detail, res.statusText)}`;
+      $("status-text").textContent = i18n.t("status.error", {
+        message: formatErrorDetail(body.detail, res.statusText),
+      });
       $("run-button").disabled = false;
       return;
     }
@@ -258,8 +297,9 @@
     if (!res.ok) return;
     const job = await res.json();
 
-    if (job.warning) {
-      $("warning-banner").textContent = job.warning;
+    const warnings = [job.warning, job.poi_warning].filter(Boolean);
+    if (warnings.length > 0) {
+      $("warning-banner").textContent = warnings.join(" ");
       $("warning-banner").classList.add("visible");
     }
 
@@ -267,12 +307,16 @@
     $("progress-fill").style.width = `${pct}%`;
 
     const phaseLabels = {
-      pending: "Queued…",
-      preparing_data: "Downloading DEM and land cover…",
-      running: `Simulating: ${(job.current_time_s / 3600).toFixed(1)} / ${(job.time_limit_s / 3600).toFixed(1)} h`,
-      done: "Done.",
-      failed: `Error: ${job.error || "unknown"}`,
-      cancelled: "Cancelled.",
+      pending: i18n.t("status.queued"),
+      preparing_data: i18n.t("status.preparingData"),
+      fetching_pois: i18n.t("status.fetchingPois"),
+      running: i18n.t("status.running", {
+        current: (job.current_time_s / 3600).toFixed(1),
+        total: (job.time_limit_s / 3600).toFixed(1),
+      }),
+      done: i18n.t("status.done"),
+      failed: i18n.t("status.error", { message: job.error || i18n.t("status.unknownError") }),
+      cancelled: i18n.t("status.cancelled"),
     };
     $("status-text").textContent = phaseLabels[job.status] || job.status;
 
@@ -287,6 +331,7 @@
   }
 
   function clearResults() {
+    state.frameRequestId++; // discard any in-flight showFrame() response
     if (state.overlayLayer) {
       map.removeLayer(state.overlayLayer);
       state.overlayLayer = null;
@@ -295,6 +340,12 @@
       map.removeLayer(state.isoLayer);
       state.isoLayer = null;
     }
+    if (state.poiLayer) {
+      map.removeLayer(state.poiLayer);
+      state.poiLayer = null;
+    }
+    state.pois = [];
+    state.poisById = {};
     state.frameTimes = [];
     state.statsByTime = {};
     state.bounds = null;
@@ -306,6 +357,8 @@
     const data = await res.json();
     state.bounds = data.bounds_wgs84; // [west, south, east, north]
     state.frameTimes = data.frame_times_s;
+    state.pois = data.pois || [];
+    state.poisById = Object.fromEntries(state.pois.map((p) => [p.id, p]));
     state.statsByTime = {};
     for (const s of data.stats_history) {
       state.statsByTime[s.time_s] = s;
@@ -327,10 +380,21 @@
   }
 
   async function showFrame(timeS) {
+    // Requests can resolve out of order (rapid slider drags, or a new
+    // simulation starting while an older frame fetch is still in
+    // flight); a stale response must not touch the map, or it leaves
+    // an extra isochrone layer behind that the current frame never
+    // removes (since it only ever removes what *it* last added).
+    const requestId = ++state.frameRequestId;
+    const jobId = state.jobId;
     $("frame-value").textContent = `${(timeS / 3600).toFixed(1)} h`;
 
     if (state.overlayLayer) map.removeLayer(state.overlayLayer);
     if (state.isoLayer) map.removeLayer(state.isoLayer);
+    if (state.poiLayer) map.removeLayer(state.poiLayer);
+    state.overlayLayer = null;
+    state.isoLayer = null;
+    state.poiLayer = null;
 
     if (state.bounds) {
       const [west, south, east, north] = state.bounds;
@@ -339,7 +403,7 @@
         [north, east],
       ];
       state.overlayLayer = L.imageOverlay(
-        `/api/simulate/${state.jobId}/frame/${timeS}/image.png`,
+        `/api/simulate/${jobId}/frame/${timeS}/image.png`,
         leafletBounds,
         { opacity: 0.85 }
       ).addTo(map);
@@ -349,8 +413,9 @@
       }
     }
 
-    const res = await fetch(`/api/simulate/${state.jobId}/frame/${timeS}`);
+    const res = await fetch(`/api/simulate/${jobId}/frame/${timeS}`);
     const frame = await res.json();
+    if (requestId !== state.frameRequestId) return;
     const group = L.layerGroup();
     for (const iso of frame.isochrones) {
       for (const line of iso.coordinates) {
@@ -363,6 +428,35 @@
       }
     }
     state.isoLayer = group.addTo(map);
+
+    const poiGroup = L.layerGroup();
+    for (const poi of frame.poi_arrival) {
+      const color = poi.reached ? "#c4471e" : "#5b6b63";
+      const geometry = state.poisById[poi.id]?.geometry;
+      const shape =
+        geometry && geometry.length > 1
+          ? L.polyline(geometry, { color, weight: 4, opacity: 0.85 })
+          : L.circleMarker([poi.lat, poi.lon], {
+              radius: 6,
+              weight: 1.5,
+              color: "#1b2320",
+              fillColor: color,
+              fillOpacity: 0.85,
+            });
+      const categoryLabel = poi.category.replace(/_/g, " ");
+      const details = [];
+      if (poi.voltage) details.push(`${poi.voltage} V`);
+      if (poi.operator) details.push(poi.operator);
+      const label =
+        (poi.name ? `${poi.name} (${categoryLabel})` : categoryLabel) +
+        (details.length ? ` [${details.join(", ")}]` : "");
+      const tooltip = poi.reached
+        ? i18n.t("poi.tooltip.reachedAt", { label, hours: poi.arrival_time_h.toFixed(1) })
+        : i18n.t("poi.tooltip.notReached", { label });
+      shape.bindTooltip(tooltip);
+      shape.addTo(poiGroup);
+    }
+    state.poiLayer = poiGroup.addTo(map);
 
     const stats = state.statsByTime[timeS];
     if (stats) {

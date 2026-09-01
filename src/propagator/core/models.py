@@ -158,6 +158,21 @@ class PropagatorStats:
 
 
 @dataclass(frozen=True)
+class CellArrivalSample:
+    """Arrival-time sample at one grid cell, keyed by an opaque string id
+    supplied by the caller (e.g. an OSM POI id). Deliberately carries no
+    lat/lon/name/tags: identity/geospatial meaning is an io/web-layer
+    concern, keeping the core engine I/O-agnostic (see CLAUDE.md)."""
+
+    key: str
+    row: int
+    col: int
+    reached: bool
+    min_arrival_time: float  # seconds; NaN if not reached
+    mean_arrival_time: float  # seconds; NaN if not reached
+
+
+@dataclass(frozen=True)
 class PropagatorOutput:
     """Snapshot of simulation outputs at a given time step."""
 
@@ -171,4 +186,7 @@ class PropagatorOutput:
     ros_max: npt.NDArray[np.floating]
     fli_mean: npt.NDArray[np.floating]
     fli_max: npt.NDArray[np.floating]
+    flame_length_mean: npt.NDArray[np.floating]
+    flame_length_max: npt.NDArray[np.floating]
     stats: PropagatorStats
+    poi_arrival: tuple[CellArrivalSample, ...] = field(default_factory=tuple)

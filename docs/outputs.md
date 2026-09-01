@@ -20,6 +20,8 @@ aggregated across the stochastic realizations of the run.
 | `ros_max` | m/min | Maximum rate of spread across realizations. |
 | `fli_mean` | kW/m | Mean fireline intensity over realizations where the cell burned. |
 | `fli_max` | kW/m | Maximum fireline intensity across realizations. |
+| `flame_length_mean` | m | Mean Byram flame length over realizations where the cell burned, derived from fireline intensity via Byram's (1959) empirical relation. Not a temperature: a proxy for fire severity/containment difficulty, historically correlated with observed flame length. |
+| `flame_length_max` | m | Maximum Byram flame length across realizations. |
 | `spotting_generation_probability` | [0, 1] | Fraction of realizations in which the cell launched at least one ember (all zeros when spotting is disabled). See [Fire Spotting](spotting.md). |
 | `spotting_receiving_probability` | [0, 1] | Fraction of realizations in which the cell was hit by an ember (all zeros when spotting is disabled). |
 | `stats` | — | Aggregate statistics: number of active cells and burned-area mean and 50/75/90th percentiles. |
@@ -50,6 +52,7 @@ arrival time — combine it with `fire_probability` when communicating risk.
 When running through the CLI, each reporting interval writes one GeoTIFF per
 variable: `fire_probability`, `min_arrival_time`, `mean_arrival_time`,
 `ros_mean`, `ros_max`, `fireline_intensity_mean`, `fireline_intensity_max`,
-and — when spotting is enabled in the configuration —
-`spotting_generation_probability` and `spotting_receiving_probability`.
+`flame_length_mean`, `flame_length_max`, and — when spotting is enabled in
+the configuration — `spotting_generation_probability` and
+`spotting_receiving_probability`.
 See [CLI Usage](cli.md) for invocation details.

@@ -8,8 +8,10 @@ from pyproj import CRS, Transformer
 
 from propagator.io.data_prep import AreaDataResult
 from propagator.io.geo import GeographicInfo
+from propagator.io.osm_poi import POI, OverpassError
 from propagator.web.jobs import JobManager, JobState, JobStatus
 from propagator.web.runner import (
+    build_sample_cells,
     build_simulator,
     run_job,
     run_loop,
@@ -129,19 +131,28 @@ def test_schedule_actions_heavy_action_blocks_ignition_cell():
         veg, dem, request, ign_row=ign_row, ign_col=ign_col
     )
     schedule_actions(simulator, request, geo_info)
-    run_loop(simulator, job)
+    # seed the global RNG (numba draws from it) so the stochastic spread
+    # attempt from the neutralized cell is reproducible, and restore the
+    # previous state afterwards
+    rng_state = np.random.get_state()
+    np.random.seed(20240601)
+    try:
+        run_loop(simulator, job)
+    finally:
+        np.random.set_state(rng_state)
 
     assert job.status == JobStatus.DONE
     # the ignition cell was neutralized by the heavy_action before the fire
     # ever started spreading: it registers as burned (ignition forces the
     # cell alight regardless of fuel) but never propagates beyond it, so
-    # burned area stays pinned at exactly one cell instead of growing like
-    # in the unprotected case. Pending stochastic events are deliberately
-    # not asserted here: seeding NumPy does not seed Numba's independent RNG.
+    # burned area stays pinned at exactly one cell and the front dies
+    # immediately (n_active == 0) instead of growing like in the
+    # unprotected case (test_run_loop_produces_frames_with_consistent_shape_and_growing_area)
     one_cell_area = request.cellsize**2
     for t in job.frame_times:
         stats = job.frames[t].stats
         assert stats["area_mean"] == one_cell_area
+        assert stats["n_active"] == 0
 
 
 def _write_tiny_geotiff(path, array, transform, crs):
@@ -198,6 +209,9 @@ def test_run_job_full_orchestration_with_stubbed_prepare_area_data(
     monkeypatch.setattr(
         "propagator.web.runner.latlon_to_rowcol", lambda *a, **k: (10, 10)
     )
+    monkeypatch.setattr(
+        "propagator.web.runner.fetch_area_pois", lambda *a, **k: []
+    )
 
     manager = JobManager()
     request = make_request(time_limit_h=1.0, time_resolution_h=1.0)
@@ -209,6 +223,221 @@ def test_run_job_full_orchestration_with_stubbed_prepare_area_data(
     assert job.error is None
     assert job.geo_info is not None
     assert len(job.frame_times) > 0
+
+
+def test_run_job_reports_pois_and_arrival(monkeypatch, tmp_path):
+    size = 20
+    transform = rio.Affine(30.0, 0.0, 500000.0, 0.0, -30.0, 4700000.0)
+    dem_path = tmp_path / "dem.tif"
+    fuel_path = tmp_path / "fuel.tif"
+    _write_tiny_geotiff(
+        dem_path,
+        np.zeros((size, size), dtype=np.float32),
+        transform,
+        "EPSG:32633",
+    )
+    _write_tiny_geotiff(
+        fuel_path,
+        np.full((size, size), 4, dtype=np.int16),
+        transform,
+        "EPSG:32633",
+    )
+    with rio.open(dem_path) as f:
+        geo_info = GeographicInfo.from_file(f)
+
+    def fake_prepare_area_data(*args, **kwargs):
+        return AreaDataResult(
+            dem_path=dem_path,
+            fuel_path=fuel_path,
+            geo_info=geo_info,
+            utm_epsg="EPSG:32633",
+            ignition_fuel_code=4,
+            ignition_warning=None,
+        )
+
+    poi = POI(
+        osm_id=1,
+        osm_type="node",
+        category="hospital",
+        name="Test Hospital",
+        lat=42.42,
+        lon=12.11,
+        tags={"amenity": "hospital"},
+    )
+
+    monkeypatch.setattr(
+        "propagator.web.runner.prepare_area_data", fake_prepare_area_data
+    )
+    monkeypatch.setattr(
+        "propagator.web.runner.latlon_to_rowcol", lambda *a, **k: (10, 10)
+    )
+    fetch_calls = []
+
+    def fake_fetch_area_pois(*args, **kwargs):
+        fetch_calls.append(kwargs)
+        return [poi]
+
+    monkeypatch.setattr(
+        "propagator.web.runner.fetch_area_pois", fake_fetch_area_pois
+    )
+
+    manager = JobManager()
+    request = make_request(
+        time_limit_h=1.0,
+        time_resolution_h=1.0,
+        include_pois=True,
+        max_pois=250,
+        poi_categories=["hospital", "power"],
+    )
+    job = make_job(request)
+
+    run_job(job, manager)
+
+    assert job.status == JobStatus.DONE
+    assert job.pois == [poi]
+    assert job.poi_cells == [("node/1#0", 10, 10)]
+    assert any(job.frames[t].poi_arrival for t in job.frame_times)
+    assert len(fetch_calls) == 1
+    assert fetch_calls[0]["max_pois"] == 250
+    assert fetch_calls[0]["categories"] == ["hospital", "power"]
+
+
+def test_run_job_continues_with_warning_when_overpass_fails(
+    monkeypatch, tmp_path
+):
+    size = 20
+    transform = rio.Affine(30.0, 0.0, 500000.0, 0.0, -30.0, 4700000.0)
+    dem_path = tmp_path / "dem.tif"
+    fuel_path = tmp_path / "fuel.tif"
+    _write_tiny_geotiff(
+        dem_path,
+        np.zeros((size, size), dtype=np.float32),
+        transform,
+        "EPSG:32633",
+    )
+    _write_tiny_geotiff(
+        fuel_path,
+        np.full((size, size), 4, dtype=np.int16),
+        transform,
+        "EPSG:32633",
+    )
+    with rio.open(dem_path) as f:
+        geo_info = GeographicInfo.from_file(f)
+
+    def fake_prepare_area_data(*args, **kwargs):
+        return AreaDataResult(
+            dem_path=dem_path,
+            fuel_path=fuel_path,
+            geo_info=geo_info,
+            utm_epsg="EPSG:32633",
+            ignition_fuel_code=4,
+            ignition_warning=None,
+        )
+
+    def fake_fetch_area_pois(*args, **kwargs):
+        raise OverpassError("boom")
+
+    monkeypatch.setattr(
+        "propagator.web.runner.prepare_area_data", fake_prepare_area_data
+    )
+    monkeypatch.setattr(
+        "propagator.web.runner.latlon_to_rowcol", lambda *a, **k: (10, 10)
+    )
+    monkeypatch.setattr(
+        "propagator.web.runner.fetch_area_pois", fake_fetch_area_pois
+    )
+
+    manager = JobManager()
+    request = make_request(time_limit_h=1.0, time_resolution_h=1.0)
+    job = make_job(request)
+
+    run_job(job, manager)
+
+    assert job.status == JobStatus.DONE
+    assert job.pois == []
+    assert job.poi_warning is not None and "boom" in job.poi_warning
+
+
+def test_build_sample_cells_drops_pois_outside_grid():
+    transform = rio.Affine(30.0, 0.0, 500000.0, 0.0, -30.0, 4700000.0)
+    geo_info = GeographicInfo(
+        crs=CRS.from_epsg(32633),
+        trans=transform,
+        bounds=(500000.0, 4700000.0 - 20 * 30, 500000.0 + 20 * 30, 4700000.0),
+        shape=(20, 20),
+    )
+    inside_lat, inside_lon = _pixel_center_lonlat(
+        transform, "EPSG:32633", 5, 5
+    )
+
+    pois = [
+        POI(1, "node", "hospital", "Inside", inside_lat, inside_lon, {}),
+        POI(2, "node", "hospital", "Outside", 0.0, 0.0, {}),
+    ]
+
+    cells = build_sample_cells(pois, geo_info, "EPSG:32633")
+    assert cells == [("node/1#0", 5, 5)]
+
+
+def test_build_sample_cells_samples_along_line_geometry():
+    transform = rio.Affine(30.0, 0.0, 500000.0, 0.0, -30.0, 4700000.0)
+    geo_info = GeographicInfo(
+        crs=CRS.from_epsg(32633),
+        trans=transform,
+        bounds=(500000.0, 4700000.0 - 20 * 30, 500000.0 + 20 * 30, 4700000.0),
+        shape=(20, 20),
+    )
+    p0 = _pixel_center_lonlat(transform, "EPSG:32633", 2, 2)
+    p1 = _pixel_center_lonlat(transform, "EPSG:32633", 5, 5)
+    p2 = _pixel_center_lonlat(transform, "EPSG:32633", 8, 8)
+
+    line_poi = POI(
+        1,
+        "way",
+        "power_line",
+        None,
+        p1[0],
+        p1[1],
+        {},
+        geometry=(p0, p1, p2),
+    )
+
+    cells = build_sample_cells([line_poi], geo_info, "EPSG:32633")
+    assert cells == [
+        ("way/1#0", 2, 2),
+        ("way/1#1", 5, 5),
+        ("way/1#2", 8, 8),
+    ]
+
+
+def test_build_sample_cells_dedupes_repeated_cells_along_geometry():
+    transform = rio.Affine(30.0, 0.0, 500000.0, 0.0, -30.0, 4700000.0)
+    geo_info = GeographicInfo(
+        crs=CRS.from_epsg(32633),
+        trans=transform,
+        bounds=(500000.0, 4700000.0 - 20 * 30, 500000.0 + 20 * 30, 4700000.0),
+        shape=(20, 20),
+    )
+    p0 = _pixel_center_lonlat(transform, "EPSG:32633", 3, 3)
+    p1 = _pixel_center_lonlat(transform, "EPSG:32633", 3, 3)
+    p2 = _pixel_center_lonlat(transform, "EPSG:32633", 7, 7)
+
+    line_poi = POI(
+        1,
+        "way",
+        "power_line",
+        None,
+        p0[0],
+        p0[1],
+        {},
+        geometry=(p0, p1, p2),
+    )
+
+    cells = build_sample_cells([line_poi], geo_info, "EPSG:32633")
+    assert cells == [
+        ("way/1#0", 3, 3),
+        ("way/1#1", 7, 7),
+    ]
 
 
 def test_run_job_fails_fast_when_ignition_outside_grid(monkeypatch, tmp_path):

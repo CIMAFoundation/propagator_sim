@@ -6,7 +6,9 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
+from propagator.core.models import CellArrivalSample
 from propagator.io.geo import GeographicInfo
+from propagator.io.osm_poi import POI
 from propagator.web.app import app
 from propagator.web.deps import get_job_manager
 from propagator.web.jobs import FrameData, JobManager, JobStatus
@@ -32,7 +34,13 @@ def synchronous_runner(job, manager):
     job.frames[3600] = FrameData(
         time_s=3600,
         fire_probability=fp,
-        stats={"n_active": 3, "area_mean": 1000.0, "area_50": 500.0, "area_75": 100.0, "area_90": 0.0},
+        stats={
+            "n_active": 3,
+            "area_mean": 1000.0,
+            "area_50": 500.0,
+            "area_75": 100.0,
+            "area_90": 0.0,
+        },
     )
     job.frame_times.append(3600)
     job.current_time_s = 3600
@@ -114,10 +122,12 @@ def test_frames_and_frame_endpoints_after_completion(client):
     frames = frames_res.json()
     assert frames["frame_times_s"] == [3600]
     assert frames["bounds_wgs84"] is not None
+    assert frames["pois"] == []
 
     frame_res = http.get(f"/api/simulate/{job_id}/frame/3600")
     assert frame_res.status_code == 200
     assert frame_res.json()["stats"]["n_active"] == 3
+    assert frame_res.json()["poi_arrival"] == []
 
     png_res = http.get(f"/api/simulate/{job_id}/frame/3600/image.png")
     assert png_res.status_code == 200
@@ -153,6 +163,64 @@ def test_frame_png_and_isochrones_are_cached_after_first_request(client):
     assert frame.isochrone_cache is cached_iso
 
 
+def test_line_poi_arrival_is_aggregated_across_samples(client):
+    http, manager = client
+    res = http.post("/api/simulate", json=base_request())
+    job_id = res.json()["job_id"]
+
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        if http.get(f"/api/simulate/{job_id}").json()["status"] == "done":
+            break
+        time.sleep(0.05)
+
+    job = manager.get(job_id)
+    job.pois = [
+        POI(
+            osm_id=1,
+            osm_type="way",
+            category="power_line",
+            name="Test Line",
+            lat=42.0,
+            lon=12.0,
+            tags={},
+            voltage="132000",
+            operator="Terna",
+            geometry=((42.0, 12.0), (42.01, 12.01)),
+        )
+    ]
+    job.frames[3600].poi_arrival = (
+        CellArrivalSample("way/1#0", 1, 1, False, float("nan"), float("nan")),
+        CellArrivalSample("way/1#1", 2, 2, True, 100.0, 120.0),
+    )
+
+    frame_res = http.get(f"/api/simulate/{job_id}/frame/3600")
+    assert frame_res.status_code == 200
+    poi_arrival = frame_res.json()["poi_arrival"]
+    assert len(poi_arrival) == 1
+    entry = poi_arrival[0]
+    assert entry["id"] == "way/1"
+    assert entry["reached"] is True
+    assert entry["arrival_time_h"] == pytest.approx(120.0 / 3600.0)
+    assert entry["voltage"] == "132000"
+    assert entry["operator"] == "Terna"
+
+    frames_res = http.get(f"/api/simulate/{job_id}/frames")
+    poi_out = frames_res.json()["pois"]
+    assert poi_out == [
+        {
+            "id": "way/1",
+            "name": "Test Line",
+            "category": "power_line",
+            "lat": 42.0,
+            "lon": 12.0,
+            "voltage": "132000",
+            "operator": "Terna",
+            "geometry": [[42.0, 12.0], [42.01, 12.01]],
+        }
+    ]
+
+
 def test_manual_page_is_served(client):
     http, _ = client
     res = http.get("/manual.html")
@@ -161,6 +229,18 @@ def test_manual_page_is_served(client):
 
     index_res = http.get("/index.html")
     assert 'href="manual.html"' in index_res.text
+
+
+def test_italian_manual_and_locales_are_served(client):
+    http, _ = client
+    res = http.get("/manual.it.html")
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/html")
+
+    for lang in ("en", "it"):
+        res = http.get(f"/locales/{lang}.json")
+        assert res.status_code == 200
+        assert res.json()["run.button"]
 
 
 def test_cancel_and_delete(client):
