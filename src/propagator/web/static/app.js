@@ -16,6 +16,15 @@
   // Mirrors the #max-pois input's default and io.osm_poi.DEFAULT_MAX_POIS.
   const DEFAULT_MAX_POIS = 1000;
 
+  // Leaflet reports the longitude of the world copy that was actually
+  // clicked, so panning across the antimeridian yields values outside
+  // [-180, 180] (e.g. 260 for a click in Canada reached going east).
+  // The server rejects those, so normalize before storing/sending.
+  // Markers and drawn lines keep the raw click coordinates, which is
+  // what puts them on the copy the user is looking at.
+  const wrapLon = (lon) =>
+    lon >= -180 && lon <= 180 ? lon : (((lon + 180) % 360) + 360) % 360 - 180;
+
   const state = {
     mode: "center",
     center: null,
@@ -121,7 +130,7 @@
   map.on("click", (e) => {
     const { lat, lng } = e.latlng;
     if (state.mode === "center") {
-      state.center = { lat, lon: lng };
+      state.center = { lat, lon: wrapLon(lng) };
       if (state.centerMarker) {
         state.centerMarker.setLatLng(e.latlng);
       } else {
@@ -138,7 +147,7 @@
       }
       setMode("ignition");
     } else if (state.mode === "ignition") {
-      state.ignition = { lat, lon: lng };
+      state.ignition = { lat, lon: wrapLon(lng) };
       if (state.ignitionMarker) {
         state.ignitionMarker.setLatLng(e.latlng);
       } else {
@@ -245,7 +254,7 @@
       actions: state.actions.map((a) => ({
         action_type: a.action_type,
         time_h: a.time_h,
-        line: a.line,
+        line: a.line.map(([plat, plon]) => [plat, wrapLon(plon)]),
       })),
     };
   }
