@@ -93,12 +93,19 @@ def test_schedule_actions_heavy_action_blocks_ignition_cell():
     geo_info = GeographicInfo(
         crs=CRS.from_epsg(32633),
         trans=transform,
-        bounds=(500000.0, 4700000.0 - size * 30, 500000.0 + size * 30, 4700000.0),
+        bounds=(
+            500000.0,
+            4700000.0 - size * 30,
+            500000.0 + size * 30,
+            4700000.0,
+        ),
         shape=(size, size),
     )
     ign_row, ign_col = 15, 15
     lat0, lon0 = _pixel_center_lonlat(transform, utm_epsg, ign_row, ign_col)
-    lat1, lon1 = _pixel_center_lonlat(transform, utm_epsg, ign_row, ign_col + 1)
+    lat1, lon1 = _pixel_center_lonlat(
+        transform, utm_epsg, ign_row, ign_col + 1
+    )
 
     veg = np.full((size, size), 4, dtype=np.int32)  # all grassland: burns
     dem = np.zeros((size, size), dtype=np.float32)
@@ -118,30 +125,23 @@ def test_schedule_actions_heavy_action_blocks_ignition_cell():
     )
     job = make_job(request)
 
-    simulator = build_simulator(veg, dem, request, ign_row=ign_row, ign_col=ign_col)
+    simulator = build_simulator(
+        veg, dem, request, ign_row=ign_row, ign_col=ign_col
+    )
     schedule_actions(simulator, request, geo_info)
-    # seed the global RNG (numba draws from it) so the stochastic spread
-    # attempt from the neutralized cell is reproducible, and restore the
-    # previous state afterwards
-    rng_state = np.random.get_state()
-    np.random.seed(20240601)
-    try:
-        run_loop(simulator, job)
-    finally:
-        np.random.set_state(rng_state)
+    run_loop(simulator, job)
 
     assert job.status == JobStatus.DONE
     # the ignition cell was neutralized by the heavy_action before the fire
     # ever started spreading: it registers as burned (ignition forces the
     # cell alight regardless of fuel) but never propagates beyond it, so
-    # burned area stays pinned at exactly one cell and the front dies
-    # immediately (n_active == 0) instead of growing like in the
-    # unprotected case (test_run_loop_produces_frames_with_consistent_shape_and_growing_area)
+    # burned area stays pinned at exactly one cell instead of growing like
+    # in the unprotected case. Pending stochastic events are deliberately
+    # not asserted here: seeding NumPy does not seed Numba's independent RNG.
     one_cell_area = request.cellsize**2
     for t in job.frame_times:
         stats = job.frames[t].stats
         assert stats["area_mean"] == one_cell_area
-        assert stats["n_active"] == 0
 
 
 def _write_tiny_geotiff(path, array, transform, crs):
@@ -159,13 +159,18 @@ def _write_tiny_geotiff(path, array, transform, crs):
         dst.write(array, 1)
 
 
-def test_run_job_full_orchestration_with_stubbed_prepare_area_data(monkeypatch, tmp_path):
+def test_run_job_full_orchestration_with_stubbed_prepare_area_data(
+    monkeypatch, tmp_path
+):
     size = 20
     transform = rio.Affine(30.0, 0.0, 500000.0, 0.0, -30.0, 4700000.0)
     dem_path = tmp_path / "dem.tif"
     fuel_path = tmp_path / "fuel.tif"
     _write_tiny_geotiff(
-        dem_path, np.zeros((size, size), dtype=np.float32), transform, "EPSG:32633"
+        dem_path,
+        np.zeros((size, size), dtype=np.float32),
+        transform,
+        "EPSG:32633",
     )
     _write_tiny_geotiff(
         fuel_path,
@@ -212,7 +217,10 @@ def test_run_job_fails_fast_when_ignition_outside_grid(monkeypatch, tmp_path):
     dem_path = tmp_path / "dem.tif"
     fuel_path = tmp_path / "fuel.tif"
     _write_tiny_geotiff(
-        dem_path, np.zeros((size, size), dtype=np.float32), transform, "EPSG:32633"
+        dem_path,
+        np.zeros((size, size), dtype=np.float32),
+        transform,
+        "EPSG:32633",
     )
     _write_tiny_geotiff(
         fuel_path,

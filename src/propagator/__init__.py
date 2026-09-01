@@ -1,7 +1,5 @@
 import os
 
-from pyproj import datadir as _pyproj_datadir
-
 from .core import (
     FUEL_SYSTEM_LEGACY,
     BoundaryConditions,
@@ -13,9 +11,23 @@ from .core import (
     get_p_time_fn,
 )
 
-_proj_data_dir = _pyproj_datadir.get_data_dir()
-os.environ["PROJ_LIB"] = _proj_data_dir
-os.environ["PROJ_DATA"] = _proj_data_dir
+
+def _configure_proj_data() -> None:
+    """Prefer pyproj's bundled data without making pyproj mandatory."""
+    try:
+        from pyproj import datadir
+    except ModuleNotFoundError as exc:
+        if exc.name != "pyproj":
+            raise
+        return
+
+    proj_data_dir = datadir.get_data_dir()
+    os.environ["PROJ_LIB"] = proj_data_dir
+    os.environ["PROJ_DATA"] = proj_data_dir
+
+
+_configure_proj_data()
+del _configure_proj_data
 
 __all__ = [
     "BoundaryConditions",
