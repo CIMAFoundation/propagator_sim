@@ -40,9 +40,18 @@
     if (dicts[lang]) return dicts[lang];
     try {
       const res = await fetch(`/locales/${lang}.json`);
+      // Check res.ok: fetch only rejects on network failure, so a 404 or
+      // 500 arrives here as a successful response whose HTML body then
+      // throws inside res.json().
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       dicts[lang] = await res.json();
-    } catch {
-      dicts[lang] = {};
+    } catch (err) {
+      // Deliberately not cached: storing {} here would make every later
+      // lookup (including the English fallback other locales rely on)
+      // silently resolve to the raw key forever. Leaving it unset lets a
+      // later language switch retry the fetch.
+      console.error(`Could not load the ${lang} locale`, err);
+      return {};
     }
     return dicts[lang];
   }

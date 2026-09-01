@@ -272,6 +272,11 @@ def fetch_overpass(
             requests.HTTPError,
             requests.ConnectionError,
             requests.Timeout,
+            # A truncated or HTML body from an overloaded mirror surfaces
+            # as JSONDecodeError (a ValueError, and a RequestException,
+            # but neither of the three above) -- exactly the transient
+            # condition this loop exists to ride out, so retry it too.
+            ValueError,
         ) as e:
             last_error = e
             if attempt < max_retries - 1:

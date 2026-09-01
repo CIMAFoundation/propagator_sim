@@ -36,14 +36,20 @@ from propagator.web.schemas import SimulateRequest
 
 logger = logging.getLogger(__name__)
 
-# Cap on how many vertices of one POI's geometry are sampled for fire
-# arrival. Every sampled cell is re-checked each frame and its
-# CellArrivalSample retained for the life of the job, so an uncapped
-# expansion (a single power line can carry hundreds of vertices, against
-# up to 5000 POIs) would run into hundreds of MB and a per-frame Python
-# loop scaling with total vertex count -- neither covered by the request
-# guardrails in `web.schemas`.
+# Sampling budget for POI fire-arrival. Every sampled cell is re-checked
+# each frame and its CellArrivalSample retained for the life of the job,
+# so the cost scales with cells x frames: at the limits `web.schemas`
+# accepts (5000 POIs, 96 frames) an uncapped expansion runs into
+# millions of live dataclasses and a per-frame Python loop to match --
+# none of it covered by CELL_REALIZATION_BUDGET or
+# MAX_ESTIMATED_MEMORY_BYTES, which only budget the simulation arrays.
+#
+# MAX_VERTICES_PER_POI bounds the detail of any one geometry;
+# MAX_SAMPLE_CELLS bounds the total, since the per-POI cap alone still
+# multiplies by the POI count. With the default 1000 POIs both stay
+# comfortably clear of the total budget, so the usual run is unaffected.
 MAX_VERTICES_PER_POI = 64
+MAX_SAMPLE_CELLS = 10000
 
 
 def cache_dir() -> Path:
@@ -93,6 +99,10 @@ def _sampled_vertices(
     between the kept vertices.
     """
     n = len(geometry)
+    if max_vertices <= 1:
+        # "one vertex" is a legitimate request (sample the POI as a
+        # point); it also keeps the step below from dividing by zero.
+        return [geometry[0]]
     if n <= max_vertices:
         return list(geometry)
     step = (n - 1) / (max_vertices - 1)
@@ -105,6 +115,7 @@ def build_sample_cells(
     geo_info: GeographicInfo,
     utm_epsg: str,
     max_vertices_per_poi: int = MAX_VERTICES_PER_POI,
+    max_sample_cells: int = MAX_SAMPLE_CELLS,
 ) -> list[tuple[str, int, int]]:
     """Convert each POI to one or more (row, col) grid cells via the same
     transform used for the ignition point, dropping any that fall outside
@@ -113,16 +124,26 @@ def build_sample_cells(
     A POI with a `geometry` (a line or polygon way, e.g. a power line or
     a substation footprint) is sampled along its extent rather than at a
     single representative point, so fire arrival is detected anywhere
-    along it, not just at its centroid. At most `max_vertices_per_poi`
-    vertices are sampled, spread evenly (see `_sampled_vertices`), which
-    bounds both the per-frame sampling cost and the `CellArrivalSample`
-    objects every frame retains. Each sample gets a `"{poi.key}#{i}"` key
-    (grid cells revisited by the geometry are deduplicated); a plain
-    point POI still gets a single `"...#0"` key, for a uniform key scheme
-    regardless of geometry.
+    along it, not just at its centroid. Each sample gets a
+    `"{poi.key}#{i}"` key (grid cells revisited by the geometry are
+    deduplicated); a plain point POI still gets a single `"...#0"` key,
+    for a uniform key scheme regardless of geometry.
+
+    Sampling is bounded twice over, because per-frame cost and retained
+    `CellArrivalSample` objects scale with the total: at most
+    `max_vertices_per_poi` vertices per geometry, spread evenly (see
+    `_sampled_vertices`), and at most roughly `max_sample_cells` cells
+    across all geometries — the per-POI allowance shrinks as the number
+    of geometry-bearing POIs grows. Point POIs are one cell each and are
+    already bounded by the request's `max_pois`.
     """
     cells = []
     height, width = geo_info.shape
+    n_geometries = sum(1 for p in pois if p.geometry and len(p.geometry) > 1)
+    if n_geometries:
+        max_vertices_per_poi = min(
+            max_vertices_per_poi, max(1, max_sample_cells // n_geometries)
+        )
     # One transformer for every vertex of every POI: building one costs
     # ~0.2 ms, and a run with many geometry-bearing POIs (power lines,
     # substation footprints) converts thousands of vertices here.
@@ -283,6 +304,14 @@ def run_job(job: JobState, manager: JobManager) -> None:
                     "without the POI overlay",
                     job.id,
                 )
+            # The fetch can take ~100 s against an unresponsive endpoint
+            # (retries plus backoff). Without a check here a cancel
+            # issued during it isn't honoured until run_loop's first
+            # iteration -- after the simulator is built -- and `submit`
+            # keeps rejecting new runs for that whole window.
+            if job.cancel_requested:
+                job.status = JobStatus.CANCELLED
+                return
 
         simulator = build_simulator(veg, dem, request, ign_row, ign_col)
         schedule_actions(simulator, request, geo_info)

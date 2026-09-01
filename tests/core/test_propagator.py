@@ -407,12 +407,30 @@ def test_passing_precomputed_grids_does_not_change_results():
         )
 
 
-def test_flame_length_is_derived_lazily_and_cached():
-    """`get_output` no longer computes the flame-length products eagerly:
-    the mean needs a full (rows, cols, realizations) transient that
-    consumers which never read it (the web UI) shouldn't pay for on every
-    frame. The values must still match the direct computation, and be
-    computed only once per snapshot."""
+def test_get_output_is_a_stable_snapshot_of_flame_length():
+    """Regression test: flame_length_mean was briefly computed lazily
+    against the live simulator while flame_length_max was bound to the
+    snapshot, so a retained PropagatorOutput could report a mean larger
+    than its own max once the run advanced."""
+    propagator = make_propagator(realizations=2)
+    propagator.fire = np.ones((2, 2, 2), dtype=np.int8)
+    propagator.fireline_int = np.full((2, 2, 2), 10.0, dtype=np.float32)
+
+    output = propagator.get_output()
+    mean_at_t = output.flame_length_mean.copy()
+    max_at_t = output.flame_length_max.copy()
+
+    # the simulation advances after the consumer took its snapshot
+    propagator.fireline_int = np.full((2, 2, 2), 1000.0, dtype=np.float32)
+
+    np.testing.assert_allclose(output.flame_length_mean, mean_at_t)
+    np.testing.assert_allclose(output.flame_length_max, max_at_t)
+    assert np.all(output.flame_length_mean <= output.flame_length_max)
+
+
+def test_flame_length_mean_matches_a_whole_grid_reduction():
+    """The mean accumulates one realization at a time to avoid a full 3D
+    flame-length transient; that must not change the result."""
     propagator = make_propagator(realizations=2)
     propagator.fire = np.array(
         [[[1, 0], [0, 1]], [[1, 1], [0, 0]]], dtype=np.int8
@@ -422,51 +440,14 @@ def test_flame_length_is_derived_lazily_and_cached():
         dtype=np.float32,
     )
 
-    calls = {"n": 0}
-    real_mean = propagator.compute_flame_length_mean
+    from propagator.core.propagator import _byram_flame_length
 
-    def counting_mean():
-        calls["n"] += 1
-        return real_mean()
-
-    propagator.compute_flame_length_mean = counting_mean
-    output = propagator.get_output()
-    assert calls["n"] == 0, "must not be computed until read"
-
+    expected = propagator._compute_variable_mean(
+        _byram_flame_length(propagator.fireline_int)
+    )
     np.testing.assert_allclose(
-        output.flame_length_mean, real_mean(), equal_nan=True
+        propagator.compute_flame_length_mean(), expected, equal_nan=True
     )
-    assert calls["n"] == 1
-    # second read is served from the cache, not recomputed
-    output.flame_length_mean
-    assert calls["n"] == 1
-
-    np.testing.assert_allclose(
-        output.flame_length_max,
-        propagator.compute_flame_length_max(),
-        equal_nan=True,
-    )
-
-
-def test_flame_length_raises_clearly_on_a_hand_built_output():
-    from propagator.core.models import PropagatorOutput, PropagatorStats
-
-    grid = np.zeros((2, 2), dtype=np.float32)
-    output = PropagatorOutput(
-        time=0,
-        fire_probability=grid,
-        spotting_generation_probability=grid,
-        spotting_receiving_probability=grid,
-        mean_arrival_time=grid,
-        min_arrival_time=grid,
-        ros_mean=grid,
-        ros_max=grid,
-        fli_mean=grid,
-        fli_max=grid,
-        stats=PropagatorStats(0, 0.0, 0.0, 0.0, 0.0),
-    )
-    with pytest.raises(AttributeError):
-        output.flame_length_mean
 
 
 def test_byram_flame_length_does_not_mutate_its_input():

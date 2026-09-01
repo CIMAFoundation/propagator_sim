@@ -334,6 +334,39 @@ def test_fetch_overpass_raises_after_exhausting_retries(monkeypatch, tmp_path):
         pass
 
 
+def test_fetch_overpass_retries_a_malformed_body(monkeypatch, tmp_path):
+    """A truncated or HTML body from an overloaded mirror surfaces as
+    JSONDecodeError, which is neither HTTPError, ConnectionError nor
+    Timeout -- it used to abort on the first attempt, though it is
+    exactly the transient condition the retry loop exists for."""
+    attempts = {"n": 0}
+
+    class FakeResponse:
+        def __init__(self, ok):
+            self._ok = ok
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            if not self._ok:
+                raise ValueError("Expecting value: line 1 column 1")
+            return {"elements": []}
+
+    def fake_post(url, data, headers, timeout):
+        attempts["n"] += 1
+        return FakeResponse(ok=attempts["n"] >= 3)
+
+    monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setattr("propagator.io.osm_poi.time.sleep", lambda s: None)
+
+    result = fetch_overpass(
+        "q", cache_dir=tmp_path, max_retries=3, backoff_s=0
+    )
+    assert result == {"elements": []}
+    assert attempts["n"] == 3
+
+
 def test_fetch_overpass_fails_fast_on_a_remark_and_never_caches_it(
     monkeypatch, tmp_path
 ):

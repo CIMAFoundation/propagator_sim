@@ -201,7 +201,10 @@ def test_line_poi_arrival_is_aggregated_across_samples(client):
     entry = poi_arrival[0]
     assert entry["id"] == "way/1"
     assert entry["reached"] is True
-    assert entry["arrival_time_h"] == pytest.approx(120.0 / 3600.0)
+    # the earliest simulated arrival across the POI's sampled cells
+    # (min_arrival_time=100 s), not the mean over realizations (120 s):
+    # an assets-at-risk view must not overstate the remaining margin
+    assert entry["arrival_time_h"] == pytest.approx(100.0 / 3600.0)
     assert entry["voltage"] == "132000"
     assert entry["operator"] == "Terna"
 

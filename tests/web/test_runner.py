@@ -226,6 +226,75 @@ def test_run_job_full_orchestration_with_stubbed_prepare_area_data(
     assert len(job.frame_times) > 0
 
 
+def test_run_job_honours_a_cancel_issued_during_the_poi_fetch(
+    monkeypatch, tmp_path
+):
+    """Regression test: the fetch can take ~100 s against an unresponsive
+    endpoint, and there was no cancel check between it and run_loop -- so
+    a cancel was only honoured after the simulator had been built, while
+    `submit` kept rejecting new runs for that whole window."""
+    size = 20
+    transform = rio.Affine(30.0, 0.0, 500000.0, 0.0, -30.0, 4700000.0)
+    dem_path = tmp_path / "dem.tif"
+    fuel_path = tmp_path / "fuel.tif"
+    _write_tiny_geotiff(
+        dem_path,
+        np.zeros((size, size), dtype=np.float32),
+        transform,
+        "EPSG:32633",
+    )
+    _write_tiny_geotiff(
+        fuel_path,
+        np.full((size, size), 4, dtype=np.int16),
+        transform,
+        "EPSG:32633",
+    )
+    with rio.open(dem_path) as f:
+        geo_info = GeographicInfo.from_file(f)
+
+    monkeypatch.setattr(
+        "propagator.web.runner.prepare_area_data",
+        lambda *a, **k: AreaDataResult(
+            dem_path=dem_path,
+            fuel_path=fuel_path,
+            geo_info=geo_info,
+            utm_epsg="EPSG:32633",
+            ignition_fuel_code=4,
+            ignition_warning=None,
+        ),
+    )
+    monkeypatch.setattr(
+        "propagator.web.runner.latlon_to_rowcol", lambda *a, **k: (10, 10)
+    )
+
+    manager = JobManager()
+    request = make_request(
+        time_limit_h=1.0, time_resolution_h=1.0, include_pois=True
+    )
+    job = make_job(request)
+
+    def cancel_during_fetch(*args, **kwargs):
+        # the user hits Cancel while Overpass is still being waited on
+        job.cancel_requested = True
+        return []
+
+    monkeypatch.setattr(
+        "propagator.web.runner.fetch_area_pois", cancel_during_fetch
+    )
+
+    built = []
+    real_build = build_simulator
+    monkeypatch.setattr(
+        "propagator.web.runner.build_simulator",
+        lambda *a, **k: built.append(1) or real_build(*a, **k),
+    )
+
+    run_job(job, manager)
+
+    assert job.status == JobStatus.CANCELLED
+    assert built == [], "must not build the simulator after a cancel"
+
+
 def test_run_job_reports_pois_and_arrival(monkeypatch, tmp_path):
     size = 20
     transform = rio.Affine(30.0, 0.0, 500000.0, 0.0, -30.0, 4700000.0)
@@ -463,6 +532,56 @@ def test_build_sample_cells_caps_vertices_per_poi_keeping_both_ends():
     assert rows == sorted(rows)
     # keys stay contiguous from #0, as the uniform scheme promises
     assert [k for k, _r, _c in cells] == [f"way/1#{i}" for i in range(8)]
+
+
+def test_build_sample_cells_bounds_total_cells_not_just_per_poi():
+    """Regression test: the per-POI cap alone still multiplies by the POI
+    count (5000 POIs x 64 vertices = 320k cells, each re-sampled every
+    frame and retained for the job's life), so a total budget has to
+    shrink the per-POI allowance as the POI count grows."""
+    transform = rio.Affine(30.0, 0.0, 500000.0, 0.0, -30.0, 4700000.0)
+    geo_info = GeographicInfo(
+        crs=CRS.from_epsg(32633),
+        trans=transform,
+        bounds=(500000.0, 4700000.0 - 60 * 30, 500000.0 + 60 * 30, 4700000.0),
+        shape=(60, 60),
+    )
+    geometry = tuple(
+        _pixel_center_lonlat(transform, "EPSG:32633", i, i) for i in range(50)
+    )
+    pois = [
+        POI(
+            i,
+            "way",
+            "power_line",
+            None,
+            geometry[0][0],
+            geometry[0][1],
+            {},
+            geometry=geometry,
+        )
+        for i in range(10)
+    ]
+
+    cells = build_sample_cells(
+        pois,
+        geo_info,
+        "EPSG:32633",
+        max_vertices_per_poi=64,
+        max_sample_cells=20,
+    )
+
+    # 20 cells over 10 geometries -> 2 vertices each, not 64
+    assert len(cells) == 20
+
+
+def test_sampled_vertices_accepts_a_single_vertex_budget():
+    """`max_vertices_per_poi=1` is the natural way to ask for "the POI as
+    a point"; it used to divide by zero."""
+    from propagator.web.runner import _sampled_vertices
+
+    geometry = ((1.0, 1.0), (2.0, 2.0), (3.0, 3.0))
+    assert _sampled_vertices(geometry, 1) == [(1.0, 1.0)]
 
 
 def test_build_sample_cells_leaves_short_geometries_untouched():

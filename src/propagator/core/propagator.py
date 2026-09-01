@@ -381,9 +381,24 @@ class Propagator:
         numpy.ndarray
             2D array of mean flame length values (m).
         """
-        return self._compute_variable_mean(
-            _byram_flame_length(self.fireline_int)
-        )
+        # Accumulated one realization at a time. Feeding
+        # `_byram_flame_length(self.fireline_int)` to
+        # `_compute_variable_mean` would be shorter, but it materializes
+        # a flame-length copy of the whole (rows, cols, realizations)
+        # intensity grid on every reporting frame -- hundreds of MB at
+        # the grid sizes `web.schemas` accepts, and outside the memory
+        # its guardrail budgets. Per realization the transient is one 2D
+        # grid instead, for the same arithmetic.
+        mask = self.fire > 0
+        s = np.zeros(self.veg.shape, dtype=np.float64)
+        for k in range(self.realizations):
+            flame_length = _byram_flame_length(self.fireline_int[:, :, k])
+            np.add(s, flame_length, out=s, where=mask[:, :, k])
+        c = np.sum(mask, axis=2)
+
+        out = np.full(self.veg.shape, np.nan, dtype=np.float32)
+        np.divide(s, c, out=out, where=c > 0)
+        return out
 
     def sample_cells(
         self,
@@ -939,6 +954,13 @@ class Propagator:
         ros_mean = self.compute_ros_mean()
         fireline_intensity_max = self.compute_fireline_int_max()
         fireline_intensity_mean = self.compute_fireline_int_mean()
+        # Reuses the intensity max just computed; the mean accumulates
+        # per realization (see compute_flame_length_mean) rather than
+        # materializing a full 3D flame-length grid.
+        flame_length_max = self.compute_flame_length_max(
+            fli_max=fireline_intensity_max
+        )
+        flame_length_mean = self.compute_flame_length_mean()
         stats = self.compute_stats(fire_probability)
         poi_arrival = (
             self.sample_cells(
@@ -962,16 +984,10 @@ class Propagator:
             ros_max=ros_max,
             fli_mean=fireline_intensity_mean,
             fli_max=fireline_intensity_max,
+            flame_length_mean=flame_length_mean,
+            flame_length_max=flame_length_max,
             stats=stats,
             poi_arrival=poi_arrival,
-            # Derived on demand (see PropagatorOutput): the max reuses
-            # the 2D intensity max already computed here, while the mean
-            # needs the full 3D intensity array, whose transient copy no
-            # consumer should pay for unless it actually reads the value.
-            flame_length_max_fn=lambda: self.compute_flame_length_max(
-                fli_max=fireline_intensity_max
-            ),
-            flame_length_mean_fn=self.compute_flame_length_mean,
         )
 
     def next_time(self) -> int | None:

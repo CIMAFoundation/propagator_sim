@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from propagator.web.deps import get_job_manager
@@ -73,8 +75,17 @@ def _poi_arrival_out_list(
             base_key = poi.key
             samples = grouped.get(base_key, ())
             reached = any(s.reached for s in samples)
+            # Earliest simulated arrival, not the mean over realizations:
+            # the UI renders this as "reached at X h", and for a POI
+            # reached in only a few realizations the mean is later than
+            # the earliest arrival -- an "assets at risk" view must not
+            # overstate the remaining margin. NaN is filtered rather than
+            # min()'d over: it would serialize as bare `NaN`, which the
+            # browser's res.json() rejects, blanking the whole frame.
             arrivals_h = [
-                s.mean_arrival_time / 3600.0 for s in samples if s.reached
+                s.min_arrival_time / 3600.0
+                for s in samples
+                if s.reached and math.isfinite(s.min_arrival_time)
             ]
             out.append(
                 POIArrivalOut(
