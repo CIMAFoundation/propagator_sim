@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -29,7 +29,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
       
 
@@ -312,6 +312,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../../web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../outputs/" class="md-nav__link">
         
   
@@ -393,7 +420,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
         
           
           <div class="md-nav__link md-nav__container">
@@ -415,14 +442,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_7">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -602,6 +629,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.FuelSystem.copy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        copy
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -623,17 +661,6 @@
     <span class="md-ellipsis">
       
         get_p_time_fn
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#propagator.core.numba.next_updates_fn" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        next_updates_fn
       
     </span>
   </a>
@@ -696,6 +723,17 @@
     <span class="md-ellipsis">
       
         add_fuel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.models.FuelSystem.copy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        copy
       
     </span>
   </a>
@@ -944,17 +982,6 @@
     <span class="md-ellipsis">
       
         single_cell_updates
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#propagator.core.numba.propagation.next_updates_fn" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        next_updates_fn
       
     </span>
   </a>
@@ -1081,6 +1108,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.FuelSystem.copy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        copy
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1102,17 +1140,6 @@
     <span class="md-ellipsis">
       
         get_p_time_fn
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#propagator.core.numba.next_updates_fn" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        next_updates_fn
       
     </span>
   </a>
@@ -1175,6 +1202,17 @@
     <span class="md-ellipsis">
       
         add_fuel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.models.FuelSystem.copy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        copy
       
     </span>
   </a>
@@ -1423,17 +1461,6 @@
     <span class="md-ellipsis">
       
         single_cell_updates
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#propagator.core.numba.propagation.next_updates_fn" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        next_updates_fn
       
     </span>
   </a>
@@ -1728,6 +1755,27 @@ behaviour or integrate new stochastic components.</p>
 
 </div>
 
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.numba.FuelSystem.copy" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">copy</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return an independent copy, so callers can mutate it (e.g. via
+<code>disable_spotting</code>) without affecting the object it was copied
+from — important since <code>FUEL_SYSTEM_LEGACY</code> is a shared module-level
+instance reused as the default fuel system across simulations.</p>
+
+
+    </div>
+
+</div>
+
 
 
   </div>
@@ -1870,289 +1918,6 @@ behaviour or integrate new stochastic components.</p>
             <td>
               <div class="doc-md-description">
                 <p><code>(v0, dem_from, dem_to, angle_to, dist, moist, w_dir, w_speed) -&gt; (time_seconds, ros)</code>.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="propagator.core.numba.next_updates_fn" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">next_updates_fn</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">cols</span><span class="p">,</span> <span class="n">realizations</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">fire</span><span class="p">,</span> <span class="n">moisture</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">fuels</span><span class="p">,</span> <span class="n">p_time_fn</span><span class="p">,</span> <span class="n">p_moist_fn</span><span class="p">)</span></code>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Compute the next updates for the fire spread simulation.</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>rows</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The row indices of the fire spread updates.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>cols</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The column indices of the fire spread updates.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>realizations</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The realization indices of the fire spread updates.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>cellsize</code>
-            </td>
-            <td>
-                  <code><span title="float">float</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The size of each cell (in meters)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>time</code>
-            </td>
-            <td>
-                  <code><span title="int">int</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The current time step.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>veg</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D vegetation array</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>dem</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D digital elevation model array</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>fire</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.int8">int8</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 3D current fire state</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>moisture</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D moisture array (units: fraction [0, 1])</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>wind_dir</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D wind direction array (units: radians between [-π, π], 0 is east-&gt;west)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>wind_speed</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D wind speed array (units: km/h)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>fuels</code>
-            </td>
-            <td>
-                  <code><a class="autorefs autorefs-internal" title="FuelSystem(n_fuels) (propagator.core.numba.models.FuelSystem)" href="#propagator.core.numba.models.FuelSystem">FuelSystem</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The fuel system</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>p_time_fn</code>
-            </td>
-            <td>
-                  <code><span title="typing.Any">Any</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The function to compute the spread time (must be jit-compiled). Units are compliant with other functions.
-    signature: (v0: float, dh: float, angle_to: float, dist: float, moist: float, w_dir: float, w_speed: float) -&gt; tuple[float, float]</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>p_moist_fn</code>
-            </td>
-            <td>
-                  <code><span title="typing.Any">Any</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The function to compute the moisture probability (must be jit-compiled). Units are compliant with other functions.
-    signature: (moist: float) -&gt; float</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="propagator.core.models.UpdateBatchTuple">UpdateBatchTuple</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>A tuple containing the arrays for the next updates.
-(next_times, next_rows, next_cols, next_realizations, next_ros, next_fireline_intensities)</p>
               </div>
             </td>
           </tr>
@@ -2633,6 +2398,27 @@ behaviour or integrate new stochastic components.</p>
           </tr>
       </tbody>
     </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.numba.models.FuelSystem.copy" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">copy</span><span class="p">()</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return an independent copy, so callers can mutate it (e.g. via
+<code>disable_spotting</code>) without affecting the object it was copied
+from — important since <code>FUEL_SYSTEM_LEGACY</code> is a shared module-level
+instance reused as the default fuel system across simulations.</p>
 
 
     </div>
@@ -5094,289 +4880,6 @@ rates_of_spread, fireline_intensities, is_spotting)</p>
 
 </div>
 
-<div class="doc doc-object doc-function">
-
-
-<h3 id="propagator.core.numba.propagation.next_updates_fn" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">next_updates_fn</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">cols</span><span class="p">,</span> <span class="n">realizations</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">fire</span><span class="p">,</span> <span class="n">moisture</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">fuels</span><span class="p">,</span> <span class="n">p_time_fn</span><span class="p">,</span> <span class="n">p_moist_fn</span><span class="p">)</span></code>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Compute the next updates for the fire spread simulation.</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>rows</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The row indices of the fire spread updates.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>cols</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The column indices of the fire spread updates.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>realizations</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The realization indices of the fire spread updates.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>cellsize</code>
-            </td>
-            <td>
-                  <code><span title="float">float</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The size of each cell (in meters)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>time</code>
-            </td>
-            <td>
-                  <code><span title="int">int</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The current time step.</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>veg</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.integer">integer</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D vegetation array</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>dem</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D digital elevation model array</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>fire</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.int8">int8</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 3D current fire state</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>moisture</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D moisture array (units: fraction [0, 1])</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>wind_dir</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D wind direction array (units: radians between [-π, π], 0 is east-&gt;west)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>wind_speed</code>
-            </td>
-            <td>
-                  <code><span title="numpy.typing.NDArray">NDArray</span>[<span title="numpy.floating">floating</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The 2D wind speed array (units: km/h)</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>fuels</code>
-            </td>
-            <td>
-                  <code><a class="autorefs autorefs-internal" title="FuelSystem(n_fuels) (propagator.core.numba.models.FuelSystem)" href="#propagator.core.numba.models.FuelSystem">FuelSystem</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The fuel system</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>p_time_fn</code>
-            </td>
-            <td>
-                  <code><span title="typing.Any">Any</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The function to compute the spread time (must be jit-compiled). Units are compliant with other functions.
-    signature: (v0: float, dh: float, angle_to: float, dist: float, moist: float, w_dir: float, w_speed: float) -&gt; tuple[float, float]</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>p_moist_fn</code>
-            </td>
-            <td>
-                  <code><span title="typing.Any">Any</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>The function to compute the moisture probability (must be jit-compiled). Units are compliant with other functions.
-    signature: (moist: float) -&gt; float</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="propagator.core.models.UpdateBatchTuple">UpdateBatchTuple</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>A tuple containing the arrays for the next updates.
-(next_times, next_rows, next_cols, next_realizations, next_ros, next_fireline_intensities)</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    </div>
-
-</div>
-
 
 
   </div>
@@ -5436,7 +4939,7 @@ rates_of_spread, fireline_intensities, is_spotting)</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "content.code.copy", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../javascripts/cima-brand.js"></script>
       
