@@ -152,11 +152,29 @@ class Propagator:
         on the vegetation grid shape."""
         shape = self.veg.shape
         self.scheduler = Scheduler(realizations=self.realizations)
+        if self.front_capacity_factor <= 0:
+            raise ValueError(
+                "front_capacity_factor must be strictly positive, got "
+                f"{self.front_capacity_factor}"
+            )
         if self.front_capacity is not None:
+            if self.front_capacity <= 0:
+                raise ValueError(
+                    "front_capacity must be strictly positive, got "
+                    f"{self.front_capacity}"
+                )
             self._front_capacity = int(self.front_capacity)
         else:
             self._front_capacity = int(
                 math.ceil(self.front_capacity_factor * self.veg.size)
+            )
+        front_heap_cells = self._front_capacity * self.realizations
+        if front_heap_cells > np.iinfo(np.int32).max:
+            raise ValueError(
+                "front_capacity * realizations = "
+                f"{front_heap_cells:,} overflows a 32-bit index "
+                f"(limit {np.iinfo(np.int32).max:,}); lower "
+                "front_capacity/front_capacity_factor or realizations"
             )
         self._front_times = np.zeros(
             (self.realizations, self._front_capacity), dtype=np.int32

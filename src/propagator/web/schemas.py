@@ -6,6 +6,7 @@ local, single-user machine (see `_check_compute_budget`).
 
 from __future__ import annotations
 
+import math
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -15,6 +16,35 @@ from pydantic import BaseModel, Field, model_validator
 # ~1e7 and runs in well under a minute; this caps combinations an order
 # of magnitude above that, which already take several minutes locally.
 CELL_REALIZATION_BUDGET = 2.5e8
+
+# Byte-accurate memory budget, mirroring the arrays
+# `Propagator.__post_init__` allocates (core/propagator.py): the
+# front-event heap (5 arrays, int32/float32, sized by
+# front_capacity_factor * grid_cells) plus per-cell grid state (fire,
+# arrival_time, ros, fireline_int, and, if spotting is on,
+# spotting_generation/receiving). Complements CELL_REALIZATION_BUDGET,
+# which ignores front_capacity_factor and spotting.
+DEFAULT_FRONT_CAPACITY_FACTOR = 2.0
+_FRONT_HEAP_BYTES_PER_CELL = (
+    5 * 4
+)  # times/rows/cols (int32) + ros/fli (float32)
+_GRID_STATE_BYTES_PER_CELL = (
+    1 + 4 + 4 + 4
+)  # fire (int8) + arrival/ros/fli (4B)
+_SPOTTING_BYTES_PER_CELL = 2 * 4  # generation/receiving (uint32)
+MAX_ESTIMATED_MEMORY_BYTES = 4 * 1024**3  # 4 GiB
+
+
+def _estimate_memory_bytes(
+    grid_cells: float, realizations: int, do_spotting: bool
+) -> float:
+    front_capacity = math.ceil(DEFAULT_FRONT_CAPACITY_FACTOR * grid_cells)
+    per_cell = _GRID_STATE_BYTES_PER_CELL
+    if do_spotting:
+        per_cell += _SPOTTING_BYTES_PER_CELL
+    return realizations * (
+        _FRONT_HEAP_BYTES_PER_CELL * front_capacity + per_cell * grid_cells
+    )
 
 
 class ActionRequest(BaseModel):
@@ -39,7 +69,9 @@ class SimulateRequest(BaseModel):
     ignition_lat: float = Field(..., ge=-90, le=90)
     ignition_lon: float = Field(..., ge=-180, le=180)
 
-    wind_dir: float = Field(0.0, ge=0, lt=360, description="Degrees, clockwise from north")
+    wind_dir: float = Field(
+        0.0, ge=0, lt=360, description="Degrees, clockwise from north"
+    )
     wind_speed: float = Field(20.0, ge=0, description="km/h")
     moisture: float = Field(10.0, ge=0, le=100, description="Percent")
 
@@ -49,7 +81,9 @@ class SimulateRequest(BaseModel):
     time_limit_h: float = Field(6.0, gt=0, le=48)
     time_resolution_h: float = Field(1.0, gt=0, le=6)
 
-    isochrone_thresholds: list[float] = Field(default_factory=lambda: [0.5, 0.75, 0.9])
+    isochrone_thresholds: list[float] = Field(
+        default_factory=lambda: [0.5, 0.75, 0.9]
+    )
 
     actions: list[ActionRequest] = Field(default_factory=list)
 
@@ -65,6 +99,19 @@ class SimulateRequest(BaseModel):
                 f"{cost:,.0f} cell-realizations, budget "
                 f"{CELL_REALIZATION_BUDGET:,.0f}). Lower the radius, "
                 "increase the cellsize, or reduce realizations."
+            )
+        estimated_bytes = _estimate_memory_bytes(
+            grid_cells, self.realizations, self.do_spotting
+        )
+        if estimated_bytes > MAX_ESTIMATED_MEMORY_BYTES:
+            raise ValueError(
+                "This combination of radius_km/cellsize/realizations/"
+                "do_spotting would allocate an estimated "
+                f"{estimated_bytes / 1024**3:.2f} GiB (budget "
+                f"{MAX_ESTIMATED_MEMORY_BYTES / 1024**3:.0f} GiB) for the "
+                "front-event heap and per-cell grid state. Lower the "
+                "radius, increase the cellsize, reduce realizations, or "
+                "disable spotting."
             )
         if self.time_resolution_h > self.time_limit_h:
             raise ValueError("time_resolution_h must not exceed time_limit_h")

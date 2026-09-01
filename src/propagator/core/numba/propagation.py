@@ -238,6 +238,9 @@ def compute_spotting(
         veg_to = veg[row_to, col_to]
         if veg_to == NO_FUEL:
             continue
+        fuel_to = fuels.get_fuel(veg_to)  # type: ignore
+        if not fuel_to.burn:
+            continue
 
         # we want to put another probabilistic filter in order
         # to assess the success of ember ignition.
@@ -245,7 +248,6 @@ def compute_spotting(
         # P_c = P_c0 (1 + P_cd), where P_c0 constant probability of ignition
         # by spotting and P_cd is a correction factor that
         # depends on vegetation type and density > set on the fuels system
-        fuel_to = fuels.get_fuel(veg_to)  # type: ignore
 
         P_c = P_C0 * (1 + fuel_to.prob_ign_by_embers)
         if uniform() > P_c:
@@ -419,6 +421,11 @@ def single_cell_updates(
     w_speed_r = wind_speed[row, col]
 
     fuel_from = fuels.get_fuel(veg_from)  # type: ignore
+    if not fuel_from.burn:
+        # A non-burnable fuel (e.g. a firebreak neutralized by a
+        # firefighting action) can end up marked as burning via forced
+        # ignition, but it must never itself propagate fire outward.
+        return fire_spread_updates
 
     for neighbour, dist_to_lattice, angle_to in zip(
         NEIGHBOURS, NEIGHBOURS_DISTANCE, NEIGHBOURS_ANGLE
@@ -437,6 +444,9 @@ def single_cell_updates(
 
         # keep only pixels where fire can spread
         if fire[row_to, col_to] or veg_to == NO_FUEL:
+            continue
+        fuel_to = fuels.get_fuel(veg_to)  # type: ignore
+        if not fuel_to.burn:
             continue
 
         dh = dem[row_to, col_to] - dem_from
@@ -460,8 +470,6 @@ def single_cell_updates(
         do_propagate = p_prob > random()
         if not do_propagate:
             continue
-
-        fuel_to = fuels.get_fuel(veg_to)  # type: ignore
 
         transition_time, ros, fireline_intensity = calculate_fire_behavior(
             fuel_from,

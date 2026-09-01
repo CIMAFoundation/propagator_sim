@@ -55,6 +55,26 @@ def test_spotting_state_allocated_only_when_enabled():
     assert with_spotting.spotting_receiving is not None
 
 
+def test_zero_front_capacity_raises_instead_of_silently_dropping_ignitions():
+    """Regression test: `front_capacity=0` used to make every `_front_push`
+    (including ignitions) silently no-op, leaving `_front_sizes` at zero
+    so `_propagate_until` returned immediately without ever reaching the
+    overflow check -- the simulation looked "done" with nothing burned."""
+    veg = np.array([[1, 2], [3, 4]], dtype=np.int32)
+    dem = np.zeros_like(veg, dtype=np.float32)
+    with pytest.raises(ValueError):
+        Propagator(veg=veg, dem=dem, realizations=2, front_capacity=0)
+
+
+def test_negative_front_capacity_factor_raises():
+    veg = np.array([[1, 2], [3, 4]], dtype=np.int32)
+    dem = np.zeros_like(veg, dtype=np.float32)
+    with pytest.raises(ValueError):
+        Propagator(
+            veg=veg, dem=dem, realizations=2, front_capacity_factor=-1.0
+        )
+
+
 def test_disabling_spotting_does_not_mutate_shared_default_fuel_system():
     """Regression test: `Propagator(do_spotting=False)` used to call
     `self.fuels.disable_spotting()` in place on whatever fuel system it
@@ -65,7 +85,9 @@ def test_disabling_spotting_does_not_mutate_shared_default_fuel_system():
     relied on the default fuel system."""
     from propagator.core import FUEL_SYSTEM_LEGACY
 
-    base_veg = np.array([[5, 5], [5, 5]], dtype=np.int32)  # conifers: spotting-capable
+    base_veg = np.array(
+        [[5, 5], [5, 5]], dtype=np.int32
+    )  # conifers: spotting-capable
     base_dem = np.zeros_like(base_veg, dtype=np.float32)
     spotting_before = list(FUEL_SYSTEM_LEGACY.spotting)
 
@@ -480,6 +502,80 @@ def test_front_heap_overflow_raises_runtime_error():
 
     with pytest.raises(RuntimeError, match="front queue overflowed"):
         propagator.step()
+
+
+def _make_two_fuel_propagator(non_vegetated_at, ignite_at, realizations=5):
+    """A 9x9, all-fuel-5 (conifers) grid except for one cell set to fuel 3
+    (non-vegetated, burn=False), placed away from the grid edge. Only the
+    5<->3 transitions are given a certain (p=1) probability (every other
+    transition, including 5->5, stays at the default 0), so any spread
+    touching the fuel-3 cell that isn't blocked by `Fuel.burn` would show
+    up deterministically rather than only probabilistically."""
+    from propagator.core.numba.models import FuelSystem
+
+    veg = np.full((9, 9), 5, dtype=np.int32)
+    veg[non_vegetated_at] = 3
+    dem = np.zeros_like(veg, dtype=np.float32)
+    fuels = FuelSystem(2)
+    fuels.add_fuel(5, "conifers", 1.0, 1.0, 20000.0, 0.0, -9999.0)
+    fuels.add_fuel(
+        3, "non-vegetated", 1.0, 1.0, 20000.0, 0.0, -9999.0, False, 0.0, False
+    )
+    fuels.add_transition_probability(5, 3, 1.0)
+    fuels.add_transition_probability(3, 5, 1.0)
+
+    propagator = Propagator(
+        veg=veg,
+        dem=dem,
+        realizations=realizations,
+        do_spotting=False,
+        fuels=fuels,
+    )
+    propagator.moisture = np.zeros(veg.shape, dtype=np.float32)
+    propagator.wind_dir = np.zeros(veg.shape, dtype=np.float32)
+    propagator.wind_speed = np.zeros(veg.shape, dtype=np.float32)
+    propagator.set_boundary_conditions(
+        BoundaryConditions(time=0, ignitions=[ignite_at])
+    )
+    return propagator
+
+
+def test_unburnable_fuel_does_not_ignite_from_a_burning_neighbour():
+    """Regression test: the propagation kernel used to only check
+    `veg == NO_FUEL` to decide whether a destination cell could catch
+    fire, ignoring `Fuel.burn` entirely -- so a fuel explicitly marked
+    non-combustible (e.g. the fuel a firefighting action neutralizes a
+    cell with) could still ignite via the fuel table's own residual
+    transition probability."""
+    propagator = _make_two_fuel_propagator(
+        non_vegetated_at=(4, 5), ignite_at=(4, 4)
+    )
+
+    steps = 0
+    while propagator.next_time() is not None and steps < 20:
+        propagator.step()
+        steps += 1
+
+    assert np.all(propagator.fire[4, 4, :] == 1)
+    assert np.all(propagator.fire[4, 5, :] == 0)
+
+
+def test_unburnable_fuel_does_not_propagate_outward():
+    """Regression test: a forced ignition on a non-burnable cell (as
+    happens when a firefighting action neutralizes the ignition point)
+    must never spread to a burnable neighbour, even though the source
+    cell itself is marked as burning."""
+    propagator = _make_two_fuel_propagator(
+        non_vegetated_at=(4, 4), ignite_at=(4, 4)
+    )
+
+    steps = 0
+    while propagator.next_time() is not None and steps < 20:
+        propagator.step()
+        steps += 1
+
+    assert np.all(propagator.fire[4, 4, :] == 1)
+    assert np.all(propagator.fire[4, 5, :] == 0)
 
 
 def test_step_applies_event():

@@ -129,7 +129,13 @@ Request parameters are validated by `propagator.web.schemas.SimulateRequest`:
 Combinations of radius/cellsize/realizations that would produce an
 unreasonably large grid for an interactive local run are rejected outright
 (422 response) rather than left to run for a long time — lower the radius,
-raise the cellsize, or reduce realizations if you hit this.
+raise the cellsize, or reduce realizations if you hit this. A second check
+estimates the actual memory the run would allocate (front-event heap plus
+per-cell grid state, including the extra spotting arrays when spotting is
+enabled) and rejects the request (422) if it exceeds a 4 GiB budget, even
+if it stays under the cell-realizations cap above — lower the radius,
+raise the cellsize, reduce realizations, or disable spotting if you hit
+this.
 
 Only one simulation runs at a time; starting a new one while another is
 still running/preparing data returns a 429 response.
