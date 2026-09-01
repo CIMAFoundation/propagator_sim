@@ -426,6 +426,73 @@ def test_build_sample_cells_samples_along_line_geometry():
     ]
 
 
+def test_build_sample_cells_caps_vertices_per_poi_keeping_both_ends():
+    """A long OSM way (power lines carry hundreds of vertices) must not
+    expand into hundreds of sample cells: each is re-sampled every frame
+    and retained for the life of the job. The kept vertices stay spread
+    over the whole extent, ends included, so coverage is preserved."""
+    transform = rio.Affine(30.0, 0.0, 500000.0, 0.0, -30.0, 4700000.0)
+    geo_info = GeographicInfo(
+        crs=CRS.from_epsg(32633),
+        trans=transform,
+        bounds=(500000.0, 4700000.0 - 60 * 30, 500000.0 + 60 * 30, 4700000.0),
+        shape=(60, 60),
+    )
+    # a 50-vertex diagonal, one vertex per cell
+    geometry = tuple(
+        _pixel_center_lonlat(transform, "EPSG:32633", i, i) for i in range(50)
+    )
+    poi = POI(
+        1,
+        "way",
+        "power_line",
+        None,
+        geometry[0][0],
+        geometry[0][1],
+        {},
+        geometry=geometry,
+    )
+
+    cells = build_sample_cells(
+        [poi], geo_info, "EPSG:32633", max_vertices_per_poi=8
+    )
+
+    assert len(cells) == 8
+    rows = [row for _key, row, _col in cells]
+    assert rows[0] == 0 and rows[-1] == 49  # both ends kept
+    assert rows == sorted(rows)
+    # keys stay contiguous from #0, as the uniform scheme promises
+    assert [k for k, _r, _c in cells] == [f"way/1#{i}" for i in range(8)]
+
+
+def test_build_sample_cells_leaves_short_geometries_untouched():
+    transform = rio.Affine(30.0, 0.0, 500000.0, 0.0, -30.0, 4700000.0)
+    geo_info = GeographicInfo(
+        crs=CRS.from_epsg(32633),
+        trans=transform,
+        bounds=(500000.0, 4700000.0 - 20 * 30, 500000.0 + 20 * 30, 4700000.0),
+        shape=(20, 20),
+    )
+    geometry = tuple(
+        _pixel_center_lonlat(transform, "EPSG:32633", i, i) for i in range(3)
+    )
+    poi = POI(
+        1,
+        "way",
+        "power_line",
+        None,
+        geometry[0][0],
+        geometry[0][1],
+        {},
+        geometry=geometry,
+    )
+
+    cells = build_sample_cells(
+        [poi], geo_info, "EPSG:32633", max_vertices_per_poi=8
+    )
+    assert len(cells) == 3
+
+
 def test_build_sample_cells_dedupes_repeated_cells_along_geometry():
     transform = rio.Affine(30.0, 0.0, 500000.0, 0.0, -30.0, 4700000.0)
     geo_info = GeographicInfo(

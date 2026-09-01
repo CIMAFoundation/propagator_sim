@@ -462,13 +462,21 @@ class Propagator:
 
         mask = self.fire > 0
 
-        # accumulate in float64 to reduce precision loss. `where=` masks
-        # the reduction in place of `np.nansum(np.where(mask, the_var,
-        # 0.0), ...)`, which allocated a second full
-        # (rows, cols, realizations) copy of `the_var` on every call --
-        # significant here because every reporting frame reduces the ros,
-        # fireline-intensity and flame-length grids this way.
-        s = np.nansum(the_var, axis=2, dtype=np.float64, where=mask)
+        # Accumulate in float64 to reduce precision loss, masking the
+        # reduction with `where=` rather than building a masked copy.
+        # `np.sum`, not `np.nansum`: nansum internally calls
+        # `_replace_nan`, which copies the whole array (plus an isnan
+        # mask) for any inexact dtype, so it allocates a full
+        # (rows, cols, realizations) transient no matter how the mask is
+        # expressed -- measured at ~1x the input array, against ~0x for
+        # np.sum. Every reporting frame reduces the ros,
+        # fireline-intensity and flame-length grids through here, so that
+        # is worth avoiding. Dropping NaN handling is safe because these
+        # arrays cannot contain NaN: they are zero-initialised and only
+        # ever written with finite values by the numba kernel. Should
+        # that change, a NaN now propagates to the output instead of
+        # being silently counted as zero -- the louder failure.
+        s = np.sum(the_var, axis=2, dtype=np.float64, where=mask)
         c = np.sum(mask, axis=2)
 
         # mean where count>0; NaN otherwise
@@ -931,14 +939,6 @@ class Propagator:
         ros_mean = self.compute_ros_mean()
         fireline_intensity_max = self.compute_fireline_int_max()
         fireline_intensity_mean = self.compute_fireline_int_mean()
-        # Hand the reductions computed just above to the helpers that
-        # would otherwise redo them over the full
-        # (rows, cols, realizations) arrays -- on the web app's larger
-        # grids that roughly doubled the per-frame reduction cost.
-        flame_length_max = self.compute_flame_length_max(
-            fli_max=fireline_intensity_max
-        )
-        flame_length_mean = self.compute_flame_length_mean()
         stats = self.compute_stats(fire_probability)
         poi_arrival = (
             self.sample_cells(
@@ -962,10 +962,16 @@ class Propagator:
             ros_max=ros_max,
             fli_mean=fireline_intensity_mean,
             fli_max=fireline_intensity_max,
-            flame_length_mean=flame_length_mean,
-            flame_length_max=flame_length_max,
             stats=stats,
             poi_arrival=poi_arrival,
+            # Derived on demand (see PropagatorOutput): the max reuses
+            # the 2D intensity max already computed here, while the mean
+            # needs the full 3D intensity array, whose transient copy no
+            # consumer should pay for unless it actually reads the value.
+            flame_length_max_fn=lambda: self.compute_flame_length_max(
+                fli_max=fireline_intensity_max
+            ),
+            flame_length_mean_fn=self.compute_flame_length_mean,
         )
 
     def next_time(self) -> int | None:

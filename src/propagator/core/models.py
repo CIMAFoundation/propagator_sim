@@ -8,7 +8,7 @@ summary statistics, and output snapshots suitable for CLI and IO layers.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -174,7 +174,20 @@ class CellArrivalSample:
 
 @dataclass(frozen=True)
 class PropagatorOutput:
-    """Snapshot of simulation outputs at a given time step."""
+    """Snapshot of simulation outputs at a given time step.
+
+    The two Byram flame-length products are exposed as properties rather
+    than eagerly-filled fields, because deriving them is not free and not
+    every consumer wants them (the web UI, for one, never reads them):
+
+    - `flame_length_max` is derived from the 2D `fli_max` already held
+      here, so it costs a grid-sized array on access.
+    - `flame_length_mean` is the true per-realization mean, which cannot
+      be recovered from `fli_mean` (the relation is non-linear), so it is
+      computed on demand from the 3D intensity array via the callable
+      `get_output` supplies. Accessing it allocates a transient the size
+      of that array; it is cached after the first access.
+    """
 
     time: int  # seconds from simulation start
     fire_probability: npt.NDArray[np.floating]
@@ -186,7 +199,52 @@ class PropagatorOutput:
     ros_max: npt.NDArray[np.floating]
     fli_mean: npt.NDArray[np.floating]
     fli_max: npt.NDArray[np.floating]
-    flame_length_mean: npt.NDArray[np.floating]
-    flame_length_max: npt.NDArray[np.floating]
     stats: PropagatorStats
     poi_arrival: tuple[CellArrivalSample, ...] = field(default_factory=tuple)
+    # Set by `Propagator.get_output`; a snapshot built by hand without one
+    # simply has no flame-length products.
+    flame_length_mean_fn: Callable[[], npt.NDArray[np.floating]] | None = (
+        field(default=None, repr=False, compare=False)
+    )
+    flame_length_max_fn: Callable[[], npt.NDArray[np.floating]] | None = field(
+        default=None, repr=False, compare=False
+    )
+
+    @property
+    def flame_length_max(self) -> npt.NDArray[np.floating]:
+        """Per-cell maximum Byram flame length (m)."""
+        if self.flame_length_max_fn is None:
+            raise AttributeError(
+                "flame_length_max is unavailable: this PropagatorOutput "
+                "was not built by Propagator.get_output()"
+            )
+        return _cached_grid(
+            self, "_flame_length_max", self.flame_length_max_fn
+        )
+
+    @property
+    def flame_length_mean(self) -> npt.NDArray[np.floating]:
+        """Per-cell mean Byram flame length (m) where the cell burned."""
+        if self.flame_length_mean_fn is None:
+            raise AttributeError(
+                "flame_length_mean is unavailable: this PropagatorOutput "
+                "was not built by Propagator.get_output()"
+            )
+        return _cached_grid(
+            self, "_flame_length_mean", self.flame_length_mean_fn
+        )
+
+
+def _cached_grid(
+    output: PropagatorOutput,
+    attr: str,
+    compute: Callable[[], npt.NDArray[np.floating]],
+) -> npt.NDArray[np.floating]:
+    """Memoize `compute()` on a frozen dataclass instance (writing
+    through `object.__setattr__`, which `frozen=True` otherwise blocks),
+    so repeated reads of a lazily-derived product don't recompute it."""
+    cached = getattr(output, attr, None)
+    if cached is None:
+        cached = compute()
+        object.__setattr__(output, attr, cached)
+    return cached

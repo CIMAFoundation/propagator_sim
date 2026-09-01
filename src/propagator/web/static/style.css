@@ -281,7 +281,7 @@ button.secondary {
   display: flex;
   gap: 12px;
   font-size: 11px;
-  color: var(--text-muted, #888);
+  color: var(--muted);
   margin-top: 4px;
 }
 

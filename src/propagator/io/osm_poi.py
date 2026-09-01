@@ -99,12 +99,6 @@ POI_CATEGORIES = (
 )
 
 
-def _category_group(category: str) -> str:
-    """Return the user-facing category group for a POI's specific
-    `category` (collapsing any `power_<subtype>` to "power")."""
-    return "power" if category.startswith("power_") else category
-
-
 class OverpassError(Exception):
     """Raised when the Overpass API request fails after retries."""
 
@@ -326,6 +320,31 @@ def _categorize(tags: dict[str, str]) -> str | None:
     return None
 
 
+def _matching_groups(tags: dict[str, str]) -> set[str]:
+    """Return *every* user-facing category group these tags match, unlike
+    `_categorize`, which resolves them to a single winner by precedence.
+
+    Filtering has to use this: OSM elements carry several of these tags
+    at once (a hospital way is normally `amenity=hospital` *and*
+    `building=yes`), so filtering on the precedence winner alone would
+    drop hospitals, schools and police stations from a "buildings"
+    selection -- elements the query deliberately asked for and the server
+    returned."""
+    groups = set()
+    amenity = tags.get("amenity")
+    if amenity in CRITICAL_AMENITIES:
+        groups.add(amenity)
+    if "emergency" in tags:
+        groups.add("emergency")
+    if "power" in tags:
+        groups.add("power")
+    if tags.get("highway") in MAJOR_HIGHWAYS:
+        groups.add("road")
+    if "building" in tags:
+        groups.add("building")
+    return groups
+
+
 def _element_geometry(el: dict) -> tuple[tuple[float, float], ...] | None:
     """Return the full (lat, lon) vertex list from an Overpass `out geom`
     way/relation element, or None if absent/degenerate (a single point
@@ -424,6 +443,12 @@ def fetch_area_pois(
     `max_pois` only ever bites into the requested categories. Each
     distinct selection gets its own cache entry, since the cache is keyed
     by the query text."""
+    if categories is not None and not categories:
+        # An empty selection can only ever yield an empty result, and the
+        # query for it carries no `out` statement at all -- don't spend a
+        # round trip (plus its retry budget) and a cache entry proving it.
+        return []
+
     west, south, east, north, _utm_epsg = wgs84_bbox_from_center(
         lat, lon, radius_km
     )
@@ -432,8 +457,13 @@ def fetch_area_pois(
     pois = parse_overpass_elements(data)
 
     if categories is not None:
+        # Match on every group an element's tags belong to, not just the
+        # precedence winner `_categorize` assigned: the query fetched it
+        # because it matched a *selected* filter, so dropping it here
+        # because some other tag outranks that one would silently hide
+        # elements the user asked for (see `_matching_groups`).
         wanted = set(categories)
-        pois = [p for p in pois if _category_group(p.category) in wanted]
+        pois = [p for p in pois if _matching_groups(p.tags) & wanted]
 
     # An element can legitimately come back twice: the query emits an
     # `out center tags` block and an `out geom tags` block, so a feature

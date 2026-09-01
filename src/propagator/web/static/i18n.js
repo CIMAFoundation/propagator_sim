@@ -6,8 +6,31 @@
   const dicts = {};
   let currentLang = "en";
 
+  // Browsers configured to block site data throw on localStorage access
+  // rather than returning null. That must not escape: init() runs
+  // synchronously up to its first await, before window.i18n is assigned,
+  // so an uncaught throw here leaves i18n undefined and takes the whole
+  // UI down with a ReferenceError in app.js -- not just the language
+  // switcher. Remembering the language is a convenience; losing it is
+  // the correct degradation.
+  function storedLang() {
+    try {
+      return localStorage.getItem(STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  function rememberLang(lang) {
+    try {
+      localStorage.setItem(STORAGE_KEY, lang);
+    } catch {
+      /* site data blocked: the choice just won't persist */
+    }
+  }
+
   function detectLang() {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = storedLang();
     if (stored && LANGS.includes(stored)) return stored;
     const browserLang = (navigator.language || navigator.languages?.[0] || "en").slice(0, 2);
     return LANGS.includes(browserLang) ? browserLang : "en";
@@ -51,7 +74,7 @@
   async function setLang(lang) {
     if (!LANGS.includes(lang)) return;
     currentLang = lang;
-    localStorage.setItem(STORAGE_KEY, lang);
+    rememberLang(lang);
     document.documentElement.lang = lang;
     await loadDict(lang);
     applyTranslations();

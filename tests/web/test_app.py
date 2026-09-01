@@ -221,6 +221,47 @@ def test_line_poi_arrival_is_aggregated_across_samples(client):
     ]
 
 
+def test_poi_with_no_in_grid_samples_is_still_reported_as_unreached(client):
+    """Regression test: a POI whose every sampled cell fell outside the
+    grid contributes no CellArrivalSample, and the arrival list was built
+    from the samples alone -- so it was fetched, counted against
+    max_pois, listed by `/frames`, and then never drawn, since the map
+    renders from `poi_arrival`."""
+    http, manager = client
+    res = http.post("/api/simulate", json=base_request())
+    job_id = res.json()["job_id"]
+
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        if http.get(f"/api/simulate/{job_id}").json()["status"] == "done":
+            break
+        time.sleep(0.05)
+
+    job = manager.get(job_id)
+    job.pois = [
+        POI(
+            osm_id=1,
+            osm_type="node",
+            category="hospital",
+            name="Off-grid",
+            lat=42.0,
+            lon=12.0,
+            tags={},
+        )
+    ]
+    job.frames[3600].poi_arrival = ()  # every sample fell outside the grid
+    job.frames[3600].poi_arrival_cache = None
+
+    poi_arrival = http.get(f"/api/simulate/{job_id}/frame/3600").json()[
+        "poi_arrival"
+    ]
+
+    assert len(poi_arrival) == 1
+    assert poi_arrival[0]["id"] == "node/1"
+    assert poi_arrival[0]["reached"] is False
+    assert poi_arrival[0]["arrival_time_h"] is None
+
+
 def test_manual_page_is_served(client):
     http, _ = client
     res = http.get("/manual.html")

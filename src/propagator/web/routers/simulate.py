@@ -57,16 +57,21 @@ def _poi_arrival_out_list(
     job: JobState, frame: FrameData
 ) -> list[POIArrivalOut]:
     if frame.poi_arrival_cache is None:
-        by_key = {p.key: p for p in job.pois}
         grouped: dict[str, list] = {}
         for sample in frame.poi_arrival:
             grouped.setdefault(_base_poi_key(sample.key), []).append(sample)
 
         out = []
-        for base_key, samples in grouped.items():
-            poi = by_key.get(base_key)
-            if poi is None:
-                continue
+        # Iterate the job's POIs, not just the ones with samples: a POI
+        # whose every sampled cell fell outside the grid contributes no
+        # samples at all (`build_sample_cells` drops those), yet it is
+        # still listed in `GET .../frames`. Emitting it here as simply
+        # not reached keeps the two endpoints consistent, and keeps the
+        # map -- which draws from this list -- from silently omitting a
+        # POI it was told about.
+        for poi in job.pois:
+            base_key = poi.key
+            samples = grouped.get(base_key, ())
             reached = any(s.reached for s in samples)
             arrivals_h = [
                 s.mean_arrival_time / 3600.0 for s in samples if s.reached

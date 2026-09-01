@@ -369,6 +369,62 @@ def test_fetch_overpass_fails_fast_on_a_remark_and_never_caches_it(
     assert not (tmp_path / "osm").exists()
 
 
+def test_fetch_area_pois_keeps_elements_matching_any_selected_category(
+    monkeypatch, tmp_path
+):
+    """Regression test: filtering used `_categorize`'s single winning
+    category, so a hospital way (which is also `building=yes`) was
+    dropped from a "building"-only selection -- an element the query
+    explicitly asked for and the server returned."""
+    hospital_building = {
+        "type": "way",
+        "id": 7,
+        "center": {"lat": 42.0, "lon": 12.0},
+        "tags": {"amenity": "hospital", "building": "yes", "name": "Osp"},
+    }
+    monkeypatch.setattr(
+        "propagator.io.osm_poi.fetch_overpass",
+        lambda *a, **k: {"elements": [hospital_building]},
+    )
+
+    only_buildings = fetch_area_pois(
+        42.0, 12.0, 1.0, cache_dir=tmp_path, categories=["building"]
+    )
+    assert [p.osm_id for p in only_buildings] == [7]
+
+    only_hospitals = fetch_area_pois(
+        42.0, 12.0, 1.0, cache_dir=tmp_path, categories=["hospital"]
+    )
+    assert [p.osm_id for p in only_hospitals] == [7]
+
+    only_roads = fetch_area_pois(
+        42.0, 12.0, 1.0, cache_dir=tmp_path, categories=["road"]
+    )
+    assert only_roads == []
+
+
+def test_fetch_area_pois_short_circuits_an_empty_category_selection(
+    monkeypatch, tmp_path
+):
+    """An empty selection cannot match anything, so it must not spend a
+    request (nor a cache entry) proving it."""
+    calls = []
+
+    def fake_fetch_overpass(query, **kwargs):
+        calls.append(query)
+        return {"elements": []}
+
+    monkeypatch.setattr(
+        "propagator.io.osm_poi.fetch_overpass", fake_fetch_overpass
+    )
+
+    assert (
+        fetch_area_pois(42.0, 12.0, 1.0, cache_dir=tmp_path, categories=[])
+        == []
+    )
+    assert calls == []
+
+
 def test_fetch_area_pois_dedup_keeps_the_copy_carrying_geometry(
     monkeypatch, tmp_path
 ):

@@ -36,6 +36,15 @@ from propagator.web.schemas import SimulateRequest
 
 logger = logging.getLogger(__name__)
 
+# Cap on how many vertices of one POI's geometry are sampled for fire
+# arrival. Every sampled cell is re-checked each frame and its
+# CellArrivalSample retained for the life of the job, so an uncapped
+# expansion (a single power line can carry hundreds of vertices, against
+# up to 5000 POIs) would run into hundreds of MB and a per-frame Python
+# loop scaling with total vertex count -- neither covered by the request
+# guardrails in `web.schemas`.
+MAX_VERTICES_PER_POI = 64
+
 
 def cache_dir() -> Path:
     override = os.environ.get("PROPAGATOR_CACHE_DIR")
@@ -70,20 +79,47 @@ def build_simulator(
     return simulator
 
 
+def _sampled_vertices(
+    geometry: tuple[tuple[float, float], ...], max_vertices: int
+) -> list[tuple[float, float]]:
+    """Return at most `max_vertices` points spread evenly along
+    `geometry`, always keeping its first and last vertex.
+
+    Long OSM ways (a power line can carry hundreds of vertices) would
+    otherwise turn a single POI into hundreds of sample cells, each
+    re-sampled every frame and retained for the life of the job. Even
+    spacing keeps coverage of the whole extent -- what per-vertex
+    sampling exists for -- and only gives up resolution on fine detail
+    between the kept vertices.
+    """
+    n = len(geometry)
+    if n <= max_vertices:
+        return list(geometry)
+    step = (n - 1) / (max_vertices - 1)
+    idxs = sorted({round(i * step) for i in range(max_vertices)})
+    return [geometry[i] for i in idxs]
+
+
 def build_sample_cells(
-    pois: list[POI], geo_info: GeographicInfo, utm_epsg: str
+    pois: list[POI],
+    geo_info: GeographicInfo,
+    utm_epsg: str,
+    max_vertices_per_poi: int = MAX_VERTICES_PER_POI,
 ) -> list[tuple[str, int, int]]:
     """Convert each POI to one or more (row, col) grid cells via the same
     transform used for the ignition point, dropping any that fall outside
     the grid.
 
     A POI with a `geometry` (a line or polygon way, e.g. a power line or
-    a substation footprint) is sampled at every vertex rather than a
+    a substation footprint) is sampled along its extent rather than at a
     single representative point, so fire arrival is detected anywhere
-    along its extent, not just at its centroid. Each sample gets a
-    `"{poi.key}#{i}"` key (grid cells revisited by the geometry are
-    deduplicated); a plain point POI still gets a single `"...#0"` key,
-    for a uniform key scheme regardless of geometry.
+    along it, not just at its centroid. At most `max_vertices_per_poi`
+    vertices are sampled, spread evenly (see `_sampled_vertices`), which
+    bounds both the per-frame sampling cost and the `CellArrivalSample`
+    objects every frame retains. Each sample gets a `"{poi.key}#{i}"` key
+    (grid cells revisited by the geometry are deduplicated); a plain
+    point POI still gets a single `"...#0"` key, for a uniform key scheme
+    regardless of geometry.
     """
     cells = []
     height, width = geo_info.shape
@@ -93,7 +129,7 @@ def build_sample_cells(
     to_utm = Transformer.from_crs("EPSG:4326", utm_epsg, always_xy=True)
     for poi in pois:
         points = (
-            poi.geometry
+            _sampled_vertices(poi.geometry, max_vertices_per_poi)
             if poi.geometry and len(poi.geometry) > 1
             else [(poi.lat, poi.lon)]
         )

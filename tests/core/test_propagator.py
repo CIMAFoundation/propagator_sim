@@ -407,6 +407,68 @@ def test_passing_precomputed_grids_does_not_change_results():
         )
 
 
+def test_flame_length_is_derived_lazily_and_cached():
+    """`get_output` no longer computes the flame-length products eagerly:
+    the mean needs a full (rows, cols, realizations) transient that
+    consumers which never read it (the web UI) shouldn't pay for on every
+    frame. The values must still match the direct computation, and be
+    computed only once per snapshot."""
+    propagator = make_propagator(realizations=2)
+    propagator.fire = np.array(
+        [[[1, 0], [0, 1]], [[1, 1], [0, 0]]], dtype=np.int8
+    )
+    propagator.fireline_int = np.array(
+        [[[10.0, 0.0], [0.0, 20.0]], [[5.0, 15.0], [0.0, 0.0]]],
+        dtype=np.float32,
+    )
+
+    calls = {"n": 0}
+    real_mean = propagator.compute_flame_length_mean
+
+    def counting_mean():
+        calls["n"] += 1
+        return real_mean()
+
+    propagator.compute_flame_length_mean = counting_mean
+    output = propagator.get_output()
+    assert calls["n"] == 0, "must not be computed until read"
+
+    np.testing.assert_allclose(
+        output.flame_length_mean, real_mean(), equal_nan=True
+    )
+    assert calls["n"] == 1
+    # second read is served from the cache, not recomputed
+    output.flame_length_mean
+    assert calls["n"] == 1
+
+    np.testing.assert_allclose(
+        output.flame_length_max,
+        propagator.compute_flame_length_max(),
+        equal_nan=True,
+    )
+
+
+def test_flame_length_raises_clearly_on_a_hand_built_output():
+    from propagator.core.models import PropagatorOutput, PropagatorStats
+
+    grid = np.zeros((2, 2), dtype=np.float32)
+    output = PropagatorOutput(
+        time=0,
+        fire_probability=grid,
+        spotting_generation_probability=grid,
+        spotting_receiving_probability=grid,
+        mean_arrival_time=grid,
+        min_arrival_time=grid,
+        ros_mean=grid,
+        ros_max=grid,
+        fli_mean=grid,
+        fli_max=grid,
+        stats=PropagatorStats(0, 0.0, 0.0, 0.0, 0.0),
+    )
+    with pytest.raises(AttributeError):
+        output.flame_length_mean
+
+
 def test_byram_flame_length_does_not_mutate_its_input():
     """It computes in place inside one transient buffer to avoid a second
     full copy of the 3D intensity array; that buffer must be its own, not
