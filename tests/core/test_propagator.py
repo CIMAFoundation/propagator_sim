@@ -55,6 +55,26 @@ def test_spotting_state_allocated_only_when_enabled():
     assert with_spotting.spotting_receiving is not None
 
 
+def test_zero_front_capacity_raises_instead_of_silently_dropping_ignitions():
+    """Regression test: `front_capacity=0` used to make every `_front_push`
+    (including ignitions) silently no-op, leaving `_front_sizes` at zero
+    so `_propagate_until` returned immediately without ever reaching the
+    overflow check -- the simulation looked "done" with nothing burned."""
+    veg = np.array([[1, 2], [3, 4]], dtype=np.int32)
+    dem = np.zeros_like(veg, dtype=np.float32)
+    with pytest.raises(ValueError):
+        Propagator(veg=veg, dem=dem, realizations=2, front_capacity=0)
+
+
+def test_negative_front_capacity_factor_raises():
+    veg = np.array([[1, 2], [3, 4]], dtype=np.int32)
+    dem = np.zeros_like(veg, dtype=np.float32)
+    with pytest.raises(ValueError):
+        Propagator(
+            veg=veg, dem=dem, realizations=2, front_capacity_factor=-1.0
+        )
+
+
 def test_disabling_spotting_does_not_mutate_shared_default_fuel_system():
     """Regression test: `Propagator(do_spotting=False)` used to call
     `self.fuels.disable_spotting()` in place on whatever fuel system it
@@ -65,7 +85,9 @@ def test_disabling_spotting_does_not_mutate_shared_default_fuel_system():
     relied on the default fuel system."""
     from propagator.core import FUEL_SYSTEM_LEGACY
 
-    base_veg = np.array([[5, 5], [5, 5]], dtype=np.int32)  # conifers: spotting-capable
+    base_veg = np.array(
+        [[5, 5], [5, 5]], dtype=np.int32
+    )  # conifers: spotting-capable
     base_dem = np.zeros_like(base_veg, dtype=np.float32)
     spotting_before = list(FUEL_SYSTEM_LEGACY.spotting)
 

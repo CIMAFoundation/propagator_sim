@@ -26,11 +26,26 @@ def test_defaults_are_accepted():
 
 def test_rejects_huge_radius_realizations_combo():
     with pytest.raises(ValidationError):
-        SimulateRequest(**base_kwargs(radius_km=50, cellsize=20, realizations=50))
+        SimulateRequest(
+            **base_kwargs(radius_km=50, cellsize=20, realizations=50)
+        )
+
+
+def test_rejects_combo_under_cell_budget_but_over_memory_budget():
+    # 50 km / 20 m / 10 realizations passes the cell-realizations budget
+    # (grid_cells * realizations == CELL_REALIZATION_BUDGET exactly) but
+    # allocates an estimated ~13-15 GB of front-heap/grid-state arrays,
+    # which the byte-based memory guardrail must reject on its own.
+    with pytest.raises(ValidationError):
+        SimulateRequest(
+            **base_kwargs(radius_km=50, cellsize=20, realizations=10)
+        )
 
 
 def test_accepts_small_high_resolution_combo():
-    req = SimulateRequest(**base_kwargs(radius_km=2, cellsize=20, realizations=20))
+    req = SimulateRequest(
+        **base_kwargs(radius_km=2, cellsize=20, realizations=20)
+    )
     assert req.radius_km == 2
 
 
@@ -53,7 +68,9 @@ def test_rejects_time_resolution_that_rounds_to_zero_seconds():
     # a time_resolution_h this small would round to time_resolution_s=0,
     # which never advances the simulation loop (see web/runner.py::run_loop)
     with pytest.raises(ValidationError):
-        SimulateRequest(**base_kwargs(time_limit_h=1.0, time_resolution_h=0.0001))
+        SimulateRequest(
+            **base_kwargs(time_limit_h=1.0, time_resolution_h=0.0001)
+        )
 
 
 def test_action_request_accepts_valid_line():
@@ -66,7 +83,9 @@ def test_action_request_accepts_valid_line():
 def test_action_request_rejects_invalid_action_type():
     with pytest.raises(ValidationError):
         ActionRequest(
-            action_type="bulldozer", time_h=1.0, line=[(42.4, 12.1), (42.45, 12.15)]
+            action_type="bulldozer",
+            time_h=1.0,
+            line=[(42.4, 12.1), (42.45, 12.15)],
         )
 
 
