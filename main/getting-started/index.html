@@ -313,15 +313,26 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#first-simulation" class="md-nav__link">
+  <a href="#optional-local-web-demo" class="md-nav__link">
     <span class="md-ellipsis">
       
-        First Simulation
+        Optional Local Web Demo
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="First Simulation">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-cli-simulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First CLI Simulation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="First CLI Simulation">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -449,7 +460,7 @@
   <span class="md-ellipsis">
     
   
-    Web UI
+    Local Web Demo
   
 
     
@@ -756,15 +767,26 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#first-simulation" class="md-nav__link">
+  <a href="#optional-local-web-demo" class="md-nav__link">
     <span class="md-ellipsis">
       
-        First Simulation
+        Optional Local Web Demo
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="First Simulation">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#first-cli-simulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First CLI Simulation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="First CLI Simulation">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -859,7 +881,24 @@ pip install -e '.[cli,io]'
 </code></pre>
 <p>If you only need the simulation engine (without CLI/I/O helpers) drop the
 extras from the install command.</p>
-<h2 id="first-simulation">First Simulation</h2>
+<p>To use the interactive browser interface, install the <code>web</code> extra instead:</p>
+<pre><code class="language-bash">pip install -e '.[web]'
+</code></pre>
+<p><code>uv sync --dev --all-extras</code> already includes it.</p>
+<h2 id="optional-local-web-demo">Optional Local Web Demo</h2>
+<p>For debugging and demonstrations, run the local web server and open the
+address it prints:</p>
+<pre><code class="language-bash">uv run propagator-web
+</code></pre>
+<p>The demo is available at <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>. Pick the simulation center
+and ignition on the map, configure the weather and duration, and select
+<strong>Run simulation</strong>. You can also draw intervention lines and schedule
+Canadair, helicopter, waterline, or heavy-vehicle actions before starting.</p>
+<p>The first run in an area downloads terrain and land-cover data. See the
+<a href="../web/">Local Web Demo</a> guide for the complete workflow, result
+interpretation, cache details, and the link to the built-in plain-English
+manual.</p>
+<h2 id="first-cli-simulation">First CLI Simulation</h2>
 <p>The repository ships with small GeoTIFF datasets and configuration files under
 <code>example/</code>. Run a simulation in GeoTIFF mode with:</p>
 <pre><code class="language-bash">uv run propagator \

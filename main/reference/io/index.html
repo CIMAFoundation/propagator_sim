@@ -319,7 +319,7 @@
   <span class="md-ellipsis">
     
   
-    Web UI
+    Local Web Demo
   
 
     
@@ -712,6 +712,100 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#boundary-conditions-and-firefighting-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Boundary Conditions and Firefighting Actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.io.boundary_conditions.TimedInput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TimedInput
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TimedInput">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.io.boundary_conditions.TimedInput.extract_ignitions_middle_point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extract_ignitions_middle_point
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.io.actions.Action" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Action
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.io.actions.CanadairAction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CanadairAction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.io.actions.HelicopterAction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HelicopterAction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.io.actions.WaterlineAction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WaterlineAction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.io.actions.HeavyAction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HeavyAction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#writers" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1061,6 +1155,100 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#boundary-conditions-and-firefighting-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Boundary Conditions and Firefighting Actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.io.boundary_conditions.TimedInput" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TimedInput
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TimedInput">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#propagator.io.boundary_conditions.TimedInput.extract_ignitions_middle_point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extract_ignitions_middle_point
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.io.actions.Action" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Action
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.io.actions.CanadairAction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CanadairAction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.io.actions.HelicopterAction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HelicopterAction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.io.actions.WaterlineAction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WaterlineAction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#propagator.io.actions.HeavyAction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HeavyAction
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1527,6 +1715,306 @@ step size and tile dimensions.
     </div>
 
 </div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="boundary-conditions-and-firefighting-actions">Boundary Conditions and Firefighting Actions</h2>
+<p><code>TimedInput</code> turns time-stamped weather, ignition, and action definitions into
+the core engine's <code>BoundaryConditions</code>. The Web UI and CLI share these action
+classes, so intervention geometry and effects are rasterized consistently.</p>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="propagator.io.boundary_conditions.TimedInput" class="doc doc-heading">
+            <code>propagator.io.boundary_conditions.TimedInput</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
+
+
+        <p>Single time-step boundary conditions.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="propagator.io.boundary_conditions.TimedInput.extract_ignitions_middle_point" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">extract_ignitions_middle_point</span><span class="p">()</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Extracts the middle coordinates from ignitions</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="propagator.io.actions.Action" class="doc doc-heading">
+            <code>propagator.io.actions.Action</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="propagator.io.actions.CanadairAction" class="doc doc-heading">
+            <code>propagator.io.actions.CanadairAction</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="propagator.io.actions.Action" href="#propagator.io.actions.Action">Action</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="propagator.io.actions.HelicopterAction" class="doc doc-heading">
+            <code>propagator.io.actions.HelicopterAction</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="propagator.io.actions.Action" href="#propagator.io.actions.Action">Action</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="propagator.io.actions.WaterlineAction" class="doc doc-heading">
+            <code>propagator.io.actions.WaterlineAction</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="propagator.io.actions.Action" href="#propagator.io.actions.Action">Action</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="propagator.io.actions.HeavyAction" class="doc doc-heading">
+            <code>propagator.io.actions.HeavyAction</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="propagator.io.actions.Action" href="#propagator.io.actions.Action">Action</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
 
 
 

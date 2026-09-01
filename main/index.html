@@ -393,7 +393,7 @@
   <span class="md-ellipsis">
     
   
-    Web UI
+    Local Web Demo
   
 
     
@@ -747,20 +747,29 @@
 <li><strong>Simulation engine</strong>: the <code>propagator.core</code> package evolves ignition grids, applies stochastic spread models, and handles boundary conditions.</li>
 <li><strong>Data access</strong>: helpers under <code>propagator.io</code> prepare GeoTIFFs or tiled rasters and emit GeoTIFF, GeoJSON, and JSON outputs.</li>
 <li><strong>Command line tools</strong>: the <code>propagator</code> CLI orchestrates runs, handles configuration files, and writes time-stepped products to disk.</li>
+<li><strong>Local web demo</strong>: an optional debug and demonstration interface for trying scenarios, firefighting actions, and animated outputs in a browser.</li>
 <li><strong>Documentation + API reference</strong>: MkDocs pages provide operator guides, while mkdocstrings renders the public Python API.</li>
 </ul>
 <h2 id="typical-workflow">Typical Workflow</h2>
-<ol>
-<li>Prepare a JSON configuration describing ignition geometry, simulation horizon, and model toggles (see <code>example/config*.json</code>).</li>
-<li>Supply static data—either as GeoTIFF DEM/vegetation layers or a tileset directory—and optional YAML fuel definitions.</li>
-<li>Launch the run via the CLI (<code>uv run propagator …</code>), enabling verbose or recording modes for richer logging.</li>
-<li>Inspect the generated rasters, isochrones, and metadata in the configured output directory.</li>
-</ol>
+<p>Choose the workflow that fits the task:</p>
+<ul>
+<li>For repeatable or automated runs, prepare a JSON configuration, supply
+  GeoTIFFs or tiled data, and run <code>uv run propagator …</code>.</li>
+<li>For integration in another application, use the Python API directly and
+  control boundary conditions, stepping, and outputs programmatically.</li>
+<li>For debugging or demonstrations, the optional local web interface can set up
+  a scenario on a map and visualize its time-stepped outputs.</li>
+</ul>
+<p>All three workflows use the same simulation engine. The Web UI presents each
+saved time step as a fire-probability heatmap, isochrones, burned-area
+statistics, and an area-growth chart; the CLI writes equivalent GIS-ready
+products to disk.</p>
 <h2 id="quick-links">Quick Links</h2>
 <ul>
 <li><a href="getting-started/">Getting started</a>: prerequisites, install, first simulation, and programmatic API tips</li>
 <li><a href="programmatic/">Programmatic Workflow</a>: end-to-end scripting with loaders and writers</li>
 <li><a href="cli/">CLI</a>: command options, modes, and logging</li>
+<li><a href="web/">Local Web Demo</a>: optional map-based debugging and demonstration interface</li>
 <li><a href="outputs/">Simulation Outputs</a>: output fields, units, and aggregation across realizations</li>
 <li><a href="spotting/">Fire Spotting</a>: ember-transport model, configuration, and outputs</li>
 <li><a href="reference/">API</a>: Python package and Numba backend reference</li>

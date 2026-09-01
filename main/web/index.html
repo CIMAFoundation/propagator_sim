@@ -25,7 +25,7 @@
     
     
       
-        <title>Web UI - PROPAGATOR Sim</title>
+        <title>Local Web Demo - PROPAGATOR Sim</title>
       
     
     
@@ -70,7 +70,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#web-ui" class="md-skip">
+        <a href="#local-web-demo" class="md-skip">
           Skip to content
         </a>
       
@@ -109,7 +109,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Web UI
+              Local Web Demo
             
           </span>
         </div>
@@ -328,7 +328,7 @@
   <span class="md-ellipsis">
     
   
-    Web UI
+    Local Web Demo
   
 
     
@@ -346,7 +346,7 @@
   <span class="md-ellipsis">
     
   
-    Web UI
+    Local Web Demo
   
 
     
@@ -383,10 +383,43 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#in-app-manual" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In-app Manual
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#using-it" class="md-nav__link">
     <span class="md-ellipsis">
       
         Using It
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#firefighting-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Firefighting Actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-the-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading the Results
       
     </span>
   </a>
@@ -728,10 +761,43 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#in-app-manual" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In-app Manual
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#using-it" class="md-nav__link">
     <span class="md-ellipsis">
       
         Using It
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#firefighting-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Firefighting Actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-the-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading the Results
       
     </span>
   </a>
@@ -799,27 +865,41 @@
 
 
 
-<h1 id="web-ui">Web UI</h1>
-<p>A local, interactive web interface lets you pick an area on a map, set
-weather and simulation parameters, and watch the fire spread animate —
-without writing a config file or GeoTIFFs by hand. It is built on top of the
-same <code>Propagator</code> engine and the public-data pipeline described in
+<h1 id="local-web-demo">Local Web Demo</h1>
+<p>A local, interactive debug and demonstration interface lets you pick an area
+on a map, set weather and simulation parameters, and watch the fire spread
+animate — without writing a config file or GeoTIFFs by hand. It is built on
+top of the same <code>Propagator</code> engine and the public-data pipeline described in
 <a href="../getting-started/">Getting Started</a>, not a separate implementation.</p>
-<p>It is a <strong>local-only</strong> tool: the server binds to <code>127.0.0.1</code> and is meant to
-run on your own machine, not to be exposed on a network.</p>
+<p>It is an <strong>optional, local-only debug/demo tool</strong>, not the primary operational
+interface. The server binds to <code>127.0.0.1</code> and is meant to run on your own
+machine, not to be exposed on a network.</p>
 <h2 id="install-and-run">Install and Run</h2>
 <pre><code class="language-bash">uv sync --extra web
 uv run propagator-web
 </code></pre>
 <p>Then open <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a> in a browser.</p>
+<p>The server is deliberately local and binds only to <code>127.0.0.1</code>. The demo is
+not an internet-hosted service and should not be exposed as an operational
+multi-user server.</p>
+<h2 id="in-app-manual">In-app Manual</h2>
+<p>Select <strong>Manual</strong> in the app header to open the built-in guide. It
+explains wildfire behaviour, every input and output, the simulation algorithm,
+and the limits of interpreting model results in plain English. The guide is
+served locally at <a href="http://127.0.0.1:8765/manual.html">http://127.0.0.1:8765/manual.html</a> while the app is running.</p>
 <h2 id="using-it">Using It</h2>
 <ol>
 <li>Click the map to place the simulation area's center, then click again to
    place the ignition point (the two "pick" modes switch automatically after
    the first click).</li>
-<li>Adjust radius, cellsize, wind, moisture, duration, and number of
-   realizations in the sidebar.</li>
-<li>Click <strong>Avvia simulazione</strong>. The server downloads DEM (Copernicus
+<li>Adjust radius, cell size, wind, moisture, duration, output frequency, and
+   number of realizations in the sidebar. Enable spotting if the scenario
+   should include wind-carried embers.</li>
+<li>Optionally add one or more firefighting actions. Choose the action and its
+   scheduled time, select <strong>Draw line</strong>, click points on the map, and select
+   <strong>Finish line</strong>. The queued actions appear below the controls and can be
+   removed before starting the run.</li>
+<li>Click <strong>Run simulation</strong>. The server downloads DEM (Copernicus
    GLO-30) and land-cover (ESA WorldCover 10 m) tiles for the area, builds
    the fuel grid, and runs the simulation, reporting progress as it goes.</li>
 <li>Once done, scrub the time slider to see the fire-probability heatmap and
@@ -830,6 +910,59 @@ uv run propagator-web
 non-vegetated — typically urban areas), a warning is shown but the run still
 completes (it will simply show no spread). If the ignition point falls
 outside the selected area, the run fails immediately with a clear error.</p>
+<h2 id="firefighting-actions">Firefighting Actions</h2>
+<p>Actions are scheduled relative to the start of the simulation and applied
+when that simulation time is reached. Each drawn WGS84 line is rasterized on
+the scenario grid through the same <code>TimedInput</code> boundary-condition machinery
+used by the CLI.</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Simulated effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Canadair</td>
+<td>Adds 25 percentage points of fuel moisture on the line and 22 points in its one-cell buffer.</td>
+</tr>
+<tr>
+<td>Helicopter</td>
+<td>Adds 22 percentage points at deterministic scattered drop points near the line and 20 points in their one-cell buffer.</td>
+</tr>
+<tr>
+<td>Waterline</td>
+<td>Adds 27 percentage points of fuel moisture across the line and its one-cell buffer.</td>
+</tr>
+<tr>
+<td>Heavy vehicles</td>
+<td>Replaces fuel across the line and its one-cell buffer with the non-vegetated fuel class, creating a persistent firebreak.</td>
+</tr>
+</tbody>
+</table>
+<p>Moisture effects are added only inside the affected cells, stack on top of
+the scenario's existing moisture, and then decay according to the simulation's
+moisture-relief model. Heavy-vehicle actions change the fuel rather than its
+moisture.</p>
+<p>Actions are scenario inputs, not live controls: add or remove them before
+selecting <strong>Run simulation</strong>. To compare intervention strategies, run the
+same scenario again with a different action type, line, or scheduled time.</p>
+<h2 id="reading-the-results">Reading the Results</h2>
+<ul>
+<li>The heatmap shows the fraction of realizations in which each cell burned.</li>
+<li>Isochrones outline the selected probability thresholds at the displayed
+  time; the defaults are 50%, 75%, and 90%.</li>
+<li>Expected burned area sums each cell's probability multiplied by its area.</li>
+<li>Threshold areas report how much land reached at least 50%, 75%, or 90%
+  probability.</li>
+<li>Active realizations count the simulations whose fire front is still moving.</li>
+<li>The growth chart compares expected area with the area above the 50%
+  threshold through time.</li>
+</ul>
+<p>These products describe a stochastic scenario, not a precise fire perimeter.
+Use them to compare likely trends and intervention assumptions, never as the
+sole basis for operational decisions.</p>
 <h2 id="how-it-works">How It Works</h2>
 <ul>
 <li><code>propagator.io.data_prep</code> (shared with <code>example/italy/prepare_area_data.py</code>)
@@ -846,6 +979,9 @@ outside the selected area, the run fails immediately with a clear error.</p>
 <li>Isochrone lines reuse <code>propagator.io.writer.isochrones_geojson.extract_isochrone</code>
   (the same code the CLI uses to write <code>isochrones_*.json</code>), reprojected to
   WGS84 for the map.</li>
+<li>Firefighting actions are converted to <code>CanadairAction</code>, <code>HelicopterAction</code>,
+  <code>WaterlineAction</code>, or <code>HeavyAction</code> objects and scheduled as future
+  <code>BoundaryConditions</code>. This keeps Web UI and CLI action semantics aligned.</li>
 </ul>
 <h2 id="guardrails">Guardrails</h2>
 <p>Request parameters are validated by <code>propagator.web.schemas.SimulateRequest</code>:</p>
@@ -860,7 +996,7 @@ outside the selected area, the run fails immediately with a clear error.</p>
 <tbody>
 <tr>
 <td><code>radius_km</code></td>
-<td>0–50</td>
+<td>&gt;0–50</td>
 <td>15</td>
 </tr>
 <tr>
@@ -875,13 +1011,18 @@ outside the selected area, the run fails immediately with a clear error.</p>
 </tr>
 <tr>
 <td><code>time_limit_h</code></td>
-<td>0–48</td>
+<td>&gt;0–48</td>
 <td>6</td>
 </tr>
 <tr>
 <td><code>time_resolution_h</code></td>
-<td>0–6, ≤ <code>time_limit_h</code></td>
+<td>&gt;0–6, ≤ <code>time_limit_h</code></td>
 <td>1</td>
+</tr>
+<tr>
+<td>action time</td>
+<td>0–<code>time_limit_h</code></td>
+<td>1 h in the UI</td>
 </tr>
 </tbody>
 </table>
