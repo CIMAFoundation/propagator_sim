@@ -248,6 +248,12 @@ def advance_front_until(
             if veg[row, col] == NO_FUEL:
                 continue
 
+            idx_from = fuel_idx[row, col]
+            if not fuels.burn[idx_from]:
+                # Forced ignitions may mark a non-combustible cell as
+                # burning, but it must not propagate fire outward.
+                continue
+
             w_dir_r = wind_dir[row, col]
             w_speed_r = wind_speed[row, col]
 
@@ -292,7 +298,7 @@ def advance_front_until(
                     fli_to,
                 )
 
-            if fuels.spotting[fuel_idx[row, col]]:
+            if fuels.spotting[idx_from]:
                 spotting_updates = compute_spotting(
                     row,
                     col,

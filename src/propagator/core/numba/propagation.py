@@ -249,6 +249,9 @@ def compute_spotting(
         veg_to = veg[row_to, col_to]
         if veg_to == NO_FUEL:
             continue
+        idx_to = fuel_idx[row_to, col_to]
+        if not fuels.burn[idx_to]:
+            continue
 
         # we want to put another probabilistic filter in order
         # to assess the success of ember ignition.
@@ -256,8 +259,6 @@ def compute_spotting(
         # P_c = P_c0 (1 + P_cd), where P_c0 constant probability of ignition
         # by spotting and P_cd is a correction factor that
         # depends on vegetation type and density > set on the fuels system
-        idx_to = fuel_idx[row_to, col_to]
-
         P_c = P_C0 * (1 + fuels.prob_ign_by_embers[idx_to])
         if uniform() > P_c:
             continue
@@ -439,13 +440,16 @@ def try_spread_to_neighbour(
     ):
         return False, row_to, col_to, 0, 0.0, 0.0
 
+    idx_to = fuel_idx[row_to, col_to]
+    if not fuels.burn[idx_to]:
+        return False, row_to, col_to, 0, 0.0, 0.0
+
     dist_to = NEIGHBOURS_DISTANCE[neighbour_index] * cellsize
     angle_to = NEIGHBOURS_ANGLE[neighbour_index]
 
     dh = dem[row_to, col_to] - dem[row, col]
     moisture_r = moisture[row_to, col_to]
     idx_from = fuel_idx[row, col]
-    idx_to = fuel_idx[row_to, col_to]
     transition_probability = fuels.spread_probability[idx_from, idx_to]
 
     p_prob = get_probability_to_neighbour(

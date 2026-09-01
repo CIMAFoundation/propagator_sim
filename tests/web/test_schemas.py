@@ -31,6 +31,15 @@ def test_rejects_huge_radius_realizations_combo():
         )
 
 
+def test_rejects_combo_under_cell_budget_but_over_memory_budget():
+    # This is exactly at the cell-realizations budget, but its estimated
+    # front-heap and grid-state allocation exceeds the memory budget.
+    with pytest.raises(ValidationError):
+        SimulateRequest(
+            **base_kwargs(radius_km=50, cellsize=20, realizations=10)
+        )
+
+
 def test_accepts_small_high_resolution_combo():
     req = SimulateRequest(
         **base_kwargs(radius_km=2, cellsize=20, realizations=20)

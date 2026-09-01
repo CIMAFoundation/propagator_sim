@@ -456,6 +456,76 @@ def test_decay_actions_moisture_exponential():
     assert propagator.actions_moisture is None
 
 
+def _make_two_fuel_propagator(non_vegetated_at, ignite_at, realizations=5):
+    """Build a deterministic burnable/non-combustible spread scenario."""
+    from propagator.core.numba.models import FuelSystem
+
+    veg = np.full((9, 9), 5, dtype=np.int32)
+    veg[non_vegetated_at] = 3
+    dem = np.zeros_like(veg, dtype=np.float32)
+    fuels = FuelSystem(2)
+    fuels.add_fuel(5, "conifers", 1.0, 1.0, 20000.0, 0.0, -9999.0)
+    fuels.add_fuel(
+        3,
+        "non-vegetated",
+        1.0,
+        1.0,
+        20000.0,
+        0.0,
+        -9999.0,
+        False,
+        0.0,
+        False,
+    )
+    fuels.add_transition_probability(5, 3, 1.0)
+    fuels.add_transition_probability(3, 5, 1.0)
+
+    propagator = Propagator(
+        veg=veg,
+        dem=dem,
+        realizations=realizations,
+        do_spotting=False,
+        fuels=fuels,
+    )
+    propagator.moisture = np.zeros(veg.shape, dtype=np.float32)
+    propagator.wind_dir = np.zeros(veg.shape, dtype=np.float32)
+    propagator.wind_speed = np.zeros(veg.shape, dtype=np.float32)
+    propagator.set_boundary_conditions(
+        BoundaryConditions(time=0, ignitions=[ignite_at])
+    )
+    return propagator
+
+
+def test_unburnable_fuel_does_not_ignite_from_a_burning_neighbour():
+    propagator = _make_two_fuel_propagator(
+        non_vegetated_at=(4, 5), ignite_at=(4, 4)
+    )
+
+    steps = 0
+    while propagator.next_time() is not None and steps < 20:
+        propagator.step()
+        steps += 1
+
+    fire = propagator.get_fire()
+    assert np.all(fire[:, 4, 4])
+    assert not np.any(fire[:, 4, 5])
+
+
+def test_unburnable_fuel_does_not_propagate_outward():
+    propagator = _make_two_fuel_propagator(
+        non_vegetated_at=(4, 4), ignite_at=(4, 4)
+    )
+
+    steps = 0
+    while propagator.next_time() is not None and steps < 20:
+        propagator.step()
+        steps += 1
+
+    fire = propagator.get_fire()
+    assert np.all(fire[:, 4, 4])
+    assert not np.any(fire[:, 4, 5])
+
+
 def test_step_applies_event():
     propagator = make_propagator(realizations=1)
     propagator.actions_moisture = np.full((2, 2), 0.5, dtype=np.float32)

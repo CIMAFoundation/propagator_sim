@@ -6,6 +6,7 @@ local, single-user machine (see `_check_compute_budget`).
 
 from __future__ import annotations
 
+import math
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -15,6 +16,33 @@ from pydantic import BaseModel, Field, model_validator
 # ~1e7 and runs in well under a minute; this caps combinations an order
 # of magnitude above that, which already take several minutes locally.
 CELL_REALIZATION_BUDGET = 2.5e8
+
+# Peak-memory guardrail adapted to this branch's block-sparse engine. It
+# includes fully populated state tiles, the dense fold used to produce web
+# results, shared input/state grids, tile indexes, and the initial front heap.
+_TILE_SIZE = 32
+_FRONT_INITIAL_CAPACITY = 4096
+_FRONT_HEAP_BYTES_PER_EVENT = 5 * 4
+_TILED_STATE_BYTES_PER_CELL = 1 + 4 + 4 + 4
+_FOLD_BYTES_PER_CELL = 48
+_SHARED_GRID_BYTES_PER_CELL = 8 + 5 * 4
+_TILE_INDEX_BYTES = 4
+MAX_ESTIMATED_MEMORY_BYTES = 4 * 1024**3  # 4 GiB
+
+
+def _estimate_memory_bytes(grid_cells: float, realizations: int) -> float:
+    grid_side = math.ceil(math.sqrt(grid_cells))
+    tiles_per_side = math.ceil(grid_side / _TILE_SIZE)
+    padded_cells = (tiles_per_side * _TILE_SIZE) ** 2
+    return (
+        realizations
+        * (
+            _TILED_STATE_BYTES_PER_CELL * padded_cells
+            + _TILE_INDEX_BYTES * tiles_per_side**2
+            + _FRONT_HEAP_BYTES_PER_EVENT * _FRONT_INITIAL_CAPACITY
+        )
+        + (_FOLD_BYTES_PER_CELL + _SHARED_GRID_BYTES_PER_CELL) * grid_cells
+    )
 
 
 class ActionRequest(BaseModel):
@@ -70,6 +98,16 @@ class SimulateRequest(BaseModel):
                 f"{cost:,.0f} cell-realizations, budget "
                 f"{CELL_REALIZATION_BUDGET:,.0f}). Lower the radius, "
                 "increase the cellsize, or reduce realizations."
+            )
+        estimated_bytes = _estimate_memory_bytes(grid_cells, self.realizations)
+        if estimated_bytes > MAX_ESTIMATED_MEMORY_BYTES:
+            raise ValueError(
+                "This combination of radius_km/cellsize/realizations would "
+                "allocate an estimated "
+                f"{estimated_bytes / 1024**3:.2f} GiB (budget "
+                f"{MAX_ESTIMATED_MEMORY_BYTES / 1024**3:.0f} GiB) for the "
+                "simulation and result state. Lower the radius, increase "
+                "the cellsize, or reduce realizations."
             )
         if self.time_resolution_h > self.time_limit_h:
             raise ValueError("time_resolution_h must not exceed time_limit_h")
