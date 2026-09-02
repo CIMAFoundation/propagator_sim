@@ -2,7 +2,7 @@
 
 ## Indice
 
-1. [Cos'è PROPAGATOR](#1-cosè-propagator)
+1. [Cos'è PROPAGATOR](#1-cose-propagator)
 2. [Come si comporta un incendio boschivo](#2-come-si-comporta-un-incendio-boschivo)
 3. [Guida all'uso della web app](#3-guida-alluso-della-web-app)
 4. [Le variabili di input, spiegate](#4-le-variabili-di-input-spiegate)
