@@ -9,20 +9,6 @@ Foundation. It models fire propagation as a stochastic cellular automaton over
 a DEM/vegetation grid, driven by wind, slope, moisture, and fuel-type
 probabilities, with an optional ember-spotting model.
 
-## Working From a Fork
-
-When this checkout is a fork of `CIMAFoundation/propagator_sim` (run
-`git remote -v` to see what is configured), be careful merging the
-upstream default branch into a feature branch: the web UI was
-contributed through PRs that were **squash-merged** upstream, so a
-branch carrying the original per-commit history shares no direct common
-ancestor with them. `git merge upstream/main` then reports spurious
-"add/add" conflicts across the whole web package instead of a clean
-incremental diff. Prefer cherry-picking, or `git checkout
-upstream/main -- <path>` for the specific files you want; check
-`git diff --stat upstream/main...HEAD` (three dots — what a PR would
-show) before opening one.
-
 ## Commands
 
 ```bash
