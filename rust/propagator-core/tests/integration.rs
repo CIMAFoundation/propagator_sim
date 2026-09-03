@@ -126,6 +126,81 @@ fn no_fuel_blocks_spread() {
     }
 }
 
+fn two_fuel_sim(non_vegetated_at: (usize, usize), ignition: (usize, usize)) -> Propagator {
+    let mut veg = Grid2::filled(9, 9, 5);
+    veg[non_vegetated_at] = 3;
+    let fuels = FuelSystem::from_defs(&[
+        FuelDef {
+            id: 5,
+            name: "combustible".into(),
+            v0: 60.0,
+            d0: 1.0,
+            d1: 0.0,
+            hhv: 20000.0,
+            humidity: None,
+            spotting: false,
+            prob_ign_by_embers: 0.0,
+            burn: true,
+            spread_probability: vec![(3, 1.0)],
+        },
+        FuelDef {
+            id: 3,
+            name: "non-vegetated".into(),
+            v0: 60.0,
+            d0: 1.0,
+            d1: 0.0,
+            hhv: 20000.0,
+            humidity: None,
+            spotting: false,
+            prob_ign_by_embers: 0.0,
+            burn: false,
+            spread_probability: vec![(5, 1.0)],
+        },
+    ])
+    .unwrap();
+
+    let mut config = PropagatorConfig::new(veg, Grid2::filled(9, 9, 0.0));
+    config.fuels = Some(fuels);
+    config.realizations = 5;
+    config.seed = Some(23);
+    config.oob_mode = OobMode::Ignore;
+    let mut sim = Propagator::new(config).unwrap();
+    sim.set_boundary_conditions(BoundaryConditions {
+        time: 0,
+        moisture: Some(FieldInput::Scalar(0.0)),
+        wind_dir: Some(FieldInput::Scalar(0.0)),
+        wind_speed: Some(FieldInput::Scalar(0.0)),
+        ignitions: Some(Ignitions::Points(vec![ignition])),
+        ..Default::default()
+    })
+    .unwrap();
+    sim
+}
+
+#[test]
+fn unburnable_fuel_does_not_ignite_from_a_burning_neighbour() {
+    let mut sim = two_fuel_sim((4, 5), (4, 4));
+    sim.step_window(3600).unwrap();
+
+    let fire = sim.get_fire().unwrap();
+    for realization in fire {
+        assert_eq!(realization[(4, 4)], 1);
+        assert_eq!(realization[(4, 5)], 0);
+    }
+}
+
+#[test]
+fn unburnable_fuel_does_not_propagate_outward() {
+    let mut sim = two_fuel_sim((4, 4), (4, 4));
+    sim.step_window(3600).unwrap();
+
+    let fire = sim.get_fire().unwrap();
+    for realization in fire {
+        assert_eq!(realization[(4, 4)], 1);
+        assert_eq!(realization[(4, 5)], 0);
+    }
+}
+
 #[test]
 fn cells_burn_at_most_once_per_realization() {
     let mut sim = new_sim(3);

@@ -180,14 +180,19 @@ pub fn advance_front_until(
             tile.fli[local] = fli_value;
         }
 
-        // ignitable but not combustible: never spreads
+        // Forced ignitions may mark an unburnable cell as burning, but it
+        // must never propagate fire outward.
         if shared.veg[(row, col)] == NO_FUEL {
+            continue;
+        }
+
+        let idx_from = shared.fuel_idx[(row, col)] as usize;
+        if !shared.fuels.burn[idx_from] {
             continue;
         }
 
         let w_dir = shared.wind_dir[(row, col)] as f64;
         let w_speed = shared.wind_speed[(row, col)] as f64;
-        let idx_from = shared.fuel_idx[(row, col)] as usize;
 
         // 8-neighbour spread
         for (neighbour, &(dr, dc)) in NEIGHBOURS.iter().enumerate() {
@@ -202,12 +207,15 @@ pub fn advance_front_until(
             {
                 continue;
             }
+            let idx_to = shared.fuel_idx[(row_to, col_to)] as usize;
+            if !shared.fuels.burn[idx_to] {
+                continue;
+            }
 
             let (dist_cells, angle) = geometry[neighbour];
             let dist = dist_cells * shared.cellsize;
             let dh = shared.dem[(row_to, col_to)] - shared.dem[(row, col)];
             let moist = shared.moisture[(row_to, col_to)] as f64;
-            let idx_to = shared.fuel_idx[(row_to, col_to)] as usize;
             let p0 = shared.fuels.transition_probability(idx_from, idx_to);
 
             let p = probability_to_neighbour(
@@ -359,6 +367,9 @@ fn compute_spotting(
 
         // ignition success (Alexandridis eq. 10)
         let idx_to = shared.fuel_idx[(row_to, col_to)] as usize;
+        if !shared.fuels.burn[idx_to] {
+            continue;
+        }
         let p_c = P_C0 * (1.0 + shared.fuels.prob_ign_by_embers[idx_to]);
         if real.rng.uniform() > p_c {
             continue;
