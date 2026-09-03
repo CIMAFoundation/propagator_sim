@@ -21,10 +21,12 @@ def _():
         BoundaryConditions,
         PropagatorOutOfBoundsError
     )
+    from propagator.core.numba import get_crowning_initiation_fn
     return (
         BoundaryConditions,
         Propagator,
         PropagatorOutOfBoundsError,
+        get_crowning_initiation_fn,
         mo,
     )
 
@@ -76,7 +78,13 @@ def _(mo):
         step=0.05, value=0.01,
         show_value=True
     )
+    crowning_initiation_model = mo.ui.dropdown(
+        options={"Cruz": "cruz", "Perrakis": "perrakis"},
+        value="Cruz",
+        label="Crowning initiation model",
+    )
     return (
+        crowning_initiation_model,
         fuel_moisture_slider,
         realizations_slider,
         timesteps_slider,
@@ -88,6 +96,7 @@ def _(mo):
 
 @app.cell
 def _(
+    crowning_initiation_model,
     fuel_moisture_slider,
     mo,
     realizations_slider,
@@ -103,6 +112,7 @@ def _(
         wind_dir_slider,
         fuel_moisture_slider,
         cbd_slider,
+        crowning_initiation_model,
     ],  justify='center')
     return
 
@@ -114,8 +124,8 @@ def _(rio):
     with rio.open('spotorno_veg_1m.tif') as f:
         veg = f.read(1)
     with rio.open('spotorno_cbh_1m.tif') as f:
-        cbh = f.read(1)
-    return dem, cbh, veg
+        fsg = f.read(1)
+    return dem, fsg, veg
 
 
 @app.cell
@@ -124,14 +134,16 @@ def _(
     Propagator,
     dem,
     veg,
-    cbh,
+    fsg,
     fuel_moisture_slider,
     realizations_slider,
     timesteps_slider,
     wind_dir_slider,
     wind_speed_slider,
     cbd_slider,
-    np
+    crowning_initiation_model,
+    get_crowning_initiation_fn,
+    np,
 ):
 
     # fake cbd
@@ -143,10 +155,13 @@ def _(
     simulator = Propagator(
         dem=dem,
         veg=veg,
-        cbh=cbh,
+        fsg=fsg,
         cbd=cbd,
         realizations=realizations_slider.value,
-        cellsize=1  # 1m
+        cellsize=1,  # 1m
+        crowning_init_fn=get_crowning_initiation_fn(
+            crowning_initiation_model.value
+        ),
     )
     simulator.set_boundary_conditions(
         BoundaryConditions(
@@ -232,12 +247,12 @@ def _(
         )
         cbar.ax.set_yticklabels(tick_labels)
 
-        # --- DEM plot
-        ax_cbh = fig.add_subplot(gs[0, 2])
-        ax_cbh.set_title('CHB')
-        alpha_mask = (simulator.cbh >= 0).astype(float)
-        im_cbh = ax_cbh.imshow(simulator.cbh, cmap="viridis", vmin=0, vmax=13, alpha=alpha_mask)
-        fig.colorbar(im_cbh, ax=ax_cbh, fraction=0.046, pad=0.04)
+        # --- FSG plot
+        ax_fsg = fig.add_subplot(gs[0, 2])
+        ax_fsg.set_title('FSG')
+        alpha_mask = (simulator.fsg >= 0).astype(float)
+        im_fsg = ax_fsg.imshow(simulator.fsg, cmap="viridis", vmin=0, vmax=13, alpha=alpha_mask)
+        fig.colorbar(im_fsg, ax=ax_fsg, fraction=0.046, pad=0.04)
         # --- Fire Probability (2nd row, col 0) ---
         ax_fp = fig.add_subplot(gs[1, 0])
         ax_fp.set_title("Fire Probability")
