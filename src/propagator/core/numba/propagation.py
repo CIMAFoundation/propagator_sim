@@ -18,9 +18,7 @@ from propagator.core.numba.functions import FIRE_SPOTTING_DISTANCE_COEFFICIENT
 from .functions import (
     fireline_intensity,
     get_probability_to_neighbour,
-    lhv_fuel,
-    probability_crowning,
-    criterion_active_crowning
+    lhv_fuel
 )
 from .models import Fuel, FuelSystem
 
@@ -217,6 +215,8 @@ def calculate_fire_behavior(
     w_dir: float,
     w_speed: float,
     p_time_fn: Any,
+    crowning_init_fn: Any,
+    active_crowning_fn: Any
 ) -> tuple[int, int, float, float]:
     """Calculate fire behaviour during propagation between cells
 
@@ -245,7 +245,12 @@ def calculate_fire_behavior(
     p_time_fn: Any
         The function to compute the spread time (must be jit-compiled). Units are compliant with other functions.
             signature: (v0: float, dh: float, angle_to: float, dist: float, moist: float, w_dir: float, w_speed: float) -> tuple[float, float]
-
+    crowning_init_fn: Any
+        The function to compute the crowning initiation probability (must be jit-compiled). Units are compliant with other functions.
+            signature: (wind_speed: float, fsg: float, sfc: float, moisture: float) -> float
+    active_crowning_fn: Any
+        The function to compute the active crowning criterion (must be jit-compiled). Units are compliant with other functions.
+            signature: (wind_speed: float, canopy_bulk_density: float, ffmc: float) -> bool
 
     Returns
     -------
@@ -290,20 +295,20 @@ def calculate_fire_behavior(
     if not do_crowning:  # skip crowning module
         return transition_time, status, ros_value, fireline_intensity_value
     # check for crownfire initiation
-    p_crown = probability_crowning(
+    crown_init = crowning_init_fn(
         w_speed,
         fsg_to,
         fuel_to.d0,
         moisture
     )
-    if p_crown > 0.5:  # crown fire
+    if crown_init:  # crown fire initiation
         # compute criterion for active crowning
-        cac = criterion_active_crowning(
+        crown_act = active_crowning_fn(
             w_speed,
             cbd_to,
             moisture,
         )
-        if cac >= 1.0:  # crowning active
+        if crown_act:  # active crowning occuring
             status = 3  # active crown fire
         else:
             status = 2  # passive crown fire
@@ -326,6 +331,8 @@ def single_cell_updates(
     fuels: FuelSystem,
     p_time_fn: Any,
     p_moist_fn: Any,
+    crowning_init_fn: Any,
+    active_crowning_fn: Any
 ) -> list[tuple[int, int, int, int, float, float]]:
     """
     Apply fire spread to a single cell and get the next spread updates.
@@ -362,6 +369,12 @@ def single_cell_updates(
     p_moist_fn: Any
         The function to compute the moisture probability (must be jit-compiled). Units are compliant with other functions.
             signature: (moist: float) -> float
+    crowning_init_fn: Any
+        The function to compute the crowning initiation probability (must be jit-compiled). Units are compliant with other functions.
+            signature: (wind_speed: float, fsg: float, sfc: float, moisture: float) -> float
+    active_crowning_fn: Any
+        The function to compute the active crowning criterion (must be jit-compiled). Units are compliant with other functions.
+            signature: (wind_speed: float, canopy_bulk_density: float, ffmc: float) -> bool
 
     Returns
     -------
@@ -442,6 +455,8 @@ def single_cell_updates(
             w_dir_r,
             w_speed_r,
             p_time_fn,
+            crowning_init_fn,
+            active_crowning_fn
         )
         fire_spread_updates.append(
             (transition_time, row_to, col_to, status, ros, fireline_intensity)
@@ -481,6 +496,8 @@ def next_updates_fn(
     fuels: FuelSystem,
     p_time_fn: Any,
     p_moist_fn: Any,
+    crowning_init_fn: Any,
+    active_crowning_fn: Any
 ) -> UpdateBatchTuple:
     """
     Compute the next updates for the fire spread simulation.
@@ -521,6 +538,12 @@ def next_updates_fn(
     p_moist_fn: Any
         The function to compute the moisture probability (must be jit-compiled). Units are compliant with other functions.
             signature: (moist: float) -> float
+    crowning_init_fn: Any
+        The function to compute the crowning initiation probability (must be jit-compiled). Units are compliant with other functions.
+            signature: (wind_speed: float, fsg: float, sfc: float, moisture: float) -> float
+    active_crowning_fn: Any
+        The function to compute the active crowning criterion (must be jit-compiled). Units are compliant with other functions.
+            signature: (wind_speed: float, canopy_bulk_density: float, ffmc: float) -> bool
 
     Returns
     -------
@@ -556,6 +579,8 @@ def next_updates_fn(
             fuels,
             p_time_fn,
             p_moist_fn,
+            crowning_init_fn,
+            active_crowning_fn
         )
 
         for fire_spread in fire_spread_update:

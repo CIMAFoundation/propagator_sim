@@ -7,7 +7,8 @@ REALIZATIONS = 100
 # --- DEFAULT MODELS ---
 ROS_DEFAULT: Literal["wang", "rothermel"] = "wang"
 MOISTURE_MODEL_DEFAULT: Literal["trucchia", "baghino"] = "trucchia"
-
+CROWNING_INITIATION_DEFAULT: Literal["cruz", "perrakis"] = "cruz"
+CROWNING_ACTIVE_DEFAULT: Literal["alexander"] = "alexander"
 
 # --- FUEL SYSTEM LEGACY ---
 NO_FUEL = 0

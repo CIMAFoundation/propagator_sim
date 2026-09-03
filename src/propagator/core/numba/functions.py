@@ -49,6 +49,8 @@ MOISTURE_OF_EXTINCTION = 0.3
 
 RateOfSpreadModel = Literal["wang", "rothermel"]
 MoistureModel = Literal["trucchia", "baghino"]
+CrowningInitiationModel = Literal["cruz", "perrakis"]
+ActiveCrowningModel = Literal["alexander"]
 
 
 @jit(cache=True)
@@ -120,6 +122,48 @@ def get_p_moisture_fn(moist_model_code: MoistureModel) -> Any:
             return p_moisture_baghino
 
     raise ValueError(f"Unknown moist_model_code: {moist_model_code!r}")
+
+
+def get_crowning_initiation_fn(crowning_model_code: CrowningInitiationModel) -> Any:
+    """Select a crowning initiation model by code.
+
+    Parameters
+    ----------
+    crowning_model_code : CrowningInitiationModel
+        The code of the crowning initiation model to select.
+
+    Returns
+    -------
+        function with signature
+        `(wind_speed, fuel_strata_gap, surface_fuel_consumption, ffmc) -> bool`.
+    """
+    match crowning_model_code:
+        case "cruz":
+            return crowning_initiation_cruz
+        case "perrakis":
+            return crowning_initiation_perrakis
+
+    raise ValueError(f"Unknown crowning_model_code: {crowning_model_code!r}")
+
+
+def get_active_crowning_fn(crowning_model_code: ActiveCrowningModel) -> Any:
+    """Select a crowning active model by code.
+
+    Parameters
+    ----------
+    crowning_model_code : CrowningInitiationModel
+        The code of the crowning initiation model to select.
+
+    Returns
+    -------
+        function with signature
+        `(wind_speed, canopy_bulk_density, ffmc) -> bool`.
+    """
+    match crowning_model_code:
+        case "alexander":
+            return active_crowning_alexander
+
+    raise ValueError(f"Unknown crowning_model_code: {crowning_model_code!r}")
 
 
 @jit(cache=False)
@@ -547,12 +591,12 @@ def get_probability_to_neighbour(
 
 
 @jit(cache=True, nopython=True, fastmath=True)
-def probability_crowning(
+def crowning_initiation_cruz(
     wind_speed: float,
     fuel_strata_gap: float,
     surface_fuel_consumption: float,
     ffmc: float,
-) -> float:
+) -> bool:
     """
     Determine if crown fire initiation occurs
     From: Cruz et al. (2004)
@@ -571,8 +615,8 @@ def probability_crowning(
 
     Returns
     -------
-    float
-        porbability of crowning.
+    bool
+        if crowing occurs.
     """
     ffmc_perc = ffmc * 100  # convert to percentage
     # surface fuel consumption is used as categories
@@ -597,15 +641,59 @@ def probability_crowning(
         b31 * d_1 + b32 * d_2 + b5*ffmc_perc
     # probability of crowning
     p_crown = np.exp(g_x) / (1 + np.exp(g_x))
-    return p_crown
+    return p_crown > 0.5  # return True if crowning occurs
 
 
 @jit(cache=True, nopython=True, fastmath=True)
-def criterion_active_crowning(
+def crowning_initiation_perrakis(
+    wind_speed: float,
+    fuel_strata_gap: float,
+    surface_fuel_consumption: float,
+    ffmc: float,
+) -> bool:
+    """
+    Determine if crown fire initiation occurs
+    From: Perrakis et al. (2023)
+    "Improved logistic models of crown fire probability in Canadian conifer forests"
+    NOTE: implemented Model 11
+
+    Parameters
+    ----------
+    wind_speed : float
+        Wind speed at 10 meters (km/h).
+    fuel_strata_gap : float
+        Fuel strata gap (m) - distance between understory and canopy.
+    surface_fuel_consumption : float
+        Available surface fuel for combustion (kg/m2).
+    ffmc : float
+        Fine fuel moisture content (fraction).
+
+    Returns
+    -------
+    bool
+        if crowing occurs.
+    """
+    ffmc_perc = ffmc * 100  # convert to percentage
+    # constants
+    b0 = -3.5550
+    b1 = 1.4407  # wind speed
+    b2 = -0.53211  # fuel strata gap
+    b3 = -0.07019  # fine fuel moisture content
+    b4 = 2.4897  # surface fuel consumption
+    # function
+    g_x = b0 + b1*wind_speed + b2*(fuel_strata_gap)**(1.5) + \
+        b3 * (wind_speed * ffmc_perc) + b4*np.log(surface_fuel_consumption)
+    # probability of crowning
+    p_crown = 1 / (1 + np.exp(-(g_x)))
+    return p_crown > 0.5  # return True if crowning occurs
+
+
+@jit(cache=True, nopython=True, fastmath=True)
+def active_crowning_alexander(
     wind_speed: float,  # km/h
     canopy_bulk_density: float,   # canopy bulk density (kg/m3)
     ffmc: float,  # fine fuel moisture content (fraction)
-) -> float:
+) -> bool:
     """
     Estimate crown fire rate of spread based on wind speed at 10 meters.
     Alexander and Cruz (2005)
@@ -623,8 +711,8 @@ def criterion_active_crowning(
 
     Returns
     -------
-    float
-        Crown fire active crowning criterion (CAC).
+    bool
+        True if active crowning occurs, False otherwise.
     """
     ffmc_perc = ffmc * 100  # convert to percentage
     # active crowning
@@ -632,4 +720,4 @@ def criterion_active_crowning(
         canopy_bulk_density**0.9)*np.exp(-0.17*ffmc_perc)
     # CAC : criteria for active crowning
     cac = ros_crown_active / (3 / canopy_bulk_density)
-    return cac
+    return cac >= 1.0  # return True if active crowning occurs
