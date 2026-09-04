@@ -294,6 +294,7 @@ def calculate_fire_behavior(
     )
     if not do_crowning:  # skip crowning module
         return transition_time, status, ros_value, fireline_intensity_value
+
     # check for crownfire initiation
     p_crown_init = p_crowning_init_fn(
         w_speed,
@@ -301,18 +302,20 @@ def calculate_fire_behavior(
         fuel_to.d0,
         moisture
     )
-    do_crowning = p_crown_init > random()
-    if do_crowning:  # crown fire initiation
-        # compute criterion for active crowning
-        crown_act = active_crowning_fn(
-            w_speed,
-            cbd_to,
-            moisture,
-        )
-        if crown_act:  # active crowning occuring
-            status = 3  # active crown fire
-        else:
-            status = 2  # passive crown fire
+    init_crowning = p_crown_init > random()
+    if not init_crowning:  # not crowning happening
+        return transition_time, status, ros_value, fireline_intensity_value
+
+    # compute criterion for active crowning
+    crown_act = active_crowning_fn(
+        w_speed,
+        cbd_to,
+        moisture,
+    )
+    if crown_act:  # active crowning occuring
+        status = 3  # active crown fire
+    else:
+        status = 2  # passive crown fire
     return transition_time, status, ros_value, fireline_intensity_value
 
 
