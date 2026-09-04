@@ -1,6 +1,7 @@
 # NOTEBOOK FOR CROWN FIRE - EXAMPLE
 
 import marimo
+from propagator.core.numba.functions import get_p_crowning_initiation_fn
 
 __generated_with = "0.17.6"
 app = marimo.App(width="medium")
@@ -21,12 +22,12 @@ def _():
         BoundaryConditions,
         PropagatorOutOfBoundsError
     )
-    from propagator.core.numba import get_crowning_initiation_fn
+    from propagator.core.numba import get_p_crowning_initiation_fn
     return (
         BoundaryConditions,
         Propagator,
         PropagatorOutOfBoundsError,
-        get_crowning_initiation_fn,
+        get_p_crowning_initiation_fn,
         mo,
     )
 
@@ -142,7 +143,7 @@ def _(
     wind_speed_slider,
     cbd_slider,
     crowning_initiation_model,
-    get_crowning_initiation_fn,
+    get_p_crowning_initiation_fn,
     np,
 ):
 
@@ -159,7 +160,7 @@ def _(
         cbd=cbd,
         realizations=realizations_slider.value,
         cellsize=1,  # 1m
-        crowning_init_fn=get_crowning_initiation_fn(
+        p_crowning_init_fn=get_p_crowning_initiation_fn(
             crowning_initiation_model.value
         ),
     )

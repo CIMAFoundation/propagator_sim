@@ -34,7 +34,7 @@ from propagator.core.numba import (
     get_p_moisture_fn,
     get_p_time_fn,
     next_updates_fn,
-    get_crowning_initiation_fn,
+    get_p_crowning_initiation_fn,
     get_active_crowning_fn,
 )
 from propagator.core.scheduler import Scheduler, SchedulerEvent
@@ -87,14 +87,14 @@ class Propagator:
         2D array of fuel strata gap values (meters).
     cbd : numpy.ndarray, optional
         2D array of canopy bulk density values (kg/m^3).
-    crowning_init_fn: Any, optional
+    p_crowning_init_fn: Any, optional
         The function to compute the crowning initiation probability (must be jit-compiled).
         Units are compliant with other functions.
             signature: (wind_speed: float, fuel_strata_gap: float, surface_fuel_consumption: float, ffmc: float) -> float
     active_crowning_fn: Any, optional
-        The function to compute the crowning active probability (must be jit-compiled).
+        The function to compute the active crowning criteria (must be jit-compiled).
         Units are compliant with other functions.
-            signature: (wind_speed: float, canopy_bulk_density: float, ffmc: float) -> float
+            signature: (wind_speed: float, canopy_bulk_density: float, ffmc: float) -> bool
 
     out_of_bounds_mode: Literal["ignore", "error"], optional
         Whether to raise an error if out-of-bounds updates are detected.
@@ -118,7 +118,7 @@ class Propagator:
     # selected simulation functions
     p_time_fn: Any = field(default=get_p_time_fn(ROS_DEFAULT))
     p_moist_fn: Any = field(default=get_p_moisture_fn(MOISTURE_MODEL_DEFAULT))
-    crowning_init_fn: Any = field(default=get_crowning_initiation_fn(CROWNING_INITIATION_DEFAULT))
+    p_crowning_init_fn: Any = field(default=get_p_crowning_initiation_fn(CROWNING_INITIATION_DEFAULT))
     active_crowning_fn: Any = field(default=get_active_crowning_fn(CROWNING_ACTIVE_DEFAULT))
 
     # scheduler object
@@ -484,7 +484,7 @@ class Propagator:
             self.fuels,
             self.p_time_fn,
             self.p_moist_fn,
-            self.crowning_init_fn,
+            self.p_crowning_init_fn,
             self.active_crowning_fn,
         )
 

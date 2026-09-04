@@ -124,7 +124,7 @@ def get_p_moisture_fn(moist_model_code: MoistureModel) -> Any:
     raise ValueError(f"Unknown moist_model_code: {moist_model_code!r}")
 
 
-def get_crowning_initiation_fn(crowning_model_code: CrowningInitiationModel) -> Any:
+def get_p_crowning_initiation_fn(crowning_model_code: CrowningInitiationModel) -> Any:
     """Select a crowning initiation model by code.
 
     Parameters
@@ -135,13 +135,13 @@ def get_crowning_initiation_fn(crowning_model_code: CrowningInitiationModel) -> 
     Returns
     -------
         function with signature
-        `(wind_speed, fuel_strata_gap, surface_fuel_consumption, ffmc) -> bool`.
+        `(wind_speed, fuel_strata_gap, surface_fuel_consumption, ffmc) -> float`.
     """
     match crowning_model_code:
         case "cruz":
-            return crowning_initiation_cruz
+            return p_crowning_initiation_cruz
         case "perrakis":
-            return crowning_initiation_perrakis
+            return p_crowning_initiation_perrakis
 
     raise ValueError(f"Unknown crowning_model_code: {crowning_model_code!r}")
 
@@ -591,14 +591,14 @@ def get_probability_to_neighbour(
 
 
 @jit(cache=True, nopython=True, fastmath=True)
-def crowning_initiation_cruz(
+def p_crowning_initiation_cruz(
     wind_speed: float,
     fuel_strata_gap: float,
     surface_fuel_consumption: float,
     ffmc: float,
-) -> bool:
+) -> float:
     """
-    Determine if crown fire initiation occurs
+    Determine crowning initiation probability
     From: Cruz et al. (2004)
     "Modeling the Likelihood of Crown Fire Occurrence in Conifer Forest Stands"
 
@@ -615,8 +615,8 @@ def crowning_initiation_cruz(
 
     Returns
     -------
-    bool
-        if crowing occurs.
+    float
+        The probability of crowning initiation.
     """
     ffmc_perc = ffmc * 100  # convert to percentage
     # surface fuel consumption is used as categories
@@ -641,18 +641,18 @@ def crowning_initiation_cruz(
         b31 * d_1 + b32 * d_2 + b5*ffmc_perc
     # probability of crowning
     p_crown = np.exp(g_x) / (1 + np.exp(g_x))
-    return p_crown > 0.5  # return True if crowning occurs
+    return p_crown  # return the probability of crowning
 
 
 @jit(cache=True, nopython=True, fastmath=True)
-def crowning_initiation_perrakis(
+def p_crowning_initiation_perrakis(
     wind_speed: float,
     fuel_strata_gap: float,
     surface_fuel_consumption: float,
     ffmc: float,
 ) -> bool:
     """
-    Determine if crown fire initiation occurs
+    Determine crowning initiation probability
     From: Perrakis et al. (2023)
     "Improved logistic models of crown fire probability in Canadian conifer forests"
     NOTE: implemented Model 11
@@ -670,8 +670,8 @@ def crowning_initiation_perrakis(
 
     Returns
     -------
-    bool
-        if crowing occurs.
+    float
+        The probability of crowning initiation.
     """
     ffmc_perc = ffmc * 100  # convert to percentage
     # constants
@@ -685,7 +685,7 @@ def crowning_initiation_perrakis(
         b3 * (wind_speed * ffmc_perc) + b4*np.log(surface_fuel_consumption)
     # probability of crowning
     p_crown = 1 / (1 + np.exp(-(g_x)))
-    return p_crown > 0.5  # return True if crowning occurs
+    return p_crown  # return the probability of crowning
 
 
 @jit(cache=True, nopython=True, fastmath=True)

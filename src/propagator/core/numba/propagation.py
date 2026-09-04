@@ -215,7 +215,7 @@ def calculate_fire_behavior(
     w_dir: float,
     w_speed: float,
     p_time_fn: Any,
-    crowning_init_fn: Any,
+    p_crowning_init_fn: Any,
     active_crowning_fn: Any
 ) -> tuple[int, int, float, float]:
     """Calculate fire behaviour during propagation between cells
@@ -245,7 +245,7 @@ def calculate_fire_behavior(
     p_time_fn: Any
         The function to compute the spread time (must be jit-compiled). Units are compliant with other functions.
             signature: (v0: float, dh: float, angle_to: float, dist: float, moist: float, w_dir: float, w_speed: float) -> tuple[float, float]
-    crowning_init_fn: Any
+    p_crowning_init_fn: Any
         The function to compute the crowning initiation probability (must be jit-compiled). Units are compliant with other functions.
             signature: (wind_speed: float, fsg: float, sfc: float, moisture: float) -> float
     active_crowning_fn: Any
@@ -295,13 +295,14 @@ def calculate_fire_behavior(
     if not do_crowning:  # skip crowning module
         return transition_time, status, ros_value, fireline_intensity_value
     # check for crownfire initiation
-    crown_init = crowning_init_fn(
+    p_crown_init = p_crowning_init_fn(
         w_speed,
         fsg_to,
         fuel_to.d0,
         moisture
     )
-    if crown_init:  # crown fire initiation
+    do_crowning = p_crown_init > random()
+    if do_crowning:  # crown fire initiation
         # compute criterion for active crowning
         crown_act = active_crowning_fn(
             w_speed,
@@ -331,7 +332,7 @@ def single_cell_updates(
     fuels: FuelSystem,
     p_time_fn: Any,
     p_moist_fn: Any,
-    crowning_init_fn: Any,
+    p_crowning_init_fn: Any,
     active_crowning_fn: Any
 ) -> list[tuple[int, int, int, int, float, float]]:
     """
@@ -369,7 +370,7 @@ def single_cell_updates(
     p_moist_fn: Any
         The function to compute the moisture probability (must be jit-compiled). Units are compliant with other functions.
             signature: (moist: float) -> float
-    crowning_init_fn: Any
+    p_crowning_init_fn: Any
         The function to compute the crowning initiation probability (must be jit-compiled). Units are compliant with other functions.
             signature: (wind_speed: float, fsg: float, sfc: float, moisture: float) -> float
     active_crowning_fn: Any
@@ -455,7 +456,7 @@ def single_cell_updates(
             w_dir_r,
             w_speed_r,
             p_time_fn,
-            crowning_init_fn,
+            p_crowning_init_fn,
             active_crowning_fn
         )
         fire_spread_updates.append(
@@ -496,7 +497,7 @@ def next_updates_fn(
     fuels: FuelSystem,
     p_time_fn: Any,
     p_moist_fn: Any,
-    crowning_init_fn: Any,
+    p_crowning_init_fn: Any,
     active_crowning_fn: Any
 ) -> UpdateBatchTuple:
     """
@@ -538,7 +539,7 @@ def next_updates_fn(
     p_moist_fn: Any
         The function to compute the moisture probability (must be jit-compiled). Units are compliant with other functions.
             signature: (moist: float) -> float
-    crowning_init_fn: Any
+    p_crowning_init_fn: Any
         The function to compute the crowning initiation probability (must be jit-compiled). Units are compliant with other functions.
             signature: (wind_speed: float, fsg: float, sfc: float, moisture: float) -> float
     active_crowning_fn: Any
@@ -579,7 +580,7 @@ def next_updates_fn(
             fuels,
             p_time_fn,
             p_moist_fn,
-            crowning_init_fn,
+            p_crowning_init_fn,
             active_crowning_fn
         )
 
