@@ -580,6 +580,22 @@ impl Propagator {
         d.set_item("ros_max", f32_grid_to_py(py, &out.ros_max))?;
         d.set_item("fli_mean", f32_grid_to_py(py, &out.fli_mean))?;
         d.set_item("fli_max", f32_grid_to_py(py, &out.fli_max))?;
+        d.set_item(
+            "flame_height_mean",
+            f32_grid_to_py(py, &out.flame_height_mean),
+        )?;
+        d.set_item(
+            "flame_height_max",
+            f32_grid_to_py(py, &out.flame_height_max),
+        )?;
+        d.set_item(
+            "radiant_reach_mean",
+            f32_grid_to_py(py, &out.radiant_reach_mean),
+        )?;
+        d.set_item(
+            "radiant_reach_max",
+            f32_grid_to_py(py, &out.radiant_reach_max),
+        )?;
 
         let stats = PyDict::new(py);
         stats.set_item("n_active", out.stats.n_active)?;

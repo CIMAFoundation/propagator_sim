@@ -5,7 +5,12 @@ import pytest
 
 from propagator.core import BoundaryConditions, Propagator  # type: ignore
 from propagator.core.models import PropagatorStats, UpdateBatch  # type: ignore
-from propagator.core.numba import FLAG_SPOT_GEN, FLAG_SPOT_RECV  # type: ignore
+from propagator.core.numba import (  # type: ignore
+    FLAG_SPOT_GEN,
+    FLAG_SPOT_RECV,
+    flame_height,
+    radiant_reach,
+)
 from propagator.core.scheduler import SchedulerEvent  # type: ignore
 
 
@@ -241,6 +246,85 @@ def test_compute_fire_probability_and_means():
             ],
             dtype=np.float32,
         ),
+        equal_nan=True,
+    )
+
+
+def byram(fli: float) -> float:
+    return 0.0775 * fli**0.46
+
+
+def test_flame_height_follows_byram_per_realization():
+    propagator = make_propagator(realizations=2)
+    # same layout as test_compute_fire_probability_and_means
+    ignite_cell(propagator, 0, 0, 0, time=10, ros=0.8, fli=10.0)
+    ignite_cell(propagator, 0, 1, 0, time=15, ros=0.4, fli=5.0)
+    ignite_cell(propagator, 1, 0, 1, time=20, ros=1.2, fli=20.0)
+    ignite_cell(propagator, 1, 1, 0, time=25, ros=0.6, fli=15.0)
+
+    expected_max = np.array(
+        [[byram(10.0), byram(20.0)], [byram(15.0), 0.0]], dtype=np.float32
+    )
+    # the mean is taken over per-realization flame heights, not the
+    # flame height of the mean intensity
+    expected_mean = np.array(
+        [
+            [byram(10.0), byram(20.0)],
+            [(byram(5.0) + byram(15.0)) / 2, np.nan],
+        ],
+        dtype=np.float32,
+    )
+    np.testing.assert_allclose(
+        propagator.compute_flame_height_max(), expected_max, rtol=1e-6
+    )
+    np.testing.assert_allclose(
+        propagator.compute_flame_height_mean(),
+        expected_mean,
+        rtol=1e-6,
+        equal_nan=True,
+    )
+    output = propagator.get_output()
+    np.testing.assert_allclose(
+        output.flame_height_max, expected_max, rtol=1e-6
+    )
+    np.testing.assert_allclose(
+        output.flame_height_mean, expected_mean, rtol=1e-6, equal_nan=True
+    )
+
+
+def test_flame_height_is_zero_for_non_positive_intensity():
+    assert flame_height(0.0) == 0.0
+    assert flame_height(-5.0) == 0.0
+    np.testing.assert_allclose(flame_height(1000.0), byram(1000.0))
+
+
+def test_radiant_reach_is_four_flame_heights_clamped():
+    assert radiant_reach(0.0) == 0.0
+    # weak fire: four flame heights is ~1 m, clamped up to 10 m
+    assert radiant_reach(10.0) == 10.0
+    np.testing.assert_allclose(radiant_reach(5000.0), 4 * byram(5000.0))
+    assert radiant_reach(1e9) == 200.0
+
+
+def test_radiant_reach_outputs_per_realization():
+    propagator = make_propagator(realizations=2)
+    # r0: (0,0) fli=10, (1,0) fli=5000; r1: (0,1) fli=1e9, (1,0) fli=0
+    ignite_cell(propagator, 0, 0, 0, time=10, ros=0.8, fli=10.0)
+    ignite_cell(propagator, 0, 1, 0, time=15, ros=0.4, fli=5000.0)
+    ignite_cell(propagator, 1, 0, 1, time=20, ros=1.2, fli=1e9)
+    ignite_cell(propagator, 1, 1, 0, time=25, ros=0.6, fli=0.0)
+
+    reach_5000 = 4 * byram(5000.0)
+    np.testing.assert_allclose(
+        propagator.compute_radiant_reach_max(),
+        np.array([[10.0, 200.0], [reach_5000, 0.0]], dtype=np.float32),
+        rtol=1e-6,
+    )
+    # (1,0): a flameless realization counts as 0 reach in the mean
+    np.testing.assert_allclose(
+        propagator.compute_radiant_reach_mean(),
+        np.array([[10.0, 200.0], [reach_5000 / 2, np.nan]], dtype=np.float32),
+        rtol=1e-6,
         equal_nan=True,
     )
 

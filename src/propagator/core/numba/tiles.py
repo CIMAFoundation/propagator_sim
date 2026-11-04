@@ -16,6 +16,7 @@ import numpy.typing as npt
 from numba import njit, prange  # type: ignore
 
 from propagator.core.constants import TILE_MASK, TILE_SHIFT, TILE_SIZE
+from propagator.core.numba.functions import flame_height, radiant_reach
 
 # Bitfield flags stored in the per-cell uint8 tile pool.
 FLAG_FIRE = np.uint8(1)
@@ -64,6 +65,10 @@ def fold_state_tiles(
     ros_max: npt.NDArray[np.float32],
     fli_sum: npt.NDArray[np.float64],
     fli_max: npt.NDArray[np.float32],
+    flame_sum: npt.NDArray[np.float64],
+    flame_max: npt.NDArray[np.float32],
+    radiant_sum: npt.NDArray[np.float64],
+    radiant_max: npt.NDArray[np.float32],
 ) -> None:
     """Aggregate tiled state across realizations into per-cell 2D maps.
 
@@ -72,7 +77,9 @@ def fold_state_tiles(
     spot counts, sums and maxes zero-initialized and `arrival_min`
     initialized to int32 max. NaN ros/fli values contribute to `count` but
     are skipped in sums and maxes, matching the previous dense
-    nansum/nanmax behaviour.
+    nansum/nanmax behaviour. `flame_sum`/`flame_max` and
+    `radiant_sum`/`radiant_max` aggregate the flame height and radiant
+    reach derived from each realization's fireline intensity.
     """
     n_realizations, tiles_h, tiles_w = tile_idx.shape
     n_rows = count.shape[0]
@@ -127,6 +134,44 @@ def fold_state_tiles(
                         fli_sum[row, col] += fli_value
                         if fli_value > fli_max[row, col]:
                             fli_max[row, col] = fli_value
+                        flame = flame_height(fli_value)
+                        flame_sum[row, col] += flame
+                        if flame > flame_max[row, col]:
+                            flame_max[row, col] = flame
+                        reach = radiant_reach(fli_value)
+                        radiant_sum[row, col] += reach
+                        if reach > radiant_max[row, col]:
+                            radiant_max[row, col] = reach
+
+
+@njit(cache=False)
+def accumulate_flame_block(
+    flags: npt.NDArray[np.uint8],
+    fli: npt.NDArray[np.float32],
+    flame_sum: npt.NDArray[np.float64],
+    flame_max: npt.NDArray[np.float32],
+    radiant_sum: npt.NDArray[np.float64],
+    radiant_max: npt.NDArray[np.float32],
+) -> None:
+    """Add one frozen tile record's flame heights and radiant reaches
+    to a fold block,
+    with the same per-cell semantics as `fold_state_tiles`."""
+    n_rows, n_cols = flags.shape
+    for row in range(n_rows):
+        for col in range(n_cols):
+            if not flags[row, col] & FLAG_FIRE:
+                continue
+            fli_value = fli[row, col]
+            if np.isnan(fli_value):
+                continue
+            flame = flame_height(fli_value)
+            flame_sum[row, col] += flame
+            if flame > flame_max[row, col]:
+                flame_max[row, col] = flame
+            reach = radiant_reach(fli_value)
+            radiant_sum[row, col] += reach
+            if reach > radiant_max[row, col]:
+                radiant_max[row, col] = reach
 
 
 @njit(cache=False)

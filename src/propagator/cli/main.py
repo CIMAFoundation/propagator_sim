@@ -353,6 +353,10 @@ def main() -> None:
         "min_arrival_time": lambda output: output.min_arrival_time,
         "fireline_intensity_mean": lambda output: output.fli_mean,
         "fireline_intensity_max": lambda output: output.fli_max,
+        "flame_height_mean": lambda output: output.flame_height_mean,
+        "flame_height_max": lambda output: output.flame_height_max,
+        "radiant_reach_mean": lambda output: output.radiant_reach_mean,
+        "radiant_reach_max": lambda output: output.radiant_reach_max,
         "ros_mean": lambda output: output.ros_mean,
         "ros_max": lambda output: output.ros_max,
     }

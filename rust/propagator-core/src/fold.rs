@@ -2,6 +2,7 @@
 //! derived output maps.
 
 use crate::grid::Grid2;
+use crate::models::{flame_height, radiant_reach};
 use crate::tiles::{
     Tile, TileGrid, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV, TILE_SHIFT, TILE_SIZE,
 };
@@ -19,6 +20,10 @@ fn accumulate_into(
     ros_max: &mut f32,
     fli_sum: &mut f64,
     fli_max: &mut f32,
+    flame_sum: &mut f64,
+    flame_max: &mut f32,
+    radiant_sum: &mut f64,
+    radiant_max: &mut f32,
     flags: u8,
     arrival: i32,
     ros: f32,
@@ -52,6 +57,16 @@ fn accumulate_into(
         if fli > *fli_max {
             *fli_max = fli;
         }
+        let flame = flame_height(fli as f64);
+        *flame_sum += flame;
+        if flame as f32 > *flame_max {
+            *flame_max = flame as f32;
+        }
+        let reach = radiant_reach(fli as f64);
+        *radiant_sum += reach;
+        if reach as f32 > *radiant_max {
+            *radiant_max = reach as f32;
+        }
     }
 }
 
@@ -81,6 +96,14 @@ pub struct StateFold {
     pub fli_sum: Grid2<f64>,
     /// maximum fireline intensity across realizations
     pub fli_max: Grid2<f32>,
+    /// sum of per-realization flame height (m) over burning realizations
+    pub flame_sum: Grid2<f64>,
+    /// maximum flame height (m) across realizations
+    pub flame_max: Grid2<f32>,
+    /// sum of per-realization radiant reach (m) over burning realizations
+    pub radiant_sum: Grid2<f64>,
+    /// maximum radiant reach (m) across realizations
+    pub radiant_max: Grid2<f32>,
 }
 
 impl StateFold {
@@ -96,6 +119,10 @@ impl StateFold {
             ros_max: Grid2::filled(rows, cols, 0.0),
             fli_sum: Grid2::filled(rows, cols, 0.0),
             fli_max: Grid2::filled(rows, cols, 0.0),
+            flame_sum: Grid2::filled(rows, cols, 0.0),
+            flame_max: Grid2::filled(rows, cols, 0.0),
+            radiant_sum: Grid2::filled(rows, cols, 0.0),
+            radiant_max: Grid2::filled(rows, cols, 0.0),
         }
     }
 
@@ -120,6 +147,10 @@ impl StateFold {
             &mut self.ros_max[(row, col)],
             &mut self.fli_sum[(row, col)],
             &mut self.fli_max[(row, col)],
+            &mut self.flame_sum[(row, col)],
+            &mut self.flame_max[(row, col)],
+            &mut self.radiant_sum[(row, col)],
+            &mut self.radiant_max[(row, col)],
             flags,
             arrival,
             ros,
@@ -141,6 +172,10 @@ impl StateFold {
         let mut ros_max = self.ros_max.as_mut_slice().chunks_mut(chunk);
         let mut fli_sum = self.fli_sum.as_mut_slice().chunks_mut(chunk);
         let mut fli_max = self.fli_max.as_mut_slice().chunks_mut(chunk);
+        let mut flame_sum = self.flame_sum.as_mut_slice().chunks_mut(chunk);
+        let mut flame_max = self.flame_max.as_mut_slice().chunks_mut(chunk);
+        let mut radiant_sum = self.radiant_sum.as_mut_slice().chunks_mut(chunk);
+        let mut radiant_max = self.radiant_max.as_mut_slice().chunks_mut(chunk);
         let mut bands = Vec::with_capacity(rows.div_ceil(rows_per_band.max(1)));
         let mut row0 = 0;
         for count in count {
@@ -158,6 +193,10 @@ impl StateFold {
                 ros_max: ros_max.next().unwrap(),
                 fli_sum: fli_sum.next().unwrap(),
                 fli_max: fli_max.next().unwrap(),
+                flame_sum: flame_sum.next().unwrap(),
+                flame_max: flame_max.next().unwrap(),
+                radiant_sum: radiant_sum.next().unwrap(),
+                radiant_max: radiant_max.next().unwrap(),
             });
             row0 += rows;
         }
@@ -206,11 +245,19 @@ impl StateFold {
                 self.arrival_sum[dst] += block.arrival_sum[src];
                 self.ros_sum[dst] += block.ros_sum[src];
                 self.fli_sum[dst] += block.fli_sum[src];
+                self.flame_sum[dst] += block.flame_sum[src];
+                self.radiant_sum[dst] += block.radiant_sum[src];
                 if block.ros_max[src] > self.ros_max[dst] {
                     self.ros_max[dst] = block.ros_max[src];
                 }
                 if block.fli_max[src] > self.fli_max[dst] {
                     self.fli_max[dst] = block.fli_max[src];
+                }
+                if block.flame_max[src] > self.flame_max[dst] {
+                    self.flame_max[dst] = block.flame_max[src];
+                }
+                if block.radiant_max[src] > self.radiant_max[dst] {
+                    self.radiant_max[dst] = block.radiant_max[src];
                 }
             }
         }
@@ -242,6 +289,10 @@ pub struct FoldBand<'a> {
     ros_max: &'a mut [f32],
     fli_sum: &'a mut [f64],
     fli_max: &'a mut [f32],
+    flame_sum: &'a mut [f64],
+    flame_max: &'a mut [f32],
+    radiant_sum: &'a mut [f64],
+    radiant_max: &'a mut [f32],
 }
 
 impl FoldBand<'_> {
@@ -271,6 +322,10 @@ impl FoldBand<'_> {
                     &mut self.ros_max[i],
                     &mut self.fli_sum[i],
                     &mut self.fli_max[i],
+                    &mut self.flame_sum[i],
+                    &mut self.flame_max[i],
+                    &mut self.radiant_sum[i],
+                    &mut self.radiant_max[i],
                     tile.flags[local],
                     tile.arrival[local],
                     tile.ros[local],
@@ -333,5 +388,15 @@ pub struct PropagatorOutput {
     pub ros_max: Grid2<f32>,
     pub fli_mean: Grid2<f32>,
     pub fli_max: Grid2<f32>,
+    /// mean Byram flame height over burning realizations, m — NaN where
+    /// never burnt
+    pub flame_height_mean: Grid2<f32>,
+    /// max Byram flame height across realizations, m — 0 where never burnt
+    pub flame_height_max: Grid2<f32>,
+    /// mean radiant reach over burning realizations, m — NaN where never
+    /// burnt
+    pub radiant_reach_mean: Grid2<f32>,
+    /// max radiant reach across realizations, m — 0 where never burnt
+    pub radiant_reach_max: Grid2<f32>,
     pub stats: PropagatorStats,
 }

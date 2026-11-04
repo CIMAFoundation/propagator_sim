@@ -23,6 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   once per state change instead of once per accessor. In Chrome on a
   14-core machine a 48-step, 50-realization demo run went from 11.8 s
   single-threaded to 2.6 s.
+- Flame height outputs `flame_height_mean` and `flame_height_max` (m), on
+  both the Rust and the numba core and as CLI rasters. Each realization's
+  fireline intensity is turned into a flame height with Byram's relation
+  `H = 0.0775 * I^0.46` while the core folds the state, so the mean is over
+  per-realization flame heights.
+- Radiant reach outputs `radiant_reach_mean` and `radiant_reach_max` (m),
+  also computed in both cores: four flame heights (Butler & Cohen 1998),
+  clamped to 10–200 m, and 0 for cells burnt without intensity.
 
 ### Changed
 
