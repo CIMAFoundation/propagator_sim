@@ -17,8 +17,8 @@ their observable trade-offs, see [Rust vs numba Core](rust-vs-numba.md).
 ## The shared model
 
 Both cores implement the same stochastic cellular-automaton model as an
-**event-driven** simulation: each of the `R` realizations owns a min-heap of
-pending ignition events, and the kernel repeatedly pops the earliest event,
+**event-driven** simulation: each of the `R` realizations owns a time-ordered
+queue of pending ignition events, and the kernel repeatedly pops the earliest event,
 marks the cell burnt, and pushes spread (and ember) events for its
 neighbours. Realizations are independent given the shared read-only inputs
 (vegetation, terrain, weather, fuels), so both cores parallelize over them.
@@ -156,17 +156,19 @@ yields the per-cell mean over the realizations that burned it.
 Frozen tiles are folded from the on-disk store (numba) or the in-memory
 fold cache (both), never re-simulated — see below.
 
-## The front event heaps
+## The front event queues
 
-Each realization's pending events are a **binary min-heap keyed by event
-time**, stored struct-of-arrays (`times`, `rows`, `cols`, `ros`, `fli`
-permuted together). The heap ordering is by `times` alone; the other arrays
-are payload that rides along with its key. `push` sifts up, `pop_min` swaps
-the root with the last leaf and sifts down — both `O(log n)`.
+Each realization's pending events are keyed by integer event time. An event
+means "cell `(row, col)` ignites at `time` with this ROS/FLI unless it is
+already burnt when popped" (lazy deletion: duplicates are allowed and skipped
+at pop). Only the earliest event is ever popped, which leaves each core free
+to pick its own structure:
 
-The cores differ in *how the buffers grow*:
+### numba: binary min-heap with suspend-and-regrow
 
-### numba: preallocation with suspend-and-regrow
+The numba core keeps a **binary min-heap** stored struct-of-arrays (`times`,
+`rows`, `cols`, `ros`, `fli` permuted together). `push` sifts up, `pop_min`
+swaps the root with the last leaf and sifts down — both `O(log n)`.
 
 The numba heaps are shared preallocated arrays (`(R, capacity)`), driven
 inside one JIT kernel. Because a kernel invocation cannot resize a NumPy
@@ -179,13 +181,22 @@ heap intact**. Control returns to the driver (`_propagate_until`), which
 grows the front and/or tile buffers (`_grow_front`, `_grow_tiles`) and
 re-enters the kernel to resume. This is the *suspend-and-regrow* protocol.
 
-### Rust: grow on demand
+### Rust: calendar queue
 
-The Rust heaps are per-realization `Vec`s (`FrontHeap`). Pushing simply
-grows the `Vec`, so there is **no capacity suspension and no reserve
-accounting** — the kernel runs a realization to completion in one call. The
-only reason a Rust realization suspends mid-window is the boundary halt
-below, which both cores share.
+The Rust core uses a **calendar queue** (`FrontQueue` in `front.rs`): a ring
+of one-second buckets covering a 2048 s window from the ring's start, a
+bitmap of occupied buckets to find the next event, and a small binary heap
+for the few events scheduled beyond the window (slow fuels, long spotting
+delays). Push and pop are `O(1)` amortized; when the ring drains, it is
+re-anchored on the earliest far event and the far events inside the new
+window move into their buckets. Events in the same second pop in LIFO
+order, so the RNG draw order — and therefore a seeded run's exact result —
+differs from a heap-based kernel, while the statistics are identical.
+
+Buckets are per-realization `Vec`s that grow on demand, so there is **no
+capacity suspension and no reserve accounting** — the kernel runs a
+realization to completion in one call. The only reason a Rust realization
+suspends mid-window is the boundary halt below, which both cores share.
 
 ## Growing the domain
 
@@ -307,7 +318,7 @@ for the operational view, sidecar persistence and the floating-point caveat.
 | Concern | numba core | Rust core |
 | --- | --- | --- |
 | Tile constants, index/pool, fold, flood | `core/numba/tiles.py` | `propagator-core/src/tiles.rs`, `fold.rs` |
-| Front heap | `core/numba/front_tracking.py` | `propagator-core/src/front.rs` |
+| Front queue | `core/numba/front_tracking.py` | `propagator-core/src/front.rs` |
 | Spread kernel | `core/numba/front_tracking.py`, `propagation.py` | `propagator-core/src/kernel.rs` |
 | Driver, growth, freezing | `core/propagator.py` | `propagator-core/src/propagator.rs` |
 | Frozen-tile store | `core/tile_store.py` | `propagator-core/src/tile_store.rs` |

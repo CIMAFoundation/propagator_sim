@@ -21,9 +21,11 @@ model. Outputs are per-cell aggregates over realizations (burn
 probability, arrival times, ROS, fireline intensity).
 
 The engine is **event-driven** (discrete-event simulation), not
-step-synchronous: each realization owns a binary min-heap of pending
-ignition events keyed by integer arrival time (seconds). Advancing the
-simulation pops events in time order until a target time.
+step-synchronous: each realization owns a queue of pending ignition
+events keyed by integer arrival time (seconds). Advancing the simulation
+pops events in time order until a target time. (The numba core uses a
+binary min-heap; the Rust core a calendar queue — see
+[Core internals](core-internals.md#the-front-event-queues).)
 
 Key architectural features that must be preserved:
 

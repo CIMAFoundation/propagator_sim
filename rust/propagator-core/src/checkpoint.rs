@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::front::FrontHeap;
+use crate::front::FrontQueue;
 use crate::fuels::FuelSystem;
 use crate::grid::Grid2;
 use crate::models::{MoistureModel, RosModel};
@@ -45,8 +45,8 @@ pub struct PropagatorCheckpoint {
     pub wind_speed: Option<Grid2<f32>>,
     pub actions_moisture: Option<Grid2<f32>>,
 
-    /// per-realization front heaps and tiled state
-    pub(crate) heaps: Vec<FrontHeap>,
+    /// per-realization front fronts and tiled state
+    pub(crate) fronts: Vec<FrontQueue>,
     pub(crate) tiles: Vec<TileGrid>,
 
     /// pending boundary-condition queue as (time, event) pairs

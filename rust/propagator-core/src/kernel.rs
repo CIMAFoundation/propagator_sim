@@ -3,7 +3,7 @@
 //! Runs per realization; realizations are independent given the shared
 //! read-only inputs, so the driver parallelizes over them with scoped
 //! threads. Unlike the numba kernel there is no suspend-and-regrow
-//! protocol: heaps and tile pools are per-realization `Vec`s that grow on
+//! protocol: fronts and tile pools are per-realization `Vec`s that grow on
 //! demand. The boundary-halt semantics (suspend *before* igniting a
 //! boundary-ring cell so the caller can expand the domain losslessly) are
 //! preserved.
@@ -16,7 +16,7 @@
 //! identical to the uncached kernel.
 
 use crate::edges::{EdgeCache, BLOCKED};
-use crate::front::FrontHeap;
+use crate::front::FrontQueue;
 use crate::fuels::{FuelSystem, NO_FUEL};
 use crate::grid::Grid2;
 use crate::models::{
@@ -110,19 +110,19 @@ pub struct SharedInputs<'a> {
 
 /// Mutable state of one realization.
 pub struct Realization {
-    pub heap: FrontHeap,
+    pub front: FrontQueue,
     pub tiles: TileGrid,
     pub rng: Rng,
     /// fire reached (or, in halt mode, is about to reach) the boundary
     pub out_of_bounds: bool,
-    /// halted before igniting a boundary cell (heap intact)
+    /// halted before igniting a boundary cell (queue intact)
     pub halted_on_boundary: bool,
 }
 
 impl Realization {
     pub fn new(rows: usize, cols: usize, rng: Rng) -> Realization {
         Realization {
-            heap: FrontHeap::new(),
+            front: FrontQueue::new(),
             tiles: TileGrid::new(rows, cols),
             rng,
             out_of_bounds: false,
@@ -137,7 +137,7 @@ fn on_boundary_ring(row: i64, col: i64, n_rows: usize, n_cols: usize) -> bool {
 }
 
 /// Advance one realization until its next event is past `end_time`.
-/// With `halt_on_boundary`, suspends (heap intact, event not popped)
+/// With `halt_on_boundary`, suspends (queue intact, event not popped)
 /// before igniting an unburnt boundary-ring cell.
 pub fn advance_front_until(
     real: &mut Realization,
@@ -150,13 +150,13 @@ pub fn advance_front_until(
     let n_cols = shared.veg.cols();
     real.halted_on_boundary = false;
 
-    while let Some(next_time) = real.heap.peek_time() {
+    while let Some(next_time) = real.front.peek_time() {
         if next_time > end_time {
             break;
         }
 
         if halt_on_boundary {
-            let (peek_row, peek_col) = real.heap.peek_cell().unwrap();
+            let (peek_row, peek_col) = real.front.peek_cell().unwrap();
             if on_boundary_ring(peek_row as i64, peek_col as i64, n_rows, n_cols)
                 && real.tiles.read_flags(peek_row as usize, peek_col as usize) & FLAG_FIRE == 0
             {
@@ -166,7 +166,7 @@ pub fn advance_front_until(
             }
         }
 
-        let (time, row_i, col_i, ros_value, fli_value) = real.heap.pop_min().unwrap();
+        let (time, row_i, col_i, ros_value, fli_value) = real.front.pop_min().unwrap();
         let row = row_i as usize;
         let col = col_i as usize;
 
@@ -254,7 +254,7 @@ pub fn advance_front_until(
                     (transition, ros, fli)
                 }
             };
-            real.heap
+            real.front
                 .push(time + transition, row_to as i32, col_to as i32, ros, fli);
         }
         edges.commit();
@@ -515,7 +515,7 @@ fn compute_spotting(
         let recv_slot = real.tiles.ensure_slot(row_to, col_to);
         real.tiles.tile_mut(recv_slot).flags[local_index(row_to, col_to)] |= FLAG_SPOT_RECV;
 
-        real.heap.push(
+        real.front.push(
             time + propagation_time,
             row_to as i32,
             col_to as i32,

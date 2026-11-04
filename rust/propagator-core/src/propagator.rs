@@ -237,7 +237,7 @@ impl Propagator {
     /// fire clips at the edge and the rest of the front keeps burning.
     /// Without it a run built with [`OobMode::Raise`] whose growth stops is
     /// stuck forever: a suspended boundary event is the earliest event in its
-    /// realization's heap, so nothing in that realization advances again.
+    /// realization's queue, so nothing in that realization advances again.
     pub fn set_oob_mode(&mut self, mode: OobMode) {
         self.oob_mode = mode;
     }
@@ -266,7 +266,7 @@ impl Propagator {
             if !real.halted_on_boundary {
                 continue;
             }
-            if let Some((row, col)) = real.heap.peek_cell() {
+            if let Some((row, col)) = real.front.peek_cell() {
                 north |= row <= 0;
                 south |= row >= n_rows as i32 - 1;
                 west |= col <= 0;
@@ -286,7 +286,7 @@ impl Propagator {
         let east_limit = n_cols as i32 - margin;
         let (mut north, mut south, mut west, mut east) = (false, false, false, false);
         for real in &self.reals {
-            for (row, col) in real.heap.event_cells() {
+            for (row, col) in real.front.event_cells() {
                 north |= row < margin;
                 south |= row >= south_limit;
                 west |= col < margin;
@@ -499,12 +499,12 @@ impl Propagator {
     fn next_front_time(&self) -> Option<i64> {
         self.reals
             .iter()
-            .filter_map(|real| real.heap.peek_time())
+            .filter_map(|real| real.front.peek_time())
             .min()
     }
 
     fn propagate_until(&mut self, end_time: i64) -> Result<()> {
-        if self.reals.iter().all(|real| real.heap.is_empty()) {
+        if self.reals.iter().all(|real| real.front.is_empty()) {
             return Ok(());
         }
         self.ensure_effective_moisture()?;
@@ -624,7 +624,7 @@ impl Propagator {
             // a new ignition seeds spread through areas that may have been
             // frozen as unreachable: bring its whole component back
             self.thaw_for_ignition(realization, row as usize, col as usize)?;
-            self.reals[realization].heap.push(
+            self.reals[realization].front.push(
                 time,
                 row,
                 col,
@@ -807,7 +807,7 @@ impl Propagator {
         let n_active = self
             .reals
             .iter()
-            .filter(|real| !real.heap.is_empty())
+            .filter(|real| !real.front.is_empty())
             .count();
         let cell_area = self.cellsize * self.cellsize;
         let mut area_mean = 0.0f64;
@@ -1055,7 +1055,7 @@ impl Propagator {
             }
         }
         let seeds: Vec<(usize, usize)> = self.reals[realization]
-            .heap
+            .front
             .event_cells()
             .filter(|&(row, col)| {
                 row >= 0 && col >= 0 && (row as usize) < grid_h && (col as usize) < grid_w
@@ -1247,7 +1247,7 @@ impl Propagator {
             wind_dir: self.wind_dir.clone(),
             wind_speed: self.wind_speed.clone(),
             actions_moisture: self.actions_moisture.clone(),
-            heaps: self.reals.iter().map(|real| real.heap.clone()).collect(),
+            fronts: self.reals.iter().map(|real| real.front.clone()).collect(),
             tiles: self.reals.iter().map(|real| real.tiles.clone()).collect(),
             scheduler_events: self.scheduler.snapshot(),
             frozen_index,
@@ -1358,7 +1358,7 @@ impl Propagator {
         let tile_row0 = row_shift >> TILE_SHIFT;
         let tile_col0 = col_shift >> TILE_SHIFT;
         for real in &mut self.reals {
-            real.heap.shift_coords(row_shift as i32, col_shift as i32);
+            real.front.shift_coords(row_shift as i32, col_shift as i32);
             real.tiles
                 .reanchor(new_shape.0, new_shape.1, tile_row0, tile_col0);
         }
@@ -1420,8 +1420,8 @@ impl Propagator {
         let tile_row0 = row_shift >> TILE_SHIFT;
         let tile_col0 = col_shift >> TILE_SHIFT;
         for (r, real) in self.reals.iter_mut().enumerate() {
-            real.heap = checkpoint.heaps[r].clone();
-            real.heap.shift_coords(row_shift as i32, col_shift as i32);
+            real.front = checkpoint.fronts[r].clone();
+            real.front.shift_coords(row_shift as i32, col_shift as i32);
             real.tiles = checkpoint.tiles[r].clone();
             if grew {
                 real.tiles

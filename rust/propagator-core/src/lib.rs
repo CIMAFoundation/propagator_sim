@@ -2,8 +2,8 @@
 //!
 //! Rust rewrite of the Python/numba core (`propagator.core`), specified
 //! in `docs/rust-core-spec.md`. The engine is event-driven: each of the
-//! `R` stochastic realizations owns a min-heap of pending ignition
-//! events and block-sparse 32x32 state tiles, so memory scales with the
+//! `R` stochastic realizations owns a time-ordered queue of pending
+//! ignition events and block-sparse 32x32 state tiles, so memory scales with the
 //! burned area rather than the grid. Burned-out interior tiles can be
 //! frozen to disk, the domain can grow in place or through world-anchored
 //! checkpoints, and runs seeded with [`Propagator::reseed`] are bitwise

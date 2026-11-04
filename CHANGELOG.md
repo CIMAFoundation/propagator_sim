@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Rust core: pending ignition events live in a calendar queue (`FrontQueue`:
+  one-second buckets over a 2048 s window with a bitmap of occupied buckets,
+  plus a small binary heap for events beyond the window) instead of a binary
+  min-heap over five parallel arrays. Push and pop are O(1) amortized. Events
+  in the same second now pop in a different order than the heap produced, so
+  seeded runs are no longer bitwise identical to earlier versions (they are
+  statistically identical). 1.2–1.6x faster on top of the edge cache.
+- Rust core: the effective moisture grid (base plus action moisture) is kept
+  as state and refreshed only on the action footprint, and action decay
+  touches only that footprint, instead of rebuilding and scanning the whole
+  grid on every step. Runs stepped every minute are 2–3.5x faster; outputs
+  are unchanged.
 - Rust core: the heap kernel now evaluates the spread models once per edge
   per generation of the inputs through a shared, block-sparse `EdgeCache`
   (ignition probability, transition time, carried ROS/FLI for the 8
