@@ -108,6 +108,11 @@ pub struct Propagator {
     wind_dir: Option<Grid2<f32>>,
     wind_speed: Option<Grid2<f32>>,
     actions_moisture: Option<Grid2<f32>>,
+    /// `moisture` plus `actions_moisture`, clipped to [0, 1]: the grid the
+    /// kernel reads. Maintained incrementally (only footprint cells are
+    /// rewritten when actions change or decay); `None` until first needed
+    /// or after the base moisture / domain changed.
+    effective_moisture: Option<Grid2<f32>>,
     /// cells whose cached edges depend on `actions_moisture`: every cell
     /// with action moisture plus its 8 neighbours (edges read the target's
     /// moisture). Decay only invalidates these.
@@ -180,6 +185,7 @@ impl Propagator {
             wind_dir: None,
             wind_speed: None,
             actions_moisture: None,
+            effective_moisture: None,
             actions_footprint: Vec::new(),
             scheduler: Scheduler::new(),
             reals,
@@ -501,7 +507,8 @@ impl Propagator {
         if self.reals.iter().all(|real| real.heap.is_empty()) {
             return Ok(());
         }
-        let moisture = self.effective_moisture()?;
+        self.ensure_effective_moisture()?;
+        let moisture = self.effective_moisture.as_ref().unwrap();
         let wind_dir = self
             .wind_dir
             .as_ref()
@@ -523,7 +530,7 @@ impl Propagator {
             veg: &self.veg,
             fuel_idx: &self.fuel_idx,
             dem: &self.dem,
-            moisture: &moisture,
+            moisture,
             wind_dir,
             wind_speed,
             fuels: &self.fuels,
@@ -558,6 +565,7 @@ impl Propagator {
         }
         if let Some(moisture) = &event.moisture {
             self.moisture = Some(moisture.clone());
+            self.effective_moisture = None;
         }
         if let Some(additional) = &event.additional_moisture {
             let (rows, cols) = self.veg.shape();
@@ -574,6 +582,7 @@ impl Propagator {
             // action moisture only ever accumulates, so the new footprint
             // covers every cell whose edges changed
             self.rebuild_actions_footprint();
+            self.refresh_effective_footprint();
             self.edges
                 .invalidate_cells(self.actions_footprint.iter().copied());
         }
@@ -635,12 +644,29 @@ impl Propagator {
             return;
         }
         let factor = (1.0 - ACTIONS_MOISTURE_DECAY).powf(elapsed_minutes) as f32;
-        for value in actions.as_mut_slice() {
-            *value *= factor;
+        // action moisture is zero outside the footprint
+        for &(row, col) in &self.actions_footprint {
+            actions[(row, col)] *= factor;
         }
+        self.refresh_effective_footprint();
         // only edges into cells with action moisture changed
         self.edges
             .invalidate_cells(self.actions_footprint.iter().copied());
+    }
+
+    /// Rewrite the footprint cells of `effective_moisture` from the base and
+    /// action moisture (no-op while the effective grid is not built).
+    fn refresh_effective_footprint(&mut self) {
+        let (Some(base), Some(actions), Some(effective)) = (
+            &self.moisture,
+            &self.actions_moisture,
+            &mut self.effective_moisture,
+        ) else {
+            return;
+        };
+        for &(row, col) in &self.actions_footprint {
+            effective[(row, col)] = (base[(row, col)] + actions[(row, col)]).clamp(0.0, 1.0);
+        }
     }
 
     /// Recompute `actions_footprint` from `actions_moisture`: the cells with
@@ -676,14 +702,18 @@ impl Propagator {
             .collect();
     }
 
-    /// Base moisture plus action-derived increments, clipped to [0, 1].
-    fn effective_moisture(&self) -> Result<Grid2<f32>> {
+    /// Build `effective_moisture` (base plus action increments, clipped to
+    /// [0, 1]) if it is missing; afterwards it is kept current incrementally.
+    fn ensure_effective_moisture(&mut self) -> Result<()> {
+        if self.effective_moisture.is_some() {
+            return Ok(());
+        }
         let moisture = self
             .moisture
             .as_ref()
             .ok_or(PropagatorError::WeatherNotSet)?;
-        match &self.actions_moisture {
-            None => Ok(moisture.clone()),
+        let effective = match &self.actions_moisture {
+            None => moisture.clone(),
             Some(actions) => {
                 let data = moisture
                     .as_slice()
@@ -692,9 +722,11 @@ impl Propagator {
                     .map(|(m, a)| (m + a).clamp(0.0, 1.0))
                     .collect();
                 let (rows, cols) = moisture.shape();
-                Ok(Grid2::from_vec(rows, cols, data))
+                Grid2::from_vec(rows, cols, data)
             }
-        }
+        };
+        self.effective_moisture = Some(effective);
+        Ok(())
     }
 
     // --- outputs -----------------------------------------------------------
@@ -1340,6 +1372,7 @@ impl Propagator {
             self.actions_moisture =
                 Some(grid.pad_const(new_shape, row_shift, col_shift, 0.0));
         }
+        self.effective_moisture = None;
         self.rebuild_actions_footprint();
 
         for (_, event) in self.scheduler.events_mut() {
@@ -1419,6 +1452,7 @@ impl Propagator {
                 grid.clone()
             }
         });
+        self.effective_moisture = None;
         self.rebuild_actions_footprint();
 
         self.scheduler = Scheduler::new();
