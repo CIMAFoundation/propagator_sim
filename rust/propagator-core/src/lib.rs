@@ -41,6 +41,7 @@ mod fuels;
 mod grid;
 mod kernel;
 mod models;
+mod parallel;
 mod propagator;
 mod rng;
 mod scheduler;

@@ -6,7 +6,13 @@ license = "MIT"
 description = "Stochastic cellular wildfire spread simulator (Rust core, ported from the Python/numba implementation)"
 
 [dependencies]
-# intentionally dependency-free: std-only core
+# std-only core; `rayon` is opt-in for targets without std threads (wasm)
+rayon = { version = "1.12", optional = true }
+
+[features]
+# parallelize realizations with rayon's global pool instead of scoped std
+# threads (required on wasm32, where the pool is created from JavaScript)
+rayon = ["dep:rayon"]
 
 [profile.release]
 lto = true

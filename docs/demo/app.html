@@ -257,7 +257,51 @@
 </div>
 
 <script type="module">
-import init, { Propagator, FuelSystemBuilder } from "./pkg/propagator_wasm.js";
+// ---- engine bundle -------------------------------------------------------
+// Two bundles are shipped (see ../demo.md and rust/propagator-wasm/build-demo.sh):
+// `pkg/` runs single-threaded anywhere; `pkg-threads/` runs realizations on
+// a pool of web workers but needs SharedArrayBuffer, i.e. a cross-origin
+// isolated page. GitHub Pages cannot send the isolation headers, so
+// coi-serviceworker.js adds them and the page is reloaded once; browsers
+// where that does not take (no service workers, no COEP credentialless)
+// keep the single-threaded bundle.
+let Propagator, FuelSystemBuilder;
+let THREADS = 1;
+
+function ensureIsolation() {
+  if (globalThis.crossOriginIsolated || !("serviceWorker" in navigator) || !window.isSecureContext) {
+    return;
+  }
+  if (navigator.serviceWorker.controller) {
+    // already controlled yet not isolated: this browser does not apply the
+    // headers; stay single-threaded rather than reload forever
+    return;
+  }
+  navigator.serviceWorker.register("./coi-serviceworker.js").then(() => {
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      window.top.location.reload();
+    }, { once: true });
+  }).catch(() => { /* no isolation: single-threaded */ });
+}
+
+async function loadCore() {
+  // `?threads=N` overrides the worker count; `?threads=1` forces the
+  // single-threaded bundle (for comparisons)
+  const requested = parseInt(new URLSearchParams(location.search).get("threads") || "", 10);
+  const forceSingle = requested === 1;
+  if (!forceSingle) ensureIsolation();
+  const isolated = !forceSingle && globalThis.crossOriginIsolated === true
+    && typeof SharedArrayBuffer !== "undefined";
+  const mod = await import(isolated ? "./pkg-threads/propagator_wasm.js" : "./pkg/propagator_wasm.js");
+  await mod.default();
+  ({ Propagator, FuelSystemBuilder } = mod);
+  if (isolated && typeof mod.initThreadPool === "function") {
+    // leave one core to the main thread, which spins while the pool works
+    const cores = navigator.hardwareConcurrency || 2;
+    THREADS = requested > 1 ? requested : Math.max(1, Math.min(cores - 1, 16));
+    await mod.initThreadPool(THREADS);
+  }
+}
 
 // Real Alexandroupolis / Evros terrain + EU 12-class fuel, extracted from the
 // eu_fuel12 / eu_dem COGs (see ../demo.md). Dimensions and cell size come from
@@ -550,6 +594,7 @@ function ensureSim() {
   sim = new Propagator(
     N, N, veg, dem, buildFuelSystem(), reals, 42,
     el("spotting").checked, CELL, el("ros").value, "trucchia",
+    false, THREADS,
   );
   sim.set_boundary_conditions(
     0n,
@@ -627,13 +672,15 @@ function resetSim() {
   el("clock").textContent = fmtTime(0);
   el("stat-time").textContent = fmtTime(0);
   el("stat-area").textContent = "0 ha";
-  el("status").textContent = "Ready. Click the map to move the ignition, then press Play or Step.";
+  el("status").textContent =
+    "Ready. Click the map to move the ignition, then press Play or Step. " +
+    (THREADS > 1 ? `Engine: ${THREADS} threads.` : "Engine: single-threaded.");
   drawFire(new Float32Array(N * N));
   drawIgnitions();
 }
 
 // ---- boot ----------------------------------------------------------------
-Promise.all([init(), loadData()]).then(() => {
+Promise.all([loadCore(), loadData()]).then(() => {
   vegCanvas = el("veg");
   fireCanvas = el("fire");
   vegCanvas.width = fireCanvas.width = N;

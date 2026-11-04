@@ -6,6 +6,55 @@ use crate::tiles::{
     Tile, TileGrid, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV, TILE_SHIFT, TILE_SIZE,
 };
 
+/// Fold one cell's state into the per-cell aggregates.
+#[inline]
+#[allow(clippy::too_many_arguments)]
+fn accumulate_into(
+    count: &mut i32,
+    spot_gen_count: &mut i32,
+    spot_recv_count: &mut i32,
+    arrival_min: &mut i32,
+    arrival_sum: &mut f64,
+    ros_sum: &mut f64,
+    ros_max: &mut f32,
+    fli_sum: &mut f64,
+    fli_max: &mut f32,
+    flags: u8,
+    arrival: i32,
+    ros: f32,
+    fli: f32,
+) {
+    if flags == 0 {
+        return;
+    }
+    if flags & FLAG_SPOT_GEN != 0 {
+        *spot_gen_count += 1;
+    }
+    if flags & FLAG_SPOT_RECV != 0 {
+        *spot_recv_count += 1;
+    }
+    if flags & FLAG_FIRE == 0 {
+        return;
+    }
+    *count += 1;
+    if arrival < *arrival_min {
+        *arrival_min = arrival;
+    }
+    *arrival_sum += arrival as f64;
+    if !ros.is_nan() {
+        *ros_sum += ros as f64;
+        if ros > *ros_max {
+            *ros_max = ros;
+        }
+    }
+    if !fli.is_nan() {
+        *fli_sum += fli as f64;
+        if fli > *fli_max {
+            *fli_max = fli;
+        }
+    }
+}
+
 /// Per-cell aggregates across realizations (see spec §3.4).
 ///
 /// Every grid is `rows x cols`. Counts and sums are reduced across all
@@ -61,35 +110,58 @@ impl StateFold {
         ros: f32,
         fli: f32,
     ) {
-        if flags == 0 {
-            return;
+        accumulate_into(
+            &mut self.count[(row, col)],
+            &mut self.spot_gen_count[(row, col)],
+            &mut self.spot_recv_count[(row, col)],
+            &mut self.arrival_min[(row, col)],
+            &mut self.arrival_sum[(row, col)],
+            &mut self.ros_sum[(row, col)],
+            &mut self.ros_max[(row, col)],
+            &mut self.fli_sum[(row, col)],
+            &mut self.fli_max[(row, col)],
+            flags,
+            arrival,
+            ros,
+            fli,
+        );
+    }
+
+    /// Split the fold into disjoint horizontal bands of `rows_per_band`
+    /// rows (the last may be shorter) that can be filled concurrently.
+    pub fn bands_mut(&mut self, rows_per_band: usize) -> Vec<FoldBand<'_>> {
+        let (rows, cols) = self.count.shape();
+        let chunk = rows_per_band.max(1) * cols;
+        let count = self.count.as_mut_slice().chunks_mut(chunk);
+        let mut spot_gen_count = self.spot_gen_count.as_mut_slice().chunks_mut(chunk);
+        let mut spot_recv_count = self.spot_recv_count.as_mut_slice().chunks_mut(chunk);
+        let mut arrival_min = self.arrival_min.as_mut_slice().chunks_mut(chunk);
+        let mut arrival_sum = self.arrival_sum.as_mut_slice().chunks_mut(chunk);
+        let mut ros_sum = self.ros_sum.as_mut_slice().chunks_mut(chunk);
+        let mut ros_max = self.ros_max.as_mut_slice().chunks_mut(chunk);
+        let mut fli_sum = self.fli_sum.as_mut_slice().chunks_mut(chunk);
+        let mut fli_max = self.fli_max.as_mut_slice().chunks_mut(chunk);
+        let mut bands = Vec::with_capacity(rows.div_ceil(rows_per_band.max(1)));
+        let mut row0 = 0;
+        for count in count {
+            let rows = count.len() / cols;
+            bands.push(FoldBand {
+                row0,
+                rows,
+                cols,
+                count,
+                spot_gen_count: spot_gen_count.next().unwrap(),
+                spot_recv_count: spot_recv_count.next().unwrap(),
+                arrival_min: arrival_min.next().unwrap(),
+                arrival_sum: arrival_sum.next().unwrap(),
+                ros_sum: ros_sum.next().unwrap(),
+                ros_max: ros_max.next().unwrap(),
+                fli_sum: fli_sum.next().unwrap(),
+                fli_max: fli_max.next().unwrap(),
+            });
+            row0 += rows;
         }
-        if flags & FLAG_SPOT_GEN != 0 {
-            self.spot_gen_count[(row, col)] += 1;
-        }
-        if flags & FLAG_SPOT_RECV != 0 {
-            self.spot_recv_count[(row, col)] += 1;
-        }
-        if flags & FLAG_FIRE == 0 {
-            return;
-        }
-        self.count[(row, col)] += 1;
-        if arrival < self.arrival_min[(row, col)] {
-            self.arrival_min[(row, col)] = arrival;
-        }
-        self.arrival_sum[(row, col)] += arrival as f64;
-        if !ros.is_nan() {
-            self.ros_sum[(row, col)] += ros as f64;
-            if ros > self.ros_max[(row, col)] {
-                self.ros_max[(row, col)] = ros;
-            }
-        }
-        if !fli.is_nan() {
-            self.fli_sum[(row, col)] += fli as f64;
-            if fli > self.fli_max[(row, col)] {
-                self.fli_max[(row, col)] = fli;
-            }
-        }
+        bands
     }
 
     /// Accumulate one full tile placed with its top-left cell at
@@ -151,6 +223,84 @@ pub fn fold_realization(fold: &mut StateFold, tiles: &TileGrid) {
     for (tile_row, tile_col, slot) in tiles.allocated() {
         let tile = tiles.tile(slot);
         fold.accumulate_tile(tile, tile_row << TILE_SHIFT, tile_col << TILE_SHIFT);
+    }
+}
+
+/// A horizontal band of a [`StateFold`], see [`StateFold::bands_mut`].
+pub struct FoldBand<'a> {
+    /// first grid row of the band
+    pub row0: usize,
+    /// rows in the band
+    pub rows: usize,
+    cols: usize,
+    count: &'a mut [i32],
+    spot_gen_count: &'a mut [i32],
+    spot_recv_count: &'a mut [i32],
+    arrival_min: &'a mut [i32],
+    arrival_sum: &'a mut [f64],
+    ros_sum: &'a mut [f64],
+    ros_max: &'a mut [f32],
+    fli_sum: &'a mut [f64],
+    fli_max: &'a mut [f32],
+}
+
+impl FoldBand<'_> {
+    /// Accumulate a tile whose top-left cell is at grid `(row0, col0)`,
+    /// clipped to the band and the grid.
+    pub fn accumulate_tile(&mut self, tile: &Tile, row0: usize, col0: usize) {
+        let band_end = self.row0 + self.rows;
+        let first = row0.max(self.row0);
+        let last = (row0 + TILE_SIZE).min(band_end);
+        if first >= last {
+            return;
+        }
+        let width = TILE_SIZE.min(self.cols.saturating_sub(col0));
+        for row in first..last {
+            let local_row = row - row0;
+            let base = (row - self.row0) * self.cols + col0;
+            for local_col in 0..width {
+                let local = local_row * TILE_SIZE + local_col;
+                let i = base + local_col;
+                accumulate_into(
+                    &mut self.count[i],
+                    &mut self.spot_gen_count[i],
+                    &mut self.spot_recv_count[i],
+                    &mut self.arrival_min[i],
+                    &mut self.arrival_sum[i],
+                    &mut self.ros_sum[i],
+                    &mut self.ros_max[i],
+                    &mut self.fli_sum[i],
+                    &mut self.fli_max[i],
+                    tile.flags[local],
+                    tile.arrival[local],
+                    tile.ros[local],
+                    tile.fli[local],
+                );
+            }
+        }
+    }
+
+    /// Fold the tiles of every realization that intersect this band. Bands
+    /// of `TILE_SIZE` rows starting at a tile boundary touch exactly one
+    /// tile row each.
+    pub fn fold_realizations<'t>(&mut self, tiles: impl Iterator<Item = &'t TileGrid>) {
+        let tile_row0 = self.row0 >> TILE_SHIFT;
+        let tile_row1 = (self.row0 + self.rows - 1) >> TILE_SHIFT;
+        for grid in tiles {
+            let (tiles_h, tiles_w) = grid.tiles_shape();
+            for tile_row in tile_row0..=tile_row1.min(tiles_h - 1) {
+                for tile_col in 0..tiles_w {
+                    let slot = grid.slot_of(tile_row, tile_col);
+                    if slot >= 0 {
+                        self.accumulate_tile(
+                            grid.tile(slot),
+                            tile_row << TILE_SHIFT,
+                            tile_col << TILE_SHIFT,
+                        );
+                    }
+                }
+            }
+        }
     }
 }
 

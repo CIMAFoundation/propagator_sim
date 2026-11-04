@@ -735,8 +735,18 @@ impl Propagator {
     fn fold_state(&mut self) -> Result<StateFold> {
         let (rows, cols) = self.veg.shape();
         let mut fold = StateFold::empty(rows, cols);
-        for real in &self.reals {
-            fold_realization(&mut fold, &real.tiles);
+        if self.n_threads <= 1 || rows <= TILE_SIZE {
+            for real in &self.reals {
+                fold_realization(&mut fold, &real.tiles);
+            }
+        } else {
+            // tile-aligned bands are disjoint in memory and each touches one
+            // tile row of every realization, so they fold concurrently
+            let mut bands = fold.bands_mut(TILE_SIZE);
+            let reals = &self.reals;
+            crate::parallel::for_each_chunked(&mut bands, self.n_threads, |band| {
+                band.fold_realizations(reals.iter().map(|real| &real.tiles));
+            });
         }
         self.fold_frozen(&mut fold)?;
         Ok(fold)

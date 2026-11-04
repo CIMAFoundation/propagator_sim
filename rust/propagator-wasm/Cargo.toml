@@ -14,6 +14,18 @@ propagator-geo = { path = "../propagator-geo" }
 wasm-bindgen = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde-wasm-bindgen = "0.6"
+wasm-bindgen-rayon = { version = "1.3", optional = true, features = ["no-bundler"] }
+
+[features]
+# Multi-threaded build: realizations run on a rayon pool of web workers
+# (`initThreadPool` exported to JavaScript). Needs a cross-origin-isolated
+# page (SharedArrayBuffer) and a nightly toolchain with `-Z build-std` plus
+# `-C target-feature=+atomics,+bulk-memory,+mutable-globals`; see
+# build-demo.sh.
+threads = ["propagator-core/rayon", "dep:wasm-bindgen-rayon"]
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O3", "--enable-threads", "--enable-bulk-memory", "--enable-mutable-globals"]
 
 [profile.release]
 # The core is compute-bound, so optimise for speed rather than size.

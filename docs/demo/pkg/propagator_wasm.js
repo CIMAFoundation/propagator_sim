@@ -113,6 +113,15 @@ export class Propagator {
         return ret >>> 0;
     }
     /**
+     * Bytes held by the shared per-cell edge cache (spread quantities
+     * reused across realizations).
+     * @returns {number}
+     */
+    edge_cache_bytes() {
+        const ret = wasm.propagator_edge_cache_bytes(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * Grow the domain in place onto the larger `veg`/`dem` anchored at
      * `(origin_row, origin_col)`, preserving all simulation state. The new
      * grid must fully contain the old one and growth to the north/west must
@@ -171,8 +180,9 @@ export class Propagator {
      * @param {string} ros_model
      * @param {string} moisture_model
      * @param {boolean | null} [halt_on_boundary]
+     * @param {number | null} [threads]
      */
-    constructor(rows, cols, veg, dem, fuels, realizations, seed, do_spotting, cellsize, ros_model, moisture_model, halt_on_boundary) {
+    constructor(rows, cols, veg, dem, fuels, realizations, seed, do_spotting, cellsize, ros_model, moisture_model, halt_on_boundary, threads) {
         const ptr0 = passArray32ToWasm0(veg, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passArrayF64ToWasm0(dem, wasm.__wbindgen_malloc);
@@ -182,7 +192,7 @@ export class Propagator {
         const len2 = WASM_VECTOR_LEN;
         const ptr3 = passStringToWasm0(moisture_model, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len3 = WASM_VECTOR_LEN;
-        const ret = wasm.propagator_new(rows, cols, ptr0, len0, ptr1, len1, fuels.__wbg_ptr, realizations, seed, do_spotting, cellsize, ptr2, len2, ptr3, len3, isLikeNone(halt_on_boundary) ? 0xFFFFFF : halt_on_boundary ? 1 : 0);
+        const ret = wasm.propagator_new(rows, cols, ptr0, len0, ptr1, len1, fuels.__wbg_ptr, realizations, seed, do_spotting, cellsize, ptr2, len2, ptr3, len3, isLikeNone(halt_on_boundary) ? 0xFFFFFF : halt_on_boundary ? 1 : 0, isLikeNone(threads) ? Number.MAX_SAFE_INTEGER : (threads) >>> 0);
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
@@ -312,6 +322,20 @@ export class Propagator {
         }
     }
     /**
+     * Turn boundary halting on or off mid-run.
+     *
+     * Call with `false` when the domain can no longer grow (a cap reached, a
+     * failed fetch): the boundary events the core has been suspending are
+     * popped on the next [`Propagator::step`], so the fire clips at the edge
+     * and the rest of the front keeps burning. Leaving it on instead freezes
+     * the realization, because a suspended boundary event is the earliest
+     * event in its heap and nothing behind it can advance.
+     * @param {boolean} halt
+     */
+    set_halt_on_boundary(halt) {
+        wasm.propagator_set_halt_on_boundary(this.__wbg_ptr, halt);
+    }
+    /**
      * Propagate for `seconds` of simulation time, applying scheduled events.
      *
      * Returns `true` when the run was constructed with
@@ -372,6 +396,16 @@ export function extract_isochrone(values, rows, cols, transform, thresholds, med
         throw takeFromExternrefTable0(ret[1]);
     }
     return takeFromExternrefTable0(ret[0]);
+}
+
+/**
+ * `true` when this bundle was built with the `threads` feature, i.e. it
+ * exports `initThreadPool` and runs realizations on a worker pool.
+ * @returns {boolean}
+ */
+export function has_threads() {
+    const ret = wasm.has_threads();
+    return ret !== 0;
 }
 
 /**

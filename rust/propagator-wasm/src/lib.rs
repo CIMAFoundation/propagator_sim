@@ -6,7 +6,9 @@
 //! instead of numpy rasters. It is meant to drive the interactive demo in the
 //! documentation, not to be a full-featured binding:
 //!
-//! * the engine runs **single-threaded** (`n_threads = 1`) — `wasm32` has no
+//! * without the `threads` feature the engine runs **single-threaded**
+//!   (`n_threads = 1`); with it, realizations run on a rayon pool of web
+//!   workers created from JavaScript via `initThreadPool` — `wasm32` has no
 //!   `std::thread`, and the core's sequential path is bit-for-bit identical;
 //! * runs are always **seeded**, so we never touch `SystemTime`/entropy;
 //! * on-disk features (tile freezing, checkpoints) are not surfaced.
@@ -16,7 +18,8 @@
 
 use propagator_core::{
     BoundaryConditions, FieldInput, FuelDef, FuelSystem, Grid2, Ignitions, MoistureModel, OobMode,
-    Propagator as CorePropagator, PropagatorConfig, PropagatorError, RosModel, TILE_SIZE,
+    Propagator as CorePropagator, PropagatorConfig, PropagatorError, PropagatorOutput, RosModel,
+    TILE_SIZE,
 };
 use propagator_geo::{extract_isochrone as extract_isochrone_geo, IsochroneOptions};
 use serde::Serialize;
@@ -82,6 +85,16 @@ pub fn extract_isochrone(
     serde_wasm_bindgen::to_value(&serializable)
         .map_err(|error| JsValue::from_str(&error.to_string()))
 }
+
+/// `true` when this bundle was built with the `threads` feature, i.e. it
+/// exports `initThreadPool` and runs realizations on a worker pool.
+#[wasm_bindgen]
+pub fn has_threads() -> bool {
+    cfg!(feature = "threads")
+}
+
+#[cfg(feature = "threads")]
+pub use wasm_bindgen_rayon::init_thread_pool;
 
 /// Tile size in cells: north/west domain growth must be a multiple of this.
 #[wasm_bindgen]
@@ -179,6 +192,9 @@ pub struct Propagator {
     inner: CorePropagator,
     rows: usize,
     cols: usize,
+    /// outputs of the current state; the fold is the costliest part of a
+    /// rendered step, so every accessor shares one until the state changes
+    output: Option<PropagatorOutput>,
 }
 
 #[wasm_bindgen]
@@ -209,6 +225,7 @@ impl Propagator {
         ros_model: &str,
         moisture_model: &str,
         halt_on_boundary: Option<bool>,
+        threads: Option<u32>,
     ) -> Result<Propagator, JsValue> {
         if veg.len() != rows * cols {
             return Err(JsValue::from_str(&format!(
@@ -234,18 +251,29 @@ impl Propagator {
         config.cellsize = cellsize;
         config.ros_model = ros_from_str(ros_model)?;
         config.moisture_model = moisture_from_str(moisture_model)?;
-        // Stay off the threaded/entropy/fs paths; boundary handling is the
-        // caller's choice (Ignore for the demo, Raise for domain growth).
+        // Stay off the entropy/fs paths; boundary handling is the caller's
+        // choice (Ignore for the demo, Raise for domain growth). More than
+        // one thread only works in the `threads` build after
+        // `initThreadPool` created the worker pool.
         config.oob_mode = if halt_on_boundary.unwrap_or(false) {
             OobMode::Raise
         } else {
             OobMode::Ignore
         };
-        config.n_threads = Some(1);
+        config.n_threads = Some(if cfg!(feature = "threads") {
+            threads.unwrap_or(1).max(1) as usize
+        } else {
+            1
+        });
         config.fuels = Some(FuelSystem::from_defs(&fuels.defs).map_err(to_js)?);
 
         let inner = CorePropagator::new(config).map_err(to_js)?;
-        Ok(Propagator { inner, rows, cols })
+        Ok(Propagator {
+            inner,
+            rows,
+            cols,
+            output: None,
+        })
     }
 
     /// Current simulation time, seconds from start.
@@ -309,6 +337,7 @@ impl Propagator {
             additional_moisture: None,
             vegetation_changes: None,
         };
+        self.output = None;
         self.inner.set_boundary_conditions(bc).map_err(to_js)
     }
 
@@ -396,6 +425,7 @@ impl Propagator {
             vegetation_changes,
             ..BoundaryConditions::default()
         };
+        self.output = None;
         self.inner.set_boundary_conditions(bc).map_err(to_js)
     }
 
@@ -406,6 +436,7 @@ impl Propagator {
     /// at the domain boundary: grow the domain with [`Propagator::expand`]
     /// and step again to resume it — nothing is lost.
     pub fn step(&mut self, seconds: i64) -> Result<bool, JsValue> {
+        self.output = None;
         match self.inner.step_window(seconds) {
             Ok(()) => Ok(false),
             Err(PropagatorError::OutOfBounds) => Ok(true),
@@ -485,6 +516,7 @@ impl Propagator {
         }
         let veg = Grid2::from_vec(rows, cols, veg);
         let dem = Grid2::from_vec(rows, cols, dem);
+        self.output = None;
         self.inner
             .expand(veg, dem, (origin_row, origin_col))
             .map_err(to_js)?;
@@ -498,15 +530,23 @@ impl Propagator {
         self.inner.next_time().unwrap_or(-1)
     }
 
+    /// Outputs for the current state, folded once per state change.
+    fn output(&mut self) -> Result<&PropagatorOutput, JsValue> {
+        if self.output.is_none() {
+            self.output = Some(self.inner.get_output().map_err(to_js)?);
+        }
+        Ok(self.output.as_ref().unwrap())
+    }
+
     /// Fire probability per cell in `[0, 1]`, row-major, `rows * cols` long.
     pub fn fire_probability(&mut self) -> Result<Vec<f32>, JsValue> {
-        let out = self.inner.get_output().map_err(to_js)?;
+        let out = self.output()?;
         Ok(out.fire_probability.as_slice().to_vec())
     }
 
     /// Mean burned area across realizations, in hectares.
     pub fn burned_area_ha(&mut self) -> Result<f64, JsValue> {
-        let out = self.inner.get_output().map_err(to_js)?;
+        let out = self.output()?;
         Ok(out.stats.area_mean / 10_000.0)
     }
 
@@ -530,7 +570,8 @@ impl Propagator {
     /// 4. spotting generation probability, `[0, 1]`
     /// 5. spotting receiving probability, `[0, 1]`
     pub fn output_snapshot(&mut self) -> Result<Vec<f32>, JsValue> {
-        let out = self.inner.get_output().map_err(to_js)?;
+        let cells = self.rows * self.cols;
+        let out = self.output()?;
         let layers = [
             &out.fire_probability,
             &out.min_arrival_time,
@@ -539,7 +580,7 @@ impl Propagator {
             &out.spotting_generation_probability,
             &out.spotting_receiving_probability,
         ];
-        let mut packed = Vec::with_capacity(layers.len() * self.rows * self.cols);
+        let mut packed = Vec::with_capacity(layers.len() * cells);
         for layer in layers {
             packed.extend_from_slice(layer.as_slice());
         }

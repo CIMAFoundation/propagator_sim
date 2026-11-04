@@ -45,6 +45,11 @@ export class Propagator {
      */
     burned_area_ha(): number;
     /**
+     * Bytes held by the shared per-cell edge cache (spread quantities
+     * reused across realizations).
+     */
+    edge_cache_bytes(): number;
+    /**
      * Grow the domain in place onto the larger `veg`/`dem` anchored at
      * `(origin_row, origin_col)`, preserving all simulation state. The new
      * grid must fully contain the old one and growth to the north/west must
@@ -68,7 +73,7 @@ export class Propagator {
      * hits instead, so the caller can grow the domain with
      * [`Propagator::expand`] and continue.
      */
-    constructor(rows: number, cols: number, veg: Int32Array, dem: Float64Array, fuels: FuelSystemBuilder, realizations: number, seed: number, do_spotting: boolean, cellsize: number, ros_model: string, moisture_model: string, halt_on_boundary?: boolean | null);
+    constructor(rows: number, cols: number, veg: Int32Array, dem: Float64Array, fuels: FuelSystemBuilder, realizations: number, seed: number, do_spotting: boolean, cellsize: number, ros_model: string, moisture_model: string, halt_on_boundary?: boolean | null, threads?: number | null);
     /**
      * Next event time (scheduler or front), or `-1` when the run is idle.
      */
@@ -116,6 +121,17 @@ export class Propagator {
      * empty array to leave the ignition set unchanged.
      */
     set_boundary_conditions(time: bigint, moisture: number, wind_dir: number, wind_speed: number, ignitions: Int32Array): void;
+    /**
+     * Turn boundary halting on or off mid-run.
+     *
+     * Call with `false` when the domain can no longer grow (a cap reached, a
+     * failed fetch): the boundary events the core has been suspending are
+     * popped on the next [`Propagator::step`], so the fire clips at the edge
+     * and the rest of the front keeps burning. Leaving it on instead freezes
+     * the realization, because a suspended boundary event is the earliest
+     * event in its heap and nothing behind it can advance.
+     */
+    set_halt_on_boundary(halt: boolean): void;
     /**
      * Propagate for `seconds` of simulation time, applying scheduled events.
      *
@@ -166,6 +182,12 @@ export class Propagator {
 export function extract_isochrone(values: Float32Array, rows: number, cols: number, transform: Float64Array, thresholds?: Float64Array | null, med_filt_val?: number | null, min_length?: number | null, smooth_sigma?: number | null, simp_fact?: number | null): any;
 
 /**
+ * `true` when this bundle was built with the `threads` feature, i.e. it
+ * exports `initThreadPool` and runs realizations on a worker pool.
+ */
+export function has_threads(): boolean;
+
+/**
  * Number of per-cell variables packed by [`Propagator::output_snapshot`].
  */
 export function output_variable_count(): number;
@@ -184,14 +206,16 @@ export interface InitOutput {
     readonly extract_isochrone: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number) => [number, number, number];
     readonly fuelsystembuilder_add_fuel: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number) => [number, number];
     readonly fuelsystembuilder_new: () => number;
+    readonly has_threads: () => number;
     readonly output_variable_count: () => number;
     readonly propagator_boundary_pressure: (a: number) => number;
     readonly propagator_boundary_proximity: (a: number, b: number) => number;
     readonly propagator_burned_area_ha: (a: number) => [number, number, number];
     readonly propagator_cols: (a: number) => number;
+    readonly propagator_edge_cache_bytes: (a: number) => number;
     readonly propagator_expand: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: bigint, i: bigint) => [number, number];
     readonly propagator_fire_probability: (a: number) => [number, number, number, number];
-    readonly propagator_new: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number) => [number, number, number];
+    readonly propagator_new: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number) => [number, number, number];
     readonly propagator_next_time: (a: number) => bigint;
     readonly propagator_origin_col: (a: number) => bigint;
     readonly propagator_origin_row: (a: number) => bigint;
@@ -200,6 +224,7 @@ export interface InitOutput {
     readonly propagator_rows: (a: number) => number;
     readonly propagator_set_action_fields: (a: number, b: bigint, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number];
     readonly propagator_set_boundary_conditions: (a: number, b: bigint, c: number, d: number, e: number, f: number, g: number) => [number, number];
+    readonly propagator_set_halt_on_boundary: (a: number, b: number) => void;
     readonly propagator_step: (a: number, b: bigint) => [number, number, number];
     readonly propagator_time: (a: number) => bigint;
     readonly tile_size: () => number;

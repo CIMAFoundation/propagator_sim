@@ -24,26 +24,43 @@ moisture) already set.
 
 !!! note "About this demo"
     The 1024 × 1024 landscape (20 m cells, ~20 km across) is a fixed extract.
-    The run is **single-threaded**, since `wasm32` has no threads — the native
-    build parallelises across realizations. The fuel model is the EU 12-class
+    Where the browser allows it the run is **multi-threaded**: realizations
+    are spread over a pool of web workers (the status line reports the
+    thread count); otherwise it falls back to a single thread. The fuel model is the EU 12-class
     system (`example/pedrogao/fuels_eu12.yaml`), defined in the demo's
     JavaScript and handed to the core through a `FuelSystemBuilder`, then
     coloured with the `eu_fuel12` colormap. See
     [Rust vs numba Core](rust-vs-numba.md) and
     [Core Internals](core-internals.md) for how the engine works.
 
-## Building the WebAssembly bundle
+## Building the WebAssembly bundles
 
-The bundle shipped with these docs lives in `docs/demo/pkg/`. To rebuild it
-from the Rust workspace:
+Two bundles ship with these docs and `docs/demo/app.html` picks one at load
+time:
+
+- `docs/demo/pkg/` — single-threaded; runs on any page.
+- `docs/demo/pkg-threads/` — multi-threaded: the core's realizations run on
+  a [rayon](https://docs.rs/rayon) pool of web workers
+  (`wasm-bindgen-rayon`). It needs `SharedArrayBuffer`, which browsers only
+  expose to *cross-origin isolated* pages (served with
+  `Cross-Origin-Opener-Policy: same-origin` and
+  `Cross-Origin-Embedder-Policy`). GitHub Pages cannot set those headers, so
+  `docs/demo/coi-serviceworker.js` adds them from a service worker and the
+  page reloads once; browsers without service workers or without
+  `COEP: credentialless` support keep the single-threaded bundle.
+
+To rebuild both from the Rust workspace:
 
 ```bash
-cd rust/propagator-wasm
-wasm-pack build --release --target web --out-dir ../../docs/demo/pkg
+rustup toolchain install nightly --component rust-src --target wasm32-unknown-unknown
+rust/propagator-wasm/build-demo.sh
 ```
 
-This produces `propagator_wasm.js` (the ES-module glue) and
-`propagator_wasm_bg.wasm` (~130 kB), which `docs/demo/app.html` loads directly.
+The threaded bundle is compiled on nightly with `-Z build-std` and the wasm
+`atomics`, `bulk-memory` and `mutable-globals` target features (the
+prebuilt `wasm32` standard library has no atomics). Each bundle is
+`propagator_wasm.js` (the ES-module glue) plus `propagator_wasm_bg.wasm`;
+the threaded one also carries the worker bootstrap script.
 
 The landscape asset `docs/demo/alexandroupolis.bin.gz` (a gzip-compressed,
 packed `veg` + `dem` window, inflated in the browser) is extracted once from

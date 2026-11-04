@@ -525,8 +525,8 @@ fn compute_spotting(
     }
 }
 
-/// Run the kernel for every realization, parallelized over available
-/// threads with scoped threads (realizations share only `shared`).
+/// Run the kernel for every realization, parallelized over `n_threads`
+/// (realizations share only `shared`); see [`crate::parallel`].
 pub fn advance_all(
     realizations: &mut [Realization],
     shared: &SharedInputs<'_>,
@@ -534,22 +534,8 @@ pub fn advance_all(
     halt_on_boundary: bool,
     n_threads: usize,
 ) {
-    let n_threads = n_threads.max(1).min(realizations.len().max(1));
-    if n_threads <= 1 || realizations.len() <= 1 {
-        for real in realizations.iter_mut() {
-            advance_front_until(real, shared, end_time, halt_on_boundary);
-        }
-        return;
-    }
-    let chunk_size = realizations.len().div_ceil(n_threads);
-    std::thread::scope(|scope| {
-        for chunk in realizations.chunks_mut(chunk_size) {
-            scope.spawn(move || {
-                for real in chunk.iter_mut() {
-                    advance_front_until(real, shared, end_time, halt_on_boundary);
-                }
-            });
-        }
+    crate::parallel::for_each_chunked(realizations, n_threads, |real| {
+        advance_front_until(real, shared, end_time, halt_on_boundary);
     });
 }
 

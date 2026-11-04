@@ -112,7 +112,9 @@ fn main() {
     }
     let elapsed = t0.elapsed().as_secs_f64();
 
+    let t_out = Instant::now();
     let output = sim.get_output().expect("output");
+    let output_ms = t_out.elapsed().as_secs_f64() * 1e3;
     let s = &output.stats;
     let area_mean_ha = s.area_mean / 1e4;
     let area_50_ha = s.area_50 / 1e4;
@@ -125,7 +127,7 @@ fn main() {
         sim.time()
     );
     eprintln!(
-        "      wall={elapsed:.3}s  area_mean={area_mean_ha:.1}ha  area_50={area_50_ha:.1}ha  n_active={}  edge_cache={:.1}MiB/{} tiles",
+        "      wall={elapsed:.3}s  get_output={output_ms:.1}ms  area_mean={area_mean_ha:.1}ha  area_50={area_50_ha:.1}ha  n_active={}  edge_cache={:.1}MiB/{} tiles",
         s.n_active,
         sim.edge_cache_bytes() as f64 / (1024.0 * 1024.0),
         sim.edge_cache_tiles()

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Multi-threaded WebAssembly demo. The core gained an opt-in `rayon` feature
+  (realizations on rayon's pool instead of scoped std threads) and the wasm
+  crate a `threads` feature on top of it (`wasm-bindgen-rayon`, exporting
+  `initThreadPool`; `Propagator` takes a trailing `threads` argument). The
+  docs demo ships two bundles — `docs/demo/pkg/` single-threaded and
+  `docs/demo/pkg-threads/` threaded — and picks the threaded one when the
+  page is cross-origin isolated, which `docs/demo/coi-serviceworker.js`
+  arranges on GitHub Pages by adding the COOP/COEP headers from a service
+  worker. `rust/propagator-wasm/build-demo.sh` builds both (the threaded one
+  on nightly with `-Z build-std` and wasm atomics). The output fold now
+  runs in parallel over tile-row bands as well, and the wasm wrapper folds
+  once per state change instead of once per accessor. In Chrome on a
+  14-core machine a 48-step, 50-realization demo run went from 11.8 s
+  single-threaded to 2.6 s.
+
 ### Changed
 
 - Rust core: pending ignition events live in a calendar queue (`FrontQueue`:
