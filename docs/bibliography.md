@@ -18,6 +18,18 @@ and applications to prescribed fire planning.
   Computation* 204(1):191–201, 2008.
   [doi:10.1016/j.amc.2008.06.046](https://doi.org/10.1016/j.amc.2008.06.046)
 
+## Flame Height and Radiant Reach
+
+- G. M. Byram. “Combustion of forest fuels.” In K. P. Davis (ed.), *Forest
+  Fire: Control and Use*, pp. 61–89. McGraw-Hill, New York, 1959.
+- M. E. Alexander. “Calculating and interpreting forest fire intensities.”
+  *Canadian Journal of Botany* 60(4):349–357, 1982.
+  [doi:10.1139/b82-048](https://doi.org/10.1139/b82-048)
+- B. W. Butler and J. D. Cohen. “Firefighter safety zones: A theoretical model
+  based on radiative heating.” *International Journal of Wildland Fire*
+  8(2):73–77, 1998.
+  [doi:10.1071/WF9980073](https://doi.org/10.1071/WF9980073)
+
 ## Operational Deployments
 
 - A. Trucchia, M. D’Andrea, F. Baghino, N. Perello, N. Rebora, and P. Fiorucci.

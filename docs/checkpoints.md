@@ -282,7 +282,8 @@ The cache maintains itself:
 
 One subtlety: the cache accumulates floating-point sums in a different
 order than a from-scratch fold, so the *mean* output fields
-(`mean_arrival_time`, `ros_mean`, `fli_mean`) can differ from an
+(`mean_arrival_time`, `ros_mean`, `fli_mean`, `flame_height_mean`,
+`radiant_reach_mean`) can differ from an
 uncached computation in the last bits of floating-point precision.
 Counts, probabilities, minima and maxima are exact.
 
