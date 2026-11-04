@@ -37,6 +37,15 @@ M4 = 1.019
 # RoS
 C_MOIST = -0.014
 
+# Byram's flame-length relation, L = 0.0775 * I^0.46 (L in m, I in kW/m)
+BYRAM_FLAME_COEFF = 0.0775
+BYRAM_FLAME_EXPONENT = 0.46
+
+# radiant reach: four flame heights (Butler & Cohen 1998), clamped (m)
+RADIANT_REACH_FLAME_HEIGHTS = 4.0
+RADIANT_REACH_MIN_M = 10.0
+RADIANT_REACH_MAX_M = 200.0
+
 
 # variable for fireline intensity
 Q = 2442.0
@@ -491,6 +500,55 @@ def fireline_intensity(
     """
     intensity = (ros / 60) * (lhv_dead_fuel * d0 + lhv_canopy * d1)
     return intensity
+
+
+@jit(cache=False, nopython=True)
+def flame_height(fli: float) -> float:
+    """
+    Flame height (m) from fireline intensity, after Byram (1959).
+
+    Uses Byram's flame-length relation ``L = 0.0775 * I^0.46`` (SI form
+    after Alexander 1982) as the flame height, i.e. the upright-flame
+    approximation without wind or slope tilt.
+
+    Parameters
+    ----------
+    fli : float
+        Fireline intensity (kW/m).
+
+    Returns
+    -------
+    float
+        Flame height (m); 0 for non-positive intensity.
+    """
+    if fli <= 0.0:
+        return 0.0
+    return BYRAM_FLAME_COEFF * fli**BYRAM_FLAME_EXPONENT
+
+
+@jit(cache=False, nopython=True)
+def radiant_reach(fli: float) -> float:
+    """
+    Radiant reach (m) of a flaming cell from its fireline intensity.
+
+    Four flame heights, where radiant flux has fallen to a level people and
+    structures tolerate (Butler & Cohen 1998), clamped to
+    [RADIANT_REACH_MIN_M, RADIANT_REACH_MAX_M].
+
+    Parameters
+    ----------
+    fli : float
+        Fireline intensity (kW/m).
+
+    Returns
+    -------
+    float
+        Radiant reach (m); 0 for non-positive intensity (no flame).
+    """
+    if fli <= 0.0:
+        return 0.0
+    reach = RADIANT_REACH_FLAME_HEIGHTS * flame_height(fli)
+    return min(max(reach, RADIANT_REACH_MIN_M), RADIANT_REACH_MAX_M)
 
 
 @jit(cache=False, nopython=True, fastmath=True)

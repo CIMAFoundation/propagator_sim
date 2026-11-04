@@ -150,6 +150,10 @@ cell state — implements exactly the sentinel semantics above.
 | `ros_max` | f32 | 0 | max over burnt, skipping NaN |
 | `fli_sum` | f64 | 0 | += fli over burnt, skipping NaN |
 | `fli_max` | f32 | 0 | max over burnt, skipping NaN |
+| `flame_sum` | f64 | 0 | += `flame_height(fli)` over burnt, skipping NaN |
+| `flame_max` | f32 | 0 | max `flame_height(fli)` over burnt, skipping NaN |
+| `radiant_sum` | f64 | 0 | += `radiant_reach(fli)` over burnt, skipping NaN |
+| `radiant_max` | f32 | 0 | max `radiant_reach(fli)` over burnt, skipping NaN |
 
 Folding runs in one parallel pass over spatial tiles (each output cell
 owned by one thread — race-free accumulation), then merges the frozen
@@ -381,7 +385,10 @@ propagation window.
   derives: `fire_probability = count / R` (also spot gen/recv
   probabilities), `min_arrival_time` (0 where never burnt),
   `mean_arrival_time`, `ros_mean`, `fli_mean` (sum/count where count>0,
-  NaN elsewhere), `ros_max`, `fli_max`, plus `stats`.
+  NaN elsewhere), `ros_max`, `fli_max`, `flame_height_mean`
+  (`flame_sum/count`, NaN elsewhere), `flame_height_max` (`flame_max`),
+  `radiant_reach_mean` (`radiant_sum/count`, NaN elsewhere),
+  `radiant_reach_max` (`radiant_max`), plus `stats`.
 - `PropagatorStats` from a probability map: `n_active` = number of
   realizations with a non-empty heap; `area_mean = Σp * cellsize²`;
   `area_50/75/90` = area of cells with p ≥ 0.5 / 0.75 / 0.9 (m²).

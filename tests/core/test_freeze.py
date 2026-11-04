@@ -88,7 +88,13 @@ def test_freeze_preserves_mean_outputs(tmp_path):
 
     # float sums are accumulated in a different order through the cache:
     # equal up to floating-point associativity
-    for name in ("mean_arrival_time", "ros_mean", "fli_mean"):
+    for name in (
+        "mean_arrival_time",
+        "ros_mean",
+        "fli_mean",
+        "flame_height_mean",
+        "flame_height_max",
+    ):
         np.testing.assert_allclose(
             getattr(after, name),
             getattr(before, name),

@@ -229,5 +229,9 @@ class Propagator:
             ros_max=out["ros_max"],
             fli_mean=out["fli_mean"],
             fli_max=out["fli_max"],
+            flame_height_mean=out["flame_height_mean"],
+            flame_height_max=out["flame_height_max"],
+            radiant_reach_mean=out["radiant_reach_mean"],
+            radiant_reach_max=out["radiant_reach_max"],
             stats=stats,
         )

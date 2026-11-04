@@ -45,6 +45,11 @@ export class Propagator {
      */
     burned_area_ha(): number;
     /**
+     * Bytes held by the shared per-cell edge cache (spread quantities
+     * reused across realizations).
+     */
+    edge_cache_bytes(): number;
+    /**
      * Grow the domain in place onto the larger `veg`/`dem` anchored at
      * `(origin_row, origin_col)`, preserving all simulation state. The new
      * grid must fully contain the old one and growth to the north/west must
@@ -116,6 +121,17 @@ export class Propagator {
      * empty array to leave the ignition set unchanged.
      */
     set_boundary_conditions(time: bigint, moisture: number, wind_dir: number, wind_speed: number, ignitions: Int32Array): void;
+    /**
+     * Turn boundary halting on or off mid-run.
+     *
+     * Call with `false` when the domain can no longer grow (a cap reached, a
+     * failed fetch): the boundary events the core has been suspending are
+     * popped on the next [`Propagator::step`], so the fire clips at the edge
+     * and the rest of the front keeps burning. Leaving it on instead freezes
+     * the realization, because a suspended boundary event is the earliest
+     * event in its heap and nothing behind it can advance.
+     */
+    set_halt_on_boundary(halt: boolean): void;
     /**
      * Propagate for `seconds` of simulation time, applying scheduled events.
      *
@@ -189,6 +205,7 @@ export interface InitOutput {
     readonly propagator_boundary_proximity: (a: number, b: number) => number;
     readonly propagator_burned_area_ha: (a: number) => [number, number, number];
     readonly propagator_cols: (a: number) => number;
+    readonly propagator_edge_cache_bytes: (a: number) => number;
     readonly propagator_expand: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: bigint, i: bigint) => [number, number];
     readonly propagator_fire_probability: (a: number) => [number, number, number, number];
     readonly propagator_new: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number) => [number, number, number];
@@ -200,6 +217,7 @@ export interface InitOutput {
     readonly propagator_rows: (a: number) => number;
     readonly propagator_set_action_fields: (a: number, b: bigint, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number];
     readonly propagator_set_boundary_conditions: (a: number, b: bigint, c: number, d: number, e: number, f: number, g: number) => [number, number];
+    readonly propagator_set_halt_on_boundary: (a: number, b: number) => void;
     readonly propagator_step: (a: number, b: bigint) => [number, number, number];
     readonly propagator_time: (a: number) => bigint;
     readonly tile_size: () => number;

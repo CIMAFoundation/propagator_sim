@@ -171,4 +171,13 @@ class PropagatorOutput:
     ros_max: npt.NDArray[np.floating]
     fli_mean: npt.NDArray[np.floating]
     fli_max: npt.NDArray[np.floating]
+    # Byram flame height, m: mean over burning realizations (NaN where
+    # never burnt) and max (0 where never burnt)
+    flame_height_mean: npt.NDArray[np.floating]
+    flame_height_max: npt.NDArray[np.floating]
+    # radiant reach, m (4 flame heights clamped to [10, 200] m): mean over
+    # burning realizations (NaN where never burnt) and max (0 where never
+    # burnt)
+    radiant_reach_mean: npt.NDArray[np.floating]
+    radiant_reach_max: npt.NDArray[np.floating]
     stats: PropagatorStats

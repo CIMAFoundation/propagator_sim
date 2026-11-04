@@ -210,6 +210,46 @@ pub fn fireline_intensity(
     (ros / 60.0) * (lhv_dead_fuel * d0 + lhv_canopy * d1)
 }
 
+/// Byram's flame-length relation coefficient, `L = 0.0775 * I^0.46`.
+pub const BYRAM_FLAME_COEFF: f64 = 0.0775;
+/// Byram's flame-length relation exponent.
+pub const BYRAM_FLAME_EXPONENT: f64 = 0.46;
+
+/// Flame height (m) from fireline intensity (kW/m), after Byram (1959).
+///
+/// Byram's flame-length relation in SI form (Alexander 1982), taken as the
+/// height of an upright flame (no wind or slope tilt). Non-positive
+/// intensity yields 0; NaN propagates.
+#[inline]
+pub fn flame_height(fli: f64) -> f64 {
+    if fli <= 0.0 {
+        return 0.0;
+    }
+    BYRAM_FLAME_COEFF * fli.powf(BYRAM_FLAME_EXPONENT)
+}
+
+/// Radiant reach in flame heights (Butler & Cohen 1998 safe separation).
+pub const RADIANT_REACH_FLAME_HEIGHTS: f64 = 4.0;
+/// Lower clamp of the radiant reach of a flaming cell, m.
+pub const RADIANT_REACH_MIN_M: f64 = 10.0;
+/// Upper clamp of the radiant reach of a flaming cell, m.
+pub const RADIANT_REACH_MAX_M: f64 = 200.0;
+
+/// Radiant reach (m) of a flaming cell from its fireline intensity (kW/m).
+///
+/// Four flame heights, where radiant flux has fallen to a level people and
+/// structures tolerate (Butler & Cohen 1998), clamped to
+/// [`RADIANT_REACH_MIN_M`, `RADIANT_REACH_MAX_M`]. Non-positive intensity
+/// (no flame) yields 0.
+#[inline]
+pub fn radiant_reach(fli: f64) -> f64 {
+    if fli <= 0.0 {
+        return 0.0;
+    }
+    (RADIANT_REACH_FLAME_HEIGHTS * flame_height(fli))
+        .clamp(RADIANT_REACH_MIN_M, RADIANT_REACH_MAX_M)
+}
+
 /// Probability of fire spread to a neighbouring cell.
 pub fn probability_to_neighbour(
     moisture_model: MoistureModel,
@@ -304,5 +344,24 @@ mod tests {
         assert!(p_high > p_low);
         assert!((0.0..=1.0).contains(&p_low));
         assert!((0.0..=1.0).contains(&p_high));
+    }
+
+    #[test]
+    fn flame_height_follows_byram() {
+        assert_eq!(flame_height(0.0), 0.0);
+        assert_eq!(flame_height(-10.0), 0.0);
+        let expected = 0.0775 * 1000f64.powf(0.46);
+        assert!((flame_height(1000.0) - expected).abs() < 1e-12);
+        assert!(flame_height(4000.0) > flame_height(1000.0));
+    }
+
+    #[test]
+    fn radiant_reach_is_four_flame_heights_clamped() {
+        assert_eq!(radiant_reach(0.0), 0.0);
+        // weak fire: 4 * 0.0775 * 10^0.46 ~ 0.9 m, clamped up to 10 m
+        assert_eq!(radiant_reach(10.0), RADIANT_REACH_MIN_M);
+        let fli = 5000.0;
+        assert!((radiant_reach(fli) - 4.0 * flame_height(fli)).abs() < 1e-12);
+        assert_eq!(radiant_reach(1e9), RADIANT_REACH_MAX_M);
     }
 }
