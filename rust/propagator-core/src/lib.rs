@@ -57,7 +57,7 @@ pub use fuels::{
     NO_FUEL,
 };
 pub use grid::Grid2;
-pub use models::{MoistureModel, RosModel};
+pub use models::{p_time, probability_to_neighbour, MoistureModel, RosModel};
 pub use propagator::{
     OobMode, Propagator, PropagatorConfig, CELLSIZE_DEFAULT, REALIZATIONS_DEFAULT,
 };

@@ -146,6 +146,31 @@ impl FuelSystem {
         self.spread_probability[from_index * self.v0.len() + to_index]
     }
 
+    /// Dense per-fuel tables, indexed by fuel index (for other execution
+    /// backends that mirror the kernel's lookups).
+    pub fn v0(&self) -> &[f64] {
+        &self.v0
+    }
+    pub fn d0(&self) -> &[f64] {
+        &self.d0
+    }
+    pub fn d1(&self) -> &[f64] {
+        &self.d1
+    }
+    pub fn hhv(&self) -> &[f64] {
+        &self.hhv
+    }
+    pub fn humidity(&self) -> &[f64] {
+        &self.humidity
+    }
+    pub fn burn(&self) -> &[bool] {
+        &self.burn
+    }
+    /// Row-major `(n, n)` base spread probabilities, `[from * n + to]`.
+    pub fn spread_probabilities(&self) -> &[f64] {
+        &self.spread_probability
+    }
+
     /// Clear spotting for every fuel (used when `do_spotting == false`).
     pub fn disable_spotting(&mut self) {
         for flag in &mut self.spotting {

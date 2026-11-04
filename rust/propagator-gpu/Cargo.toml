@@ -1,0 +1,15 @@
+[package]
+name = "propagator-gpu"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "WebGPU (wgpu) execution backend for the PROPAGATOR core: arrival-time relaxation over realization x grid fields"
+
+[dependencies]
+propagator-core = { path = "../propagator-core" }
+wgpu = "30"
+pollster = "0.4"
+bytemuck = { version = "1", features = ["derive"] }
+
+[profile.release]
+opt-level = 3

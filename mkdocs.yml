@@ -29,6 +29,7 @@ nav:
   - Checkpoints & Domain Growth: checkpoints.md
   - Rust vs numba Core: rust-vs-numba.md
   - Core Internals: core-internals.md
+  - GPU Core (WebGPU): gpu-core.md
   - Migration Guide: migration.md
   - API Reference:
       - Overview: reference/index.md

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Experimental GPU execution backend `rust/propagator-gpu` (wgpu / WebGPU):
+  each realization is solved as a shortest-path problem on a hashed random
+  graph by bucketed arrival-time relaxation over `realizations x grid`
+  fields, with a GPU-side worklist of active tiles and a GPU fold. Same
+  ensemble statistics as the CPU core (area within 1%, burn-probability
+  maps correlated > 0.999); contact spread only (no spotting, actions or
+  growth yet). Within 1.5x of the 14-thread CPU core on an M4 Pro, not
+  faster; see `docs/gpu-core.md`. The core exposes its fuel tables and the
+  two spread-model functions for such backends.
 - Multi-threaded WebAssembly demo. The core gained an opt-in `rayon` feature
   (realizations on rayon's pool instead of scoped std threads) and the wasm
   crate a `threads` feature on top of it (`wasm-bindgen-rayon`, exporting
