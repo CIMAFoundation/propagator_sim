@@ -448,6 +448,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#flame-height" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flame Height
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#radiant-reach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Radiant Reach
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cli-raster-products" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -841,6 +863,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#flame-height" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flame Height
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#radiant-reach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Radiant Reach
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cli-raster-products" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -926,6 +970,26 @@ aggregated across the stochastic realizations of the run.</p>
 <td>Maximum fireline intensity across realizations.</td>
 </tr>
 <tr>
+<td><code>flame_height_mean</code></td>
+<td>m</td>
+<td>Mean flame height over realizations where the cell burned (NaN elsewhere). See <a href="#flame-height">Flame Height</a>.</td>
+</tr>
+<tr>
+<td><code>flame_height_max</code></td>
+<td>m</td>
+<td>Maximum flame height across realizations (0 where never burnt).</td>
+</tr>
+<tr>
+<td><code>radiant_reach_mean</code></td>
+<td>m</td>
+<td>Mean radiant reach over realizations where the cell burned (NaN elsewhere). See <a href="#radiant-reach">Radiant Reach</a>.</td>
+</tr>
+<tr>
+<td><code>radiant_reach_max</code></td>
+<td>m</td>
+<td>Maximum radiant reach across realizations (0 where never burnt).</td>
+</tr>
+<tr>
 <td><code>spotting_generation_probability</code></td>
 <td>[0, 1]</td>
 <td>Fraction of realizations in which the cell launched at least one ember (all zeros when spotting is disabled). See <a href="../spotting/">Fire Spotting</a>.</td>
@@ -958,11 +1022,36 @@ expected = output.mean_arrival_time
 is the minimum over the realizations in which the cell burned, so cells with a
 low <code>fire_probability</code> can still carry a meaningful (if unlikely) early
 arrival time — combine it with <code>fire_probability</code> when communicating risk.</p>
+<h2 id="flame-height">Flame Height</h2>
+<p>Flame height is computed in the core from each realization's fireline
+intensity <code>I</code> (kW/m) with Byram's flame-length relation (Byram 1959; SI form
+after Alexander 1982), taken as the height of an upright flame:</p>
+<pre><code class="language-text">H = 0.0775 * I^0.46    [m]
+</code></pre>
+<p>The core applies it per cell and per realization while folding the state,
+so <code>flame_height_mean</code> is the mean of the per-realization flame heights,
+not the flame height of <code>fli_mean</code>. Since the relation is concave, it is
+never larger than the latter. Wind and slope tilt are not modelled, and
+cells with zero intensity have zero flame height.</p>
+<h2 id="radiant-reach">Radiant Reach</h2>
+<p>Radiant reach is the distance from a flaming cell at which radiant heat has
+fallen to a level people and structures can tolerate. It is four flame
+heights, the safe-separation convention of Butler &amp; Cohen (1998), clamped
+so that a single weak or very hot cell stays plausible:</p>
+<pre><code class="language-text">R = clamp(4 * H, 10 m, 200 m)    for I &gt; 0
+R = 0                            for I &lt;= 0 (no flame)
+</code></pre>
+<p>Like flame height, it is computed in the core for each realization, so
+<code>radiant_reach_mean</code> is the mean of the per-realization reaches. A
+realization that burned the cell with zero intensity counts as 0 in the
+mean. The map gives the reach <em>of</em> each burnt cell; it is not a buffer
+around the fire.</p>
 <h2 id="cli-raster-products">CLI Raster Products</h2>
 <p>When running through the CLI, each reporting interval writes one GeoTIFF per
 variable: <code>fire_probability</code>, <code>min_arrival_time</code>, <code>mean_arrival_time</code>,
 <code>ros_mean</code>, <code>ros_max</code>, <code>fireline_intensity_mean</code>, <code>fireline_intensity_max</code>,
-and — when spotting is enabled in the configuration —
+<code>flame_height_mean</code>, <code>flame_height_max</code>, <code>radiant_reach_mean</code>,
+<code>radiant_reach_max</code>, and — when spotting is enabled in the configuration —
 <code>spotting_generation_probability</code> and <code>spotting_receiving_probability</code>.
 See <a href="../cli/">CLI Usage</a> for invocation details.</p>
 

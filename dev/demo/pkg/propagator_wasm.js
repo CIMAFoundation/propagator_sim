@@ -113,6 +113,15 @@ export class Propagator {
         return ret >>> 0;
     }
     /**
+     * Bytes held by the shared per-cell edge cache (spread quantities
+     * reused across realizations).
+     * @returns {number}
+     */
+    edge_cache_bytes() {
+        const ret = wasm.propagator_edge_cache_bytes(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * Grow the domain in place onto the larger `veg`/`dem` anchored at
      * `(origin_row, origin_col)`, preserving all simulation state. The new
      * grid must fully contain the old one and growth to the north/west must
@@ -310,6 +319,20 @@ export class Propagator {
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
+    }
+    /**
+     * Turn boundary halting on or off mid-run.
+     *
+     * Call with `false` when the domain can no longer grow (a cap reached, a
+     * failed fetch): the boundary events the core has been suspending are
+     * popped on the next [`Propagator::step`], so the fire clips at the edge
+     * and the rest of the front keeps burning. Leaving it on instead freezes
+     * the realization, because a suspended boundary event is the earliest
+     * event in its heap and nothing behind it can advance.
+     * @param {boolean} halt
+     */
+    set_halt_on_boundary(halt) {
+        wasm.propagator_set_halt_on_boundary(this.__wbg_ptr, halt);
     }
     /**
      * Propagate for `seconds` of simulation time, applying scheduled events.

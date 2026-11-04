@@ -781,6 +781,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#propagator.core.numba.flame_height" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flame_height
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#propagator.core.numba.get_p_moisture_fn" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -803,6 +814,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#propagator.core.numba.radiant_reach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        radiant_reach
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#propagator.core.numba.build_fuel_index_grid" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -818,6 +840,17 @@
     <span class="md-ellipsis">
       
         seed_rngs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.accumulate_flame_block" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        accumulate_flame_block
       
     </span>
   </a>
@@ -1100,6 +1133,28 @@
     <span class="md-ellipsis">
       
         fireline_intensity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.flame_height" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flame_height
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.radiant_reach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        radiant_reach
       
     </span>
   </a>
@@ -1326,6 +1381,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#propagator.core.numba.flame_height" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flame_height
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#propagator.core.numba.get_p_moisture_fn" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1348,6 +1414,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#propagator.core.numba.radiant_reach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        radiant_reach
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#propagator.core.numba.build_fuel_index_grid" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1363,6 +1440,17 @@
     <span class="md-ellipsis">
       
         seed_rngs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.accumulate_flame_block" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        accumulate_flame_block
       
     </span>
   </a>
@@ -1645,6 +1733,28 @@
     <span class="md-ellipsis">
       
         fireline_intensity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.flame_height" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flame_height
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.functions.radiant_reach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        radiant_reach
       
     </span>
   </a>
@@ -2052,6 +2162,81 @@ behaviour or integrate new stochastic components.</p>
 <div class="doc doc-object doc-function">
 
 
+<h3 id="propagator.core.numba.flame_height" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">flame_height</span><span class="p">(</span><span class="n">fli</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Flame height (m) from fireline intensity, after Byram (1959).</p>
+<p>Uses Byram's flame-length relation <code>L = 0.0775 * I^0.46</code> (SI form
+after Alexander 1982) as the flame height, i.e. the upright-flame
+approximation without wind or slope tilt.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>fli</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fireline intensity (kW/m).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Flame height (m); 0 for non-positive intensity.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="propagator.core.numba.get_p_moisture_fn" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">get_p_moisture_fn</span><span class="p">(</span><span class="n">moist_model_code</span><span class="p">)</span></code>
 
@@ -2196,6 +2381,81 @@ behaviour or integrate new stochastic components.</p>
 <div class="doc doc-object doc-function">
 
 
+<h3 id="propagator.core.numba.radiant_reach" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">radiant_reach</span><span class="p">(</span><span class="n">fli</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Radiant reach (m) of a flaming cell from its fireline intensity.</p>
+<p>Four flame heights, where radiant flux has fallen to a level people and
+structures tolerate (Butler &amp; Cohen 1998), clamped to
+[RADIANT_REACH_MIN_M, RADIANT_REACH_MAX_M].</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>fli</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fireline intensity (kW/m).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Radiant reach (m); 0 for non-positive intensity (no flame).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="propagator.core.numba.build_fuel_index_grid" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">build_fuel_index_grid</span><span class="p">(</span><span class="n">fuels</span><span class="p">,</span> <span class="n">veg</span><span class="p">)</span></code>
 
@@ -2307,6 +2567,26 @@ dense index of its fuel in the FuelSystem arrays.</p>
 <div class="doc doc-object doc-function">
 
 
+<h3 id="propagator.core.numba.accumulate_flame_block" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">accumulate_flame_block</span><span class="p">(</span><span class="n">flags</span><span class="p">,</span> <span class="n">fli</span><span class="p">,</span> <span class="n">flame_sum</span><span class="p">,</span> <span class="n">flame_max</span><span class="p">,</span> <span class="n">radiant_sum</span><span class="p">,</span> <span class="n">radiant_max</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Add one frozen tile record's flame heights and radiant reaches
+to a fold block,
+with the same per-cell semantics as <code>fold_state_tiles</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h3 id="propagator.core.numba.flood_reachable" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">flood_reachable</span><span class="p">(</span><span class="n">open_mask</span><span class="p">,</span> <span class="n">seed_rows</span><span class="p">,</span> <span class="n">seed_cols</span><span class="p">,</span> <span class="n">reachable</span><span class="p">)</span></code>
 
@@ -2330,7 +2610,7 @@ zero-initialized; seeds outside <code>open_mask</code> are ignored.</p>
 
 
 <h3 id="propagator.core.numba.fold_state_tiles" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">fold_state_tiles</span><span class="p">(</span><span class="n">tile_idx</span><span class="p">,</span> <span class="n">tile_flags</span><span class="p">,</span> <span class="n">tile_arrival</span><span class="p">,</span> <span class="n">tile_ros</span><span class="p">,</span> <span class="n">tile_fli</span><span class="p">,</span> <span class="n">count</span><span class="p">,</span> <span class="n">spot_gen_count</span><span class="p">,</span> <span class="n">spot_recv_count</span><span class="p">,</span> <span class="n">arrival_min</span><span class="p">,</span> <span class="n">arrival_sum</span><span class="p">,</span> <span class="n">ros_sum</span><span class="p">,</span> <span class="n">ros_max</span><span class="p">,</span> <span class="n">fli_sum</span><span class="p">,</span> <span class="n">fli_max</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">fold_state_tiles</span><span class="p">(</span><span class="n">tile_idx</span><span class="p">,</span> <span class="n">tile_flags</span><span class="p">,</span> <span class="n">tile_arrival</span><span class="p">,</span> <span class="n">tile_ros</span><span class="p">,</span> <span class="n">tile_fli</span><span class="p">,</span> <span class="n">count</span><span class="p">,</span> <span class="n">spot_gen_count</span><span class="p">,</span> <span class="n">spot_recv_count</span><span class="p">,</span> <span class="n">arrival_min</span><span class="p">,</span> <span class="n">arrival_sum</span><span class="p">,</span> <span class="n">ros_sum</span><span class="p">,</span> <span class="n">ros_max</span><span class="p">,</span> <span class="n">fli_sum</span><span class="p">,</span> <span class="n">fli_max</span><span class="p">,</span> <span class="n">flame_sum</span><span class="p">,</span> <span class="n">flame_max</span><span class="p">,</span> <span class="n">radiant_sum</span><span class="p">,</span> <span class="n">radiant_max</span><span class="p">)</span></code>
 
 </h3>
 
@@ -2343,7 +2623,9 @@ contribute for burned cells (FLAG_FIRE set). Callers must pass <code>count</code
 spot counts, sums and maxes zero-initialized and <code>arrival_min</code>
 initialized to int32 max. NaN ros/fli values contribute to <code>count</code> but
 are skipped in sums and maxes, matching the previous dense
-nansum/nanmax behaviour.</p>
+nansum/nanmax behaviour. <code>flame_sum</code>/<code>flame_max</code> and
+<code>radiant_sum</code>/<code>radiant_max</code> aggregate the flame height and radiant
+reach derived from each realization's fireline intensity.</p>
 
 
     </div>
@@ -4374,6 +4656,156 @@ heating value and FFMC.</p>
             <td>
               <div class="doc-md-description">
                 <p>Fireline intensity (kW/m).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="propagator.core.numba.functions.flame_height" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">flame_height</span><span class="p">(</span><span class="n">fli</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Flame height (m) from fireline intensity, after Byram (1959).</p>
+<p>Uses Byram's flame-length relation <code>L = 0.0775 * I^0.46</code> (SI form
+after Alexander 1982) as the flame height, i.e. the upright-flame
+approximation without wind or slope tilt.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>fli</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fireline intensity (kW/m).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Flame height (m); 0 for non-positive intensity.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="propagator.core.numba.functions.radiant_reach" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">radiant_reach</span><span class="p">(</span><span class="n">fli</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Radiant reach (m) of a flaming cell from its fireline intensity.</p>
+<p>Four flame heights, where radiant flux has fallen to a level people and
+structures tolerate (Butler &amp; Cohen 1998), clamped to
+[RADIANT_REACH_MIN_M, RADIANT_REACH_MAX_M].</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>fli</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Fireline intensity (kW/m).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Radiant reach (m); 0 for non-positive intensity (no flame).</p>
               </div>
             </td>
           </tr>

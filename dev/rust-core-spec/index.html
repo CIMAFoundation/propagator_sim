@@ -1437,6 +1437,30 @@ cell state — implements exactly the sentinel semantics above.</p>
 <td>0</td>
 <td>max over burnt, skipping NaN</td>
 </tr>
+<tr>
+<td><code>flame_sum</code></td>
+<td>f64</td>
+<td>0</td>
+<td>+= <code>flame_height(fli)</code> over burnt, skipping NaN</td>
+</tr>
+<tr>
+<td><code>flame_max</code></td>
+<td>f32</td>
+<td>0</td>
+<td>max <code>flame_height(fli)</code> over burnt, skipping NaN</td>
+</tr>
+<tr>
+<td><code>radiant_sum</code></td>
+<td>f64</td>
+<td>0</td>
+<td>+= <code>radiant_reach(fli)</code> over burnt, skipping NaN</td>
+</tr>
+<tr>
+<td><code>radiant_max</code></td>
+<td>f32</td>
+<td>0</td>
+<td>max <code>radiant_reach(fli)</code> over burnt, skipping NaN</td>
+</tr>
 </tbody>
 </table>
 <p>Folding runs in one parallel pass over spatial tiles (each output cell
@@ -1642,7 +1666,10 @@ propagation window.</p>
   derives: <code>fire_probability = count / R</code> (also spot gen/recv
   probabilities), <code>min_arrival_time</code> (0 where never burnt),
   <code>mean_arrival_time</code>, <code>ros_mean</code>, <code>fli_mean</code> (sum/count where count&gt;0,
-  NaN elsewhere), <code>ros_max</code>, <code>fli_max</code>, plus <code>stats</code>.</li>
+  NaN elsewhere), <code>ros_max</code>, <code>fli_max</code>, <code>flame_height_mean</code>
+  (<code>flame_sum/count</code>, NaN elsewhere), <code>flame_height_max</code> (<code>flame_max</code>),
+  <code>radiant_reach_mean</code> (<code>radiant_sum/count</code>, NaN elsewhere),
+  <code>radiant_reach_max</code> (<code>radiant_max</code>), plus <code>stats</code>.</li>
 <li><code>PropagatorStats</code> from a probability map: <code>n_active</code> = number of
   realizations with a non-empty heap; <code>area_mean = Σp * cellsize²</code>;
   <code>area_50/75/90</code> = area of cells with p ≥ 0.5 / 0.75 / 0.9 (m²).</li>
