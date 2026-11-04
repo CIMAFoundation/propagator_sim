@@ -7,7 +7,15 @@
 //! demand. The boundary-halt semantics (suspend *before* igniting a
 //! boundary-ring cell so the caller can expand the domain losslessly) are
 //! preserved.
+//!
+//! The spread models are evaluated through the shared [`EdgeCache`]: the
+//! probability, transition time and carried ROS / FLI of a cell's eight
+//! outgoing edges depend only on the inputs, so they are computed once per
+//! cell and reused by every realization; only the Bernoulli draw is per
+//! realization. Draw order is unchanged, so seeded runs are bitwise
+//! identical to the uncached kernel.
 
+use crate::edges::{Edge, EdgeCache};
 use crate::front::FrontHeap;
 use crate::fuels::{FuelSystem, NO_FUEL};
 use crate::grid::Grid2;
@@ -96,6 +104,8 @@ pub struct SharedInputs<'a> {
     pub ros_model: RosModel,
     pub moisture_model: MoistureModel,
     pub do_spotting: bool,
+    /// per-cell edge cache for the current generation of the inputs
+    pub edges: &'a EdgeCache,
 }
 
 /// Mutable state of one realization.
@@ -194,53 +204,31 @@ pub fn advance_front_until(
         let w_dir = shared.wind_dir[(row, col)] as f64;
         let w_speed = shared.wind_speed[(row, col)] as f64;
 
-        // 8-neighbour spread
+        // 8-neighbour spread: deterministic edge quantities from the shared
+        // cache, one Bernoulli draw per spreadable edge
+        let edges = shared.edges.get_or_fill(row, col, || {
+            compute_edges(shared, &geometry, row, col, idx_from, w_dir, w_speed)
+        });
         for (neighbour, &(dr, dc)) in NEIGHBOURS.iter().enumerate() {
-            let row_to = row_i as i64 + dr;
-            let col_to = col_i as i64 + dc;
-            if !shared.veg.in_bounds(row_to, col_to) {
+            let edge = &edges[neighbour];
+            if edge.is_blocked() {
                 continue;
             }
-            let (row_to, col_to) = (row_to as usize, col_to as usize);
-            if shared.veg[(row_to, col_to)] == NO_FUEL
-                || real.tiles.read_flags(row_to, col_to) & FLAG_FIRE != 0
-            {
+            // a spreadable edge always points inside the grid
+            let row_to = (row_i as i64 + dr) as usize;
+            let col_to = (col_i as i64 + dc) as usize;
+            if real.tiles.read_flags(row_to, col_to) & FLAG_FIRE != 0 {
                 continue;
             }
-            let idx_to = shared.fuel_idx[(row_to, col_to)] as usize;
-            if !shared.fuels.burn[idx_to] {
+            if edge.p <= real.rng.uniform() {
                 continue;
             }
-
-            let (dist_cells, angle) = geometry[neighbour];
-            let dist = dist_cells * shared.cellsize;
-            let dh = shared.dem[(row_to, col_to)] - shared.dem[(row, col)];
-            let moist = shared.moisture[(row_to, col_to)] as f64;
-            let p0 = shared.fuels.transition_probability(idx_from, idx_to);
-
-            let p = probability_to_neighbour(
-                shared.moisture_model,
-                angle,
-                dist,
-                w_dir,
-                w_speed,
-                moist,
-                dh,
-                p0,
-            );
-            if p <= real.rng.uniform() {
-                continue;
-            }
-
-            let (transition_time, ros, fli) = calculate_fire_behavior(
-                shared, idx_from, idx_to, dh, dist, angle, moist, w_dir, w_speed,
-            );
             real.heap.push(
-                time + transition_time,
+                time + edge.transition,
                 row_to as i32,
                 col_to as i32,
-                ros as f32,
-                fli as f32,
+                edge.ros,
+                edge.fli,
             );
         }
 
@@ -260,6 +248,64 @@ pub fn advance_front_until(
             );
         }
     }
+}
+
+/// The eight outgoing edges of a spreading cell: blocked where the target
+/// is off-grid, unburnable or not a spreading fuel, otherwise the spread
+/// model outputs for that direction (realization-independent).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn compute_edges(
+    shared: &SharedInputs<'_>,
+    geometry: &[(f64, f64); N_NEIGHBOURS],
+    row: usize,
+    col: usize,
+    idx_from: usize,
+    w_dir: f64,
+    w_speed: f64,
+) -> [Edge; N_NEIGHBOURS] {
+    let mut edges = [Edge::BLOCKED; N_NEIGHBOURS];
+    for (neighbour, &(dr, dc)) in NEIGHBOURS.iter().enumerate() {
+        let row_to = row as i64 + dr;
+        let col_to = col as i64 + dc;
+        if !shared.veg.in_bounds(row_to, col_to) {
+            continue;
+        }
+        let (row_to, col_to) = (row_to as usize, col_to as usize);
+        if shared.veg[(row_to, col_to)] == NO_FUEL {
+            continue;
+        }
+        let idx_to = shared.fuel_idx[(row_to, col_to)] as usize;
+        if !shared.fuels.burn[idx_to] {
+            continue;
+        }
+
+        let (dist_cells, angle) = geometry[neighbour];
+        let dist = dist_cells * shared.cellsize;
+        let dh = shared.dem[(row_to, col_to)] - shared.dem[(row, col)];
+        let moist = shared.moisture[(row_to, col_to)] as f64;
+        let p0 = shared.fuels.transition_probability(idx_from, idx_to);
+
+        let p = probability_to_neighbour(
+            shared.moisture_model,
+            angle,
+            dist,
+            w_dir,
+            w_speed,
+            moist,
+            dh,
+            p0,
+        );
+        let (transition, ros, fli) = calculate_fire_behavior(
+            shared, idx_from, idx_to, dh, dist, angle, moist, w_dir, w_speed,
+        );
+        edges[neighbour] = Edge {
+            p,
+            transition,
+            ros: ros as f32,
+            fli: fli as f32,
+        };
+    }
+    edges
 }
 
 /// (transition time [s, >= 1], ROS [m/min], fireline intensity [kW/m]).

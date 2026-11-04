@@ -33,6 +33,7 @@
 //! ```
 
 mod checkpoint;
+mod edges;
 mod error;
 mod fold;
 mod front;
@@ -47,6 +48,7 @@ mod tile_store;
 mod tiles;
 
 pub use checkpoint::{PropagatorCheckpoint, ResumeOptions, CHECKPOINT_VERSION};
+pub use edges::{Edge, EdgeCache};
 pub use error::{PropagatorError, Result};
 pub use fold::{PropagatorOutput, PropagatorStats, StateFold};
 pub use fuels::{
