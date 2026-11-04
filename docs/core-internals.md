@@ -144,7 +144,9 @@ the pool and remaps the index when tiles are frozen out.
 Outputs (`get_output()`, the dense getters) are produced by a single
 **fold** pass that reduces the tiled state across realizations into 2D
 per-cell maps: burn `count`, spotting counts, `arrival_min`/`arrival_sum`,
-`ros_sum`/`ros_max`, `fli_sum`/`fli_max`. Dividing a `*_sum` by `count`
+`ros_sum`/`ros_max`, `fli_sum`/`fli_max`, `flame_sum`/`flame_max` (Byram
+flame height of each realization's intensity) and `radiant_sum`/`radiant_max`
+(radiant reach, four flame heights clamped to 10–200 m). Dividing a `*_sum` by `count`
 yields the per-cell mean over the realizations that burned it.
 
 - numba folds in parallel **over spatial tiles** (`fold_state_tiles`, a

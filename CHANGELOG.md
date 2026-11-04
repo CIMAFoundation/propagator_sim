@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Flame height outputs `flame_height_mean` and `flame_height_max` (m), on
+  both the Rust and the numba core and as CLI rasters. Each realization's
+  fireline intensity is turned into a flame height with Byram's relation
+  `H = 0.0775 * I^0.46` while the core folds the state, so the mean is over
+  per-realization flame heights.
+- Radiant reach outputs `radiant_reach_mean` and `radiant_reach_max` (m),
+  also computed in both cores: four flame heights (Butler & Cohen 1998),
+  clamped to 10–200 m, and 0 for cells burnt without intensity.
+
 ### Changed
 
 - Rust core: the heap kernel now evaluates the spread models once per edge
