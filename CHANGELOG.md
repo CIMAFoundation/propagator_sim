@@ -20,7 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   two spread-model functions for such backends. The backend also runs on
   WebGPU in the browser (wasm crate feature `gpu`, bundle
   `docs/demo/pkg-gpu`, demo `?engine=gpu`), where it is 4–8x faster end to
-  end than the 13-worker wasm core on the Alexandroupolis demo.
+  end than the 13-worker wasm core on the Alexandroupolis demo. Covers
+  ember spotting, scalar or per-cell weather, decaying action moisture and
+  vegetation changes, checkpoints and domain growth (draws are hashed by
+  world coordinates, so a grown domain reproduces its realizations
+  exactly); parity with the CPU core is tested per feature.
 - Multi-threaded WebAssembly demo. The core gained an opt-in `rayon` feature
   (realizations on rayon's pool instead of scoped std threads) and the wasm
   crate a `threads` feature on top of it (`wasm-bindgen-rayon`, exporting

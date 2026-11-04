@@ -166,6 +166,12 @@ impl FuelSystem {
     pub fn burn(&self) -> &[bool] {
         &self.burn
     }
+    pub fn spotting(&self) -> &[bool] {
+        &self.spotting
+    }
+    pub fn prob_ign_by_embers(&self) -> &[f64] {
+        &self.prob_ign_by_embers
+    }
     /// Row-major `(n, n)` base spread probabilities, `[from * n + to]`.
     pub fn spread_probabilities(&self) -> &[f64] {
         &self.spread_probability

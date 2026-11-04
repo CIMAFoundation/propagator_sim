@@ -22,8 +22,9 @@ export class FuelSystemBuilder {
 /**
  * WebGPU execution backend (feature `gpu`): the same scenario inputs as
  * [`Propagator`], run by `propagator-gpu`. Methods that touch the GPU are
- * async (they await buffer mappings). Scope: contact spread with scalar
- * weather and point ignitions; no spotting, actions or growth.
+ * async (they await buffer mappings). Supports contact spread, spotting,
+ * scalar weather per window and the demo's actions (moisture, fuel
+ * changes); see docs/gpu-core.md.
  */
 export class GpuPropagator {
     private constructor();
@@ -33,7 +34,12 @@ export class GpuPropagator {
      * Open the GPU and upload the scenario (async; rejects when WebGPU is
      * unavailable).
      */
-    static create(rows: number, cols: number, veg: Int32Array | number[], dem: Float64Array | number[], fuels: FuelSystemBuilder, realizations: number, seed: number, cellsize: number, ros_model: string, moisture_model: string): Promise<GpuPropagator>;
+    static create(rows: number, cols: number, veg: Int32Array | number[], dem: Float64Array | number[], fuels: FuelSystemBuilder, realizations: number, seed: number, do_spotting: boolean, cellsize: number, ros_model: string, moisture_model: string): Promise<GpuPropagator>;
+    /**
+     * Firefighting actions at `time`, as [`Propagator::set_action_fields`]:
+     * extra moisture (fraction) on cells and a fuel code on cells.
+     */
+    set_action_fields(time: bigint, moisture_cells: Int32Array | number[], moisture_values: Float32Array | number[], veg_cells: Int32Array | number[], veg_fuel: number): void;
     /**
      * Weather window starting at `time` plus point ignitions (flat
      * `[row, col, ...]`), as [`Propagator::set_boundary_conditions`].
@@ -242,8 +248,9 @@ export interface InitOutput {
     readonly fuelsystembuilder_add_fuel: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number) => [number, number];
     readonly fuelsystembuilder_new: () => number;
     readonly gpupropagator_cols: (a: number) => number;
-    readonly gpupropagator_create: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number) => any;
+    readonly gpupropagator_create: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number) => any;
     readonly gpupropagator_rows: (a: number) => number;
+    readonly gpupropagator_set_action_fields: (a: number, b: bigint, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number];
     readonly gpupropagator_set_boundary_conditions: (a: number, b: bigint, c: number, d: number, e: number, f: number, g: number) => [number, number];
     readonly gpupropagator_snapshot: (a: number) => any;
     readonly gpupropagator_step: (a: number, b: bigint) => any;
@@ -271,8 +278,8 @@ export interface InitOutput {
     readonly propagator_time: (a: number) => bigint;
     readonly tile_size: () => number;
     readonly wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246_35: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246_36: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246_37: (a: number, b: number, c: any) => [number, number];
     readonly wasm_bindgen__convert__closures_____invoke__he21c9032761183b0: (a: number, b: number, c: any, d: any) => void;
     readonly wasm_bindgen__convert__closures_____invoke__hfab4748bf2a224fe: (a: number, b: number, c: any) => [number, number];
     readonly __wbindgen_malloc: (a: number, b: number) => number;

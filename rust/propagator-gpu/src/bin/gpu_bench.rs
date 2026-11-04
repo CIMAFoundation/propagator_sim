@@ -8,9 +8,79 @@
 use std::time::Instant;
 
 use propagator_core::{
-    legacy_fuel_system, BoundaryConditions, FieldInput, Grid2, Ignitions, OobMode, Propagator,
-    PropagatorConfig,
+    legacy_fuel_system, BoundaryConditions, FieldInput, FuelDef, FuelSystem, Grid2, Ignitions,
+    OobMode, Propagator, PropagatorConfig,
 };
+
+/// A landscape exported from the demo asset (`SCENE=<dir>`): `header.txt`
+/// (rows cols cellsize ign_row ign_col), `veg.i32`, `dem.f32`, `fuels.txt`
+/// (one fuel per line: id v0 d0 d1 hhv humidity|nan spotting prob_ign burn
+/// n_pairs id:p ...).
+struct Scene {
+    veg: Grid2<i32>,
+    dem: Grid2<f64>,
+    cellsize: f64,
+    ignition: (usize, usize),
+    fuels: FuelSystem,
+}
+
+fn load_scene(dir: &str) -> Scene {
+    let dir = std::path::Path::new(dir);
+    let header = std::fs::read_to_string(dir.join("header.txt")).expect("header.txt");
+    let h: Vec<f64> = header
+        .split_whitespace()
+        .map(|v| v.parse().unwrap())
+        .collect();
+    let (rows, cols) = (h[0] as usize, h[1] as usize);
+    let veg_bytes = std::fs::read(dir.join("veg.i32")).expect("veg.i32");
+    let dem_bytes = std::fs::read(dir.join("dem.f32")).expect("dem.f32");
+    let veg: Vec<i32> = veg_bytes
+        .chunks_exact(4)
+        .map(|b| i32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+        .collect();
+    let dem: Vec<f64> = dem_bytes
+        .chunks_exact(4)
+        .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]) as f64)
+        .collect();
+    let mut defs = Vec::new();
+    for line in std::fs::read_to_string(dir.join("fuels.txt"))
+        .expect("fuels.txt")
+        .lines()
+    {
+        let f: Vec<&str> = line.split_whitespace().collect();
+        if f.is_empty() {
+            continue;
+        }
+        let n_pairs: usize = f[9].parse().unwrap();
+        let spread_probability = f[10..10 + n_pairs]
+            .iter()
+            .map(|kv| {
+                let (k, v) = kv.split_once(':').unwrap();
+                (k.parse::<i32>().unwrap(), v.parse::<f64>().unwrap())
+            })
+            .collect();
+        defs.push(FuelDef {
+            id: f[0].parse().unwrap(),
+            name: format!("fuel {}", f[0]),
+            v0: f[1].parse().unwrap(),
+            d0: f[2].parse().unwrap(),
+            d1: f[3].parse().unwrap(),
+            hhv: f[4].parse().unwrap(),
+            humidity: f[5].parse::<f64>().ok().filter(|v| !v.is_nan()),
+            spotting: f[6] == "1",
+            prob_ign_by_embers: f[7].parse().unwrap(),
+            burn: f[8] == "1",
+            spread_probability,
+        });
+    }
+    Scene {
+        veg: Grid2::from_vec(rows, cols, veg),
+        dem: Grid2::from_vec(rows, cols, dem),
+        cellsize: h[2],
+        ignition: (h[3] as usize, h[4] as usize),
+        fuels: FuelSystem::from_defs(&defs).expect("fuel system"),
+    }
+}
 use propagator_gpu::{GpuConfig, GpuPropagator};
 
 fn main() {
@@ -24,7 +94,8 @@ fn main() {
     let sweeps: u32 = arg(6, "6").parse().expect("sweeps");
 
     // scenario knobs (env): MOIST (percent), WIND (km/h), WDIR (deg),
-    // SLOPE (m per cell along columns), MIXED=1 (random legacy fuels 1..7)
+    // SLOPE (m per cell along columns), MIXED=1 (random legacy fuels 1..7),
+    // SPOT=1 (ember spotting), SCENE=<dir> (exported demo landscape)
     let envf = |k: &str, d: f64| {
         std::env::var(k)
             .ok()
@@ -36,9 +107,22 @@ fn main() {
     let wind_dir = envf("WDIR", 90.0);
     let slope = envf("SLOPE", 0.0);
     let mixed = std::env::var("MIXED").is_ok();
+    let spotting = std::env::var("SPOT").is_ok();
+    let scene = std::env::var("SCENE").ok().map(|d| load_scene(&d));
+    let n = scene.as_ref().map(|s| s.veg.shape().0).unwrap_or(n);
     let c = n / 2;
     let mut veg = Grid2::filled(n, n, 4);
     let mut dem = Grid2::filled(n, n, 0.0);
+    let mut cellsize = 20.0;
+    let mut ignition = (c, c);
+    let mut fuels = legacy_fuel_system();
+    if let Some(s) = &scene {
+        veg = s.veg.clone();
+        dem = s.dem.clone();
+        cellsize = s.cellsize;
+        ignition = s.ignition;
+        fuels = s.fuels.clone();
+    }
     if mixed {
         // deterministic pseudo-random legacy fuel codes 1..7 in 8x8 patches
         let mut x = 0x9E37_79B9u32;
@@ -68,13 +152,16 @@ fn main() {
     config.realizations = reals;
     config.seed = Some(seed);
     config.oob_mode = OobMode::Ignore;
+    config.cellsize = cellsize;
+    config.fuels = Some(fuels.clone());
+    config.do_spotting = spotting;
     let mut cpu = Propagator::new(config).expect("cpu propagator");
     cpu.set_boundary_conditions(BoundaryConditions {
         time: 0,
         moisture: Some(FieldInput::Scalar(moisture)),
         wind_dir: Some(FieldInput::Scalar(wind_dir)),
         wind_speed: Some(FieldInput::Scalar(wind_speed)),
-        ignitions: Some(Ignitions::Points(vec![(c, c)])),
+        ignitions: Some(Ignitions::Points(vec![ignition])),
         ..Default::default()
     })
     .expect("bc");
@@ -89,17 +176,21 @@ fn main() {
 
     // --- GPU ---
     let t0 = Instant::now();
-    let mut gcfg = GpuConfig::new(veg, dem, legacy_fuel_system());
+    let mut gcfg = GpuConfig::new(veg, dem, fuels);
     gcfg.realizations = reals;
     gcfg.seed = seed as u32;
+    gcfg.cellsize = cellsize;
+    gcfg.do_spotting = spotting;
     gcfg.bucket_seconds = bucket;
     gcfg.sweeps_per_bucket = sweeps;
     let mut gpu = GpuPropagator::new(gcfg).expect("gpu propagator");
-    gpu.set_boundary_conditions(0, wind_dir, wind_speed, moisture, &[(c, c)])
+    gpu.set_scalar_weather(0, wind_dir, wind_speed, moisture, &[ignition])
         .expect("gpu bc");
     let gpu_setup = t0.elapsed().as_secs_f64();
     if std::env::var("GPU_DEBUG").is_ok() {
-        let edges = gpu.debug_edges(c, c).expect("debug edges");
+        let edges = gpu
+            .debug_edges(ignition.0, ignition.1)
+            .expect("debug edges");
         for (d, e) in edges.iter().enumerate() {
             eprintln!(
                 "dir {d}: p={:.4} tt={:.0} ros={:.3} fli={:.1} angle={:.3} u={:.3} wdir={:.3} wspd={:.1}",
@@ -195,7 +286,7 @@ fn main() {
             sc += (i % n) as f64 * v;
             sw += v;
         }
-        (sr / sw - c as f64, sc / sw - c as f64)
+        (sr / sw - ignition.0 as f64, sc / sw - ignition.1 as f64)
     };
     let (cpu_cr, cpu_cc) = centroid(a);
     let (gpu_cr, gpu_cc) = centroid(b);

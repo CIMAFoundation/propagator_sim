@@ -590,8 +590,9 @@ impl Propagator {
 
 /// WebGPU execution backend (feature `gpu`): the same scenario inputs as
 /// [`Propagator`], run by `propagator-gpu`. Methods that touch the GPU are
-/// async (they await buffer mappings). Scope: contact spread with scalar
-/// weather and point ignitions; no spotting, actions or growth.
+/// async (they await buffer mappings). Supports contact spread, spotting,
+/// scalar weather per window and the demo's actions (moisture, fuel
+/// changes); see docs/gpu-core.md.
 #[cfg(feature = "gpu")]
 #[wasm_bindgen]
 pub struct GpuPropagator {
@@ -614,6 +615,7 @@ impl GpuPropagator {
         fuels: &FuelSystemBuilder,
         realizations: usize,
         seed: u32,
+        do_spotting: bool,
         cellsize: f64,
         ros_model: &str,
         moisture_model: &str,
@@ -629,6 +631,7 @@ impl GpuPropagator {
         );
         config.realizations = realizations.max(1);
         config.seed = seed;
+        config.do_spotting = do_spotting;
         config.cellsize = cellsize;
         config.ros_model = ros_from_str(ros_model)?;
         config.moisture_model = moisture_from_str(moisture_model)?;
@@ -671,7 +674,54 @@ impl GpuPropagator {
             .map(|rc| (rc[0] as usize, rc[1] as usize))
             .collect();
         self.inner
-            .set_boundary_conditions(time, wind_dir, wind_speed, moisture, &points)
+            .set_scalar_weather(time, wind_dir, wind_speed, moisture, &points)
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    /// Firefighting actions at `time`, as [`Propagator::set_action_fields`]:
+    /// extra moisture (fraction) on cells and a fuel code on cells.
+    pub fn set_action_fields(
+        &mut self,
+        time: i64,
+        moisture_cells: Vec<i32>,
+        moisture_values: Vec<f32>,
+        veg_cells: Vec<i32>,
+        veg_fuel: i32,
+    ) -> Result<(), JsValue> {
+        if moisture_cells.len() % 2 != 0 || veg_cells.len() % 2 != 0 {
+            return Err(JsValue::from_str("cells must be flat lists of [row, col] pairs"));
+        }
+        if moisture_cells.len() / 2 != moisture_values.len() {
+            return Err(JsValue::from_str("moisture_values must have one value per cell"));
+        }
+        let mut bc = propagator_gpu::GpuBoundaryConditions {
+            time,
+            ..Default::default()
+        };
+        if !moisture_cells.is_empty() {
+            let mut grid = Grid2::filled(self.rows, self.cols, 0.0f32);
+            for (rc, value) in moisture_cells.chunks_exact(2).zip(moisture_values.iter()) {
+                let (row, col) = (rc[0] as usize, rc[1] as usize);
+                if row >= self.rows || col >= self.cols {
+                    return Err(JsValue::from_str("moisture cell outside the grid"));
+                }
+                grid[(row, col)] = *value;
+            }
+            bc.additional_moisture = Some(grid);
+        }
+        if !veg_cells.is_empty() {
+            let mut grid = Grid2::filled(self.rows, self.cols, f64::NAN);
+            for rc in veg_cells.chunks_exact(2) {
+                let (row, col) = (rc[0] as usize, rc[1] as usize);
+                if row >= self.rows || col >= self.cols {
+                    return Err(JsValue::from_str("veg cell outside the grid"));
+                }
+                grid[(row, col)] = veg_fuel as f64;
+            }
+            bc.vegetation_changes = Some(grid);
+        }
+        self.inner
+            .set_boundary_conditions(bc)
             .map_err(|e| JsValue::from_str(&e.to_string()))
     }
 

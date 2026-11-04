@@ -625,7 +625,8 @@ async function ensureSim() {
   const reals = parseInt(el("reals").value, 10);
   if (ENGINE === "gpu") {
     const inner = await GpuPropagatorClass.create(
-      N, N, veg, dem, buildFuelSystem(), reals, 42, CELL, el("ros").value, "trucchia",
+      N, N, veg, dem, buildFuelSystem(), reals, 42, el("spotting").checked, CELL,
+      el("ros").value, "trucchia",
     );
     sim = new GpuSim(inner);
   } else {

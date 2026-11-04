@@ -75,8 +75,9 @@ if (Symbol.dispose) FuelSystemBuilder.prototype[Symbol.dispose] = FuelSystemBuil
 /**
  * WebGPU execution backend (feature `gpu`): the same scenario inputs as
  * [`Propagator`], run by `propagator-gpu`. Methods that touch the GPU are
- * async (they await buffer mappings). Scope: contact spread with scalar
- * weather and point ignitions; no spotting, actions or growth.
+ * async (they await buffer mappings). Supports contact spread, spotting,
+ * scalar weather per window and the demo's actions (moisture, fuel
+ * changes); see docs/gpu-core.md.
  */
 export class GpuPropagator {
     static __wrap(ptr) {
@@ -112,18 +113,20 @@ export class GpuPropagator {
      * @param {FuelSystemBuilder} fuels
      * @param {number} realizations
      * @param {number} seed
+     * @param {boolean} do_spotting
      * @param {number} cellsize
      * @param {string} ros_model
      * @param {string} moisture_model
      * @returns {Promise<GpuPropagator>}
      */
-    static create(rows, cols, veg, dem, fuels, realizations, seed, cellsize, ros_model, moisture_model) {
+    static create(rows, cols, veg, dem, fuels, realizations, seed, do_spotting, cellsize, ros_model, moisture_model) {
         _assertClass(fuels, FuelSystemBuilder);
         const val5 = +rows;
         const val6 = +cols;
         const val7 = +realizations;
         const val8 = +seed;
-        const val9 = +cellsize;
+        const val9 = +do_spotting;
+        const val10 = +cellsize;
         let ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3;
         try {
             ptr0 = passArray32ToWasm0(veg, wasm.__wbindgen_malloc);
@@ -141,7 +144,7 @@ export class GpuPropagator {
             if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 4, 4); }
             throw e;
         }
-        const ret = wasm.gpupropagator_create(val5, val6, ptr0, len0, ptr1, len1, fuels.__wbg_ptr, val7, val8, val9, ptr2, len2, ptr3, len3);
+        const ret = wasm.gpupropagator_create(val5, val6, ptr0, len0, ptr1, len1, fuels.__wbg_ptr, val7, val8, val9, val10, ptr2, len2, ptr3, len3);
         return ret;
     }
     /**
@@ -150,6 +153,37 @@ export class GpuPropagator {
     get rows() {
         const ret = wasm.gpupropagator_rows(this.__wbg_ptr);
         return ret >>> 0;
+    }
+    /**
+     * Firefighting actions at `time`, as [`Propagator::set_action_fields`]:
+     * extra moisture (fraction) on cells and a fuel code on cells.
+     * @param {bigint} time
+     * @param {Int32Array | number[]} moisture_cells
+     * @param {Float32Array | number[]} moisture_values
+     * @param {Int32Array | number[]} veg_cells
+     * @param {number} veg_fuel
+     */
+    set_action_fields(time, moisture_cells, moisture_values, veg_cells, veg_fuel) {
+        const val4 = BigInt.asIntN(64, time);
+        const val5 = +veg_fuel;
+        let ptr0, len0, ptr1, len1, ptr2, len2;
+        try {
+            ptr0 = passArray32ToWasm0(moisture_cells, wasm.__wbindgen_malloc);
+            len0 = WASM_VECTOR_LEN;
+            ptr1 = passArrayF32ToWasm0(moisture_values, wasm.__wbindgen_malloc);
+            len1 = WASM_VECTOR_LEN;
+            ptr2 = passArray32ToWasm0(veg_cells, wasm.__wbindgen_malloc);
+            len2 = WASM_VECTOR_LEN;
+        } catch (e) {
+            if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 4, 4); }
+            if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 4, 4); }
+            if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 4, 4); }
+            throw e;
+        }
+        const ret = wasm.gpupropagator_set_action_fields(this.__wbg_ptr, val4, ptr0, len0, ptr1, len1, ptr2, len2, val5);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
     }
     /**
      * Weather window starting at `time` plus point ignitions (flat
@@ -1200,23 +1234,23 @@ function __wbg_get_imports() {
             arg0.writeBuffer(arg1, arg2, getArrayU8FromWasm0(arg3, arg4), arg5, arg6);
         }, arguments); },
         __wbindgen_generic_0000000000000001: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 89, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [Externref], shim_idx: 96, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__hfab4748bf2a224fe);
             return ret;
         },
         __wbindgen_generic_0000000000000002: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 41, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("GPUDevice")], shim_idx: 48, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
             const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246);
             return ret;
         },
         __wbindgen_generic_0000000000000003: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 41, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246_35);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("any")], shim_idx: 48, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246_36);
             return ret;
         },
         __wbindgen_generic_0000000000000004: function(arg0, arg1) {
-            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 41, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
-            const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246_36);
+            // Cast intrinsic for `Closure(Closure { owned: true, function: Function { arguments: [NamedExternref("undefined")], shim_idx: 48, ret: Result(Unit), inner_ret: Some(Result(Unit)) }, mutable: true }) -> Externref`.
+            const ret = makeMutClosure(arg0, arg1, wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246_37);
             return ret;
         },
         __wbindgen_generic_0000000000000005: function(arg0) {
@@ -1270,15 +1304,15 @@ function wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246(arg0, arg
     }
 }
 
-function wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246_35(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246_35(arg0, arg1, arg2);
+function wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246_36(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246_36(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }
 }
 
-function wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246_36(arg0, arg1, arg2) {
-    const ret = wasm.wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246_36(arg0, arg1, arg2);
+function wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246_37(arg0, arg1, arg2) {
+    const ret = wasm.wasm_bindgen__convert__closures_____invoke__h0734b3eec33b7246_37(arg0, arg1, arg2);
     if (ret[1]) {
         throw takeFromExternrefTable0(ret[0]);
     }

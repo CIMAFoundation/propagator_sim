@@ -21,9 +21,16 @@ treats each realization as a **shortest-path problem on a random graph**:
   from the ignitions. Statistically this is the same model as the CPU
   core, which draws once per edge when the source cell burns.
 - Edge weights are the transition times of the spread model, evaluated with
-  the weather of the window in which the **source** cell ignites, as the
-  CPU kernel does at pop time. Nothing is precomputed: the GPU recomputes
-  the eight edges of a cell when it pushes them.
+  the weather fields in force when the **source** cell is pushed, as the
+  CPU kernel does at pop time (every window ends with sweeps to
+  convergence, so a source is always pushed under its own window). Nothing
+  is precomputed: the GPU recomputes the eight edges of a cell when it
+  pushes them. Weather is a per-cell field (scalar inputs are filled), and
+  the effective moisture includes the decaying action moisture, refreshed
+  by the host before each advance as the CPU core does.
+- Draws are hashed by **world** coordinates (the configuration's `origin`),
+  so a domain grown through a checkpoint reproduces the same realizations
+  bit for bit (a test asserts it).
 - State per `(realization, cell)` is one 32-bit word, `arrival << 4 |
   code`, where `code` is the direction the fire came from (or "forced
   ignition"). Spread is `atomicMin` of `arrival + transition` into the
@@ -39,11 +46,19 @@ treats each realization as a **shortest-path problem on a random graph**:
   (indirect dispatch), so idle tiles cost nothing. Every weather window
   ends with sweeps to convergence (an empty worklist), so the fold observes
   final arrivals.
+- When a push wins, the edge's ROS and FLI are stored as a packed `f16`
+  pair for the target (one word per realization-cell); the fold reads them
+  back. Two pushes landing on the same cell in one sweep can leave the
+  loser's pair, which only affects the mean ROS / FLI outputs of that cell.
+- Spotting follows the CPU kernel's model: a Poisson number of embers per
+  pushed spotting cell, lognormal wind- and intensity-scaled landing
+  distances, an ignition draw and a lognormal time to propagation; the
+  landing becomes an arrival with code "spot" (counted in
+  `spotting_receiving_probability`). All of it is hashed per cell, so the
+  draw sequence is fixed for the run.
 - The fold over realizations also runs on the GPU: per cell, count, first
-  and mean arrival, mean and maximum ROS and fireline intensity. ROS and FLI
-  are recomputed from the winning edge (the stored direction, the source's
-  arrival and its window), so no per-realization payload is stored and the
-  fold is race-free.
+  and mean arrival, mean and maximum ROS and fireline intensity, embers
+  received.
 
 The relaxation is exact in the Dijkstra sense: the bucket width and the
 number of sweeps per bucket change throughput, not results (a test asserts
@@ -52,12 +67,24 @@ bit-identical maps across bucket settings).
 ## Scope
 
 Supported: contact spread with the Wang, Rothermel and Standard ROS models
-and the Trucchia and Baghino moisture models; scalar weather per window
-(wind direction, wind speed, fuel moisture); forced point ignitions;
-boundary mode "ignore".
+and the Trucchia and Baghino moisture models; ember spotting; scalar or
+per-cell weather per window (wind direction, wind speed, fuel moisture);
+firefighting actions (decaying additional moisture, vegetation changes);
+forced point ignitions; checkpoints (`checkpoint` / `restore` /
+`from_checkpoint`) and domain growth through a checkpoint onto a larger
+grid with a different origin; boundary mode "ignore".
 
-Not yet: ember spotting, per-cell weather fields, firefighting actions,
-domain growth, checkpoints.
+Not covered: the "spotting generation" output (which cells emitted
+embers), tile freezing (the state is dense), boundary halt / growth
+without a checkpoint.
+
+Parity with the CPU core is asserted by `tests/gpu_vs_cpu.rs` on each
+feature (burned area within 5 %, 10 % with spotting; burn-map correlation
+above 0.97–0.99), plus exact checkpoint restore and exact growth.
+Measured ratios on 256² grassland with 100 realizations: per-cell weather
+0.990, decaying action 0.975, firebreak 0.995, spotting 0.938 (correlation
+0.999 in every case). On the Alexandroupolis landscape with spotting,
+seeds 1–3 at 100 realizations: 1.015, 1.016, 0.998.
 
 The backend also builds for the browser: the wasm crate's `gpu` feature
 exposes `GpuPropagator` (async `create`, `step`, `snapshot`) on WebGPU, and
@@ -92,6 +119,8 @@ wasm threads. Both remain to be measured.
 
 ```bash
 cd rust/propagator-gpu
+uv run python scripts/export_scene.py /tmp/scene            # demo landscape + EU12 fuels
+SCENE=/tmp/scene SPOT=1 WIND=45 MOIST=5 cargo run --release --bin gpu_bench -- 1024 100 24 1
 cargo run --release --bin gpu_bench -- 1000 100 12        # grid reals hours
 GPU_DEBUG=1 cargo run --release --bin gpu_bench -- 256 10 1  # per-edge model check
 MOIST=5 WIND=45 MIXED=1 SLOPE=2 cargo run --release --bin gpu_bench -- 512 100 12
@@ -122,11 +151,12 @@ the wasm fold walks every allocated tile of every realization on the main
 thread and worker pool. Kernels alone are comparable; the wasm numbers
 varied by 2x between runs on this (thermally loaded) machine.
 
-Open item: on this landscape the WebGPU burned area runs 1–9 % above the
-CPU core (4519 vs 4148 ha at 50 realizations, 4370 vs 4202 at 100), where
-the synthetic native scenarios agree within 2 %. Whether that is ensemble
-noise or a systematic difference on real terrain and mixed fuels needs a
-native run on the demo data with several seeds.
+The 1–9 % area excess first seen in the browser (seed 42) was ensemble
+noise: the same scenario run natively on the exported demo landscape
+(`SCENE=<dir>` in `gpu_bench`) reproduces the browser numbers exactly, and
+over seeds 1–5 at 100 realizations the GPU / CPU area ratio is 0.994,
+1.002, 1.002, 1.007, 0.978 (mean 0.996), with the CPU itself spanning 4205
+to 4402 ha across those seeds.
 
 WebGPU limits matter: Chrome allows 10 storage buffers per shader stage,
 so the kernel packs its state into 8 (static inputs in one buffer,
