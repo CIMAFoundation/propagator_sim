@@ -3,7 +3,12 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from propagator.web.schemas import ActionRequest, SimulateRequest
+from propagator.web.schemas import (
+    _EDGE_CACHE_BYTES_PER_CELL,
+    ActionRequest,
+    SimulateRequest,
+    _estimate_memory_bytes,
+)
 
 
 def base_kwargs(**overrides):
@@ -37,6 +42,33 @@ def test_rejects_combo_under_cell_budget_but_over_memory_budget():
     with pytest.raises(ValidationError):
         SimulateRequest(
             **base_kwargs(radius_km=50, cellsize=20, realizations=10)
+        )
+
+
+def test_rust_core_estimate_adds_shared_edge_cache():
+    grid_cells = 1000.0**2
+    numba_bytes = _estimate_memory_bytes(grid_cells, 10, "numba")
+    rust_bytes = _estimate_memory_bytes(grid_cells, 10, "rust")
+    # the cache is shared by all realizations: one term per padded cell
+    assert rust_bytes - numba_bytes == pytest.approx(
+        _EDGE_CACHE_BYTES_PER_CELL * 1024.0**2
+    )
+    assert _estimate_memory_bytes(
+        grid_cells, 20, "rust"
+    ) - _estimate_memory_bytes(grid_cells, 20, "numba") == pytest.approx(
+        rust_bytes - numba_bytes
+    )
+
+
+def test_rust_core_rejects_combo_the_numba_core_accepts():
+    # 50 km / 25 m / 5 realizations: ~2.1 GiB on numba, ~4.5 GiB on rust
+    # once the fully populated edge cache is counted
+    SimulateRequest(**base_kwargs(radius_km=50, cellsize=25, realizations=5))
+    with pytest.raises(ValidationError):
+        SimulateRequest(
+            **base_kwargs(
+                core="rust", radius_km=50, cellsize=25, realizations=5
+            )
         )
 
 

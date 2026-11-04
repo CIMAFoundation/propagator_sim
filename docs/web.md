@@ -134,7 +134,9 @@ raise the cellsize, or reduce realizations if you hit this. A second check
 estimates the peak memory the block-sparse engine and its result fold would
 allocate and rejects the request (422) if it exceeds a 4 GiB budget, even if
 it stays under the cell-realizations cap above — lower the radius, raise the
-cellsize, or reduce realizations if you hit this.
+cellsize, or reduce realizations if you hit this. With `core: "rust"` the
+estimate also counts the engine's shared per-cell edge cache (168 KiB per
+reached 32x32 tile, independent of the realization count).
 
 Only one simulation runs at a time; starting a new one while another is
 still running/preparing data returns a 429 response.

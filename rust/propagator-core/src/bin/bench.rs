@@ -4,7 +4,15 @@
 //! Python benchmark harness so timings and burned-area aggregates can be
 //! compared directly. Usage:
 //!
-//!   bench <grid> <realizations> <hours> [seed] [threads] [dump.f32]
+//!   bench <grid> <realizations> <hours> [seed] [threads] [dump.f32] [flags]
+//!
+//! Flags (after the positional arguments):
+//!   --step <s>       step window in seconds (default 3600)
+//!   --field-weather  per-cell wind direction / speed grids instead of
+//!                    scalars (a smooth gradient across the domain)
+//!   --actions        a decaying action-moisture patch next to the
+//!                    ignition, so the effective moisture (and the edge
+//!                    cache) changes every step window
 //!
 //! Prints a human summary to stderr and one tab-separated machine line to
 //! stdout: `RUST\t<grid>\t<reals>\t<sim_s>\t<wall_s>\t<area_mean_ha>\t<area_50_ha>`.
@@ -24,7 +32,25 @@ fn main() {
     let hours: i64 = arg(3, "12").parse().expect("hours");
     let seed: u64 = arg(4, "12345").parse().expect("seed");
     let threads: Option<usize> = args.get(5).and_then(|s| s.parse().ok()).filter(|&t| t > 0);
-    let dump = args.get(6).cloned();
+    let dump = args.get(6).cloned().filter(|s| !s.starts_with("--") && !s.is_empty());
+
+    let mut step_seconds: i64 = 3600;
+    let mut field_weather = false;
+    let mut actions = false;
+    let mut i = 6;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--step" => {
+                i += 1;
+                step_seconds = args.get(i).and_then(|s| s.parse().ok()).expect("--step <s>");
+            }
+            "--field-weather" => field_weather = true,
+            "--actions" => actions = true,
+            other if other.starts_with("--") => panic!("unknown flag {other}"),
+            _ => {}
+        }
+        i += 1;
+    }
 
     let veg = Grid2::filled(n, n, 4); // grassland (fuel code 4)
     let dem = Grid2::filled(n, n, 0.0);
@@ -36,12 +62,40 @@ fn main() {
 
     let mut sim = Propagator::new(config).expect("construct propagator");
     let c = n / 2;
+    let (wind_dir, wind_speed) = if field_weather {
+        // direction swings 60..120 deg west->east, speed 20..40 km/h
+        // north->south: every cell gets its own edge quantities
+        let mut dir = Grid2::filled(n, n, 0.0f32);
+        let mut speed = Grid2::filled(n, n, 0.0f32);
+        for row in 0..n {
+            for col in 0..n {
+                dir[(row, col)] = 60.0 + 60.0 * col as f32 / n as f32;
+                speed[(row, col)] = 20.0 + 20.0 * row as f32 / n as f32;
+            }
+        }
+        (FieldInput::Grid(dir), FieldInput::Grid(speed))
+    } else {
+        (FieldInput::Scalar(90.0), FieldInput::Scalar(30.0))
+    };
+    let additional_moisture = actions.then(|| {
+        // a wet strip downwind of the ignition (+30 % moisture), decaying;
+        // wind from 90 deg (east) drives the fire west, to lower columns
+        let mut grid = Grid2::filled(n, n, 0.0f32);
+        let half = (n / 20).max(2);
+        for row in c.saturating_sub(half)..(c + half).min(n) {
+            for col in c.saturating_sub(3 * half)..c.saturating_sub(2 * half) {
+                grid[(row, col)] = 30.0;
+            }
+        }
+        grid
+    });
     sim.set_boundary_conditions(BoundaryConditions {
         time: 0,
         moisture: Some(FieldInput::Scalar(0.0)),
-        wind_dir: Some(FieldInput::Scalar(90.0)),
-        wind_speed: Some(FieldInput::Scalar(30.0)),
+        wind_dir: Some(wind_dir),
+        wind_speed: Some(wind_speed),
         ignitions: Some(Ignitions::Points(vec![(c, c)])),
+        additional_moisture,
         ..Default::default()
     })
     .expect("set boundary conditions");
@@ -53,7 +107,7 @@ fn main() {
         if sim.next_time().is_none() {
             break;
         }
-        sim.step_window(3600).expect("step");
+        sim.step_window(step_seconds).expect("step");
         steps += 1;
     }
     let elapsed = t0.elapsed().as_secs_f64();
@@ -64,15 +118,17 @@ fn main() {
     let area_50_ha = s.area_50 / 1e4;
 
     eprintln!(
-        "RUST  grid={n}x{n} reals={reals} threads={} steps={steps} sim_time={}s",
+        "RUST  grid={n}x{n} reals={reals} threads={} steps={steps} sim_time={}s step={step_seconds}s field_weather={field_weather} actions={actions}",
         threads
             .map(|t| t.to_string())
             .unwrap_or_else(|| "auto".into()),
         sim.time()
     );
     eprintln!(
-        "      wall={elapsed:.3}s  area_mean={area_mean_ha:.1}ha  area_50={area_50_ha:.1}ha  n_active={}",
-        s.n_active
+        "      wall={elapsed:.3}s  area_mean={area_mean_ha:.1}ha  area_50={area_50_ha:.1}ha  n_active={}  edge_cache={:.1}MiB/{} tiles",
+        s.n_active,
+        sim.edge_cache_bytes() as f64 / (1024.0 * 1024.0),
+        sim.edge_cache_tiles()
     );
     println!(
         "RUST\t{n}\t{reals}\t{}\t{elapsed:.4}\t{area_mean_ha:.2}\t{area_50_ha:.2}",

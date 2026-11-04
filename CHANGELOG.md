@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Rust core: the heap kernel now evaluates the spread models once per edge
+  per generation of the inputs through a shared, block-sparse `EdgeCache`
+  (ignition probability, transition time, carried ROS/FLI for the 8
+  directions), instead of once per event per realization. Entries are
+  filled lazily (probability first, fire behaviour only for accepted
+  draws), so the kernel never evaluates more of the models than before;
+  with a single realization the cache is bypassed. Weather and vegetation
+  changes invalidate the whole cache; decaying action moisture only
+  invalidates the cells it touches (plus their neighbours), so runs with
+  firefighting actions keep the speedup. Seeded runs are bitwise
+  identical; 1.5–2x faster from about 4 realizations up, within noise of
+  the old kernel below that. The cache costs 168 KiB per reached 32x32
+  tile, shared by all realizations, reported by `edge_cache_bytes()` on the
+  Rust adapter and wasm bindings and included in the web memory guardrail
+  for `core: "rust"`.
+
 ### Added
 
 - Core parity: `boundary_proximity(margin)` — which edges (N/S/W/E) have

@@ -11,11 +11,11 @@
 //! The spread models are evaluated through the shared [`EdgeCache`]: the
 //! probability, transition time and carried ROS / FLI of a cell's eight
 //! outgoing edges depend only on the inputs, so they are computed once per
-//! cell and reused by every realization; only the Bernoulli draw is per
+//! edge and reused by every realization; only the Bernoulli draw is per
 //! realization. Draw order is unchanged, so seeded runs are bitwise
 //! identical to the uncached kernel.
 
-use crate::edges::{Edge, EdgeCache};
+use crate::edges::{EdgeCache, BLOCKED};
 use crate::front::FrontHeap;
 use crate::fuels::{FuelSystem, NO_FUEL};
 use crate::grid::Grid2;
@@ -204,14 +204,29 @@ pub fn advance_front_until(
         let w_dir = shared.wind_dir[(row, col)] as f64;
         let w_speed = shared.wind_speed[(row, col)] as f64;
 
-        // 8-neighbour spread: deterministic edge quantities from the shared
-        // cache, one Bernoulli draw per spreadable edge
-        let edges = shared.edges.get_or_fill(row, col, || {
-            compute_edges(shared, &geometry, row, col, idx_from, w_dir, w_speed)
-        });
+        // 8-neighbour spread: one Bernoulli draw per spreadable, unburnt
+        // neighbour. Edge quantities come from the shared cache and are
+        // filled lazily, probability first and fire behaviour only for
+        // accepted draws, so no more of the models is evaluated than in an
+        // uncached kernel; the draw order is unchanged.
+        let mut edges = shared.edges.lookup(row, col);
         for (neighbour, &(dr, dc)) in NEIGHBOURS.iter().enumerate() {
-            let edge = &edges[neighbour];
-            if edge.is_blocked() {
+            let p = match edges.p(neighbour) {
+                Some(p) => p,
+                None => {
+                    let p = match edge_target(shared, row, col, neighbour) {
+                        None => BLOCKED,
+                        Some(target) => {
+                            let geo =
+                                edge_geometry(shared, &geometry, row, col, neighbour, &target);
+                            edge_probability(shared, idx_from, &target, &geo, w_dir, w_speed)
+                        }
+                    };
+                    edges.set_p(neighbour, p);
+                    p
+                }
+            };
+            if p < 0.0 {
                 continue;
             }
             // a spreadable edge always points inside the grid
@@ -220,17 +235,29 @@ pub fn advance_front_until(
             if real.tiles.read_flags(row_to, col_to) & FLAG_FIRE != 0 {
                 continue;
             }
-            if edge.p <= real.rng.uniform() {
+            if p <= real.rng.uniform() {
                 continue;
             }
-            real.heap.push(
-                time + edge.transition,
-                row_to as i32,
-                col_to as i32,
-                edge.ros,
-                edge.fli,
-            );
+            let (transition, ros, fli) = match edges.behavior(neighbour) {
+                Some(cached) => cached,
+                None => {
+                    let target = EdgeTarget {
+                        row: row_to,
+                        col: col_to,
+                        idx_to: shared.fuel_idx[(row_to, col_to)] as usize,
+                    };
+                    let geo = edge_geometry(shared, &geometry, row, col, neighbour, &target);
+                    let (transition, ros, fli) =
+                        edge_behavior(shared, idx_from, &target, &geo, w_dir, w_speed);
+                    let (ros, fli) = (ros as f32, fli as f32);
+                    let transition = edges.set_behavior(neighbour, transition, ros, fli);
+                    (transition, ros, fli)
+                }
+            };
+            real.heap
+                .push(time + transition, row_to as i32, col_to as i32, ros, fli);
         }
+        edges.commit();
 
         // ember spotting
         if shared.do_spotting && shared.fuels.spotting[idx_from] {
@@ -250,62 +277,114 @@ pub fn advance_front_until(
     }
 }
 
-/// The eight outgoing edges of a spreading cell: blocked where the target
-/// is off-grid, unburnable or not a spreading fuel, otherwise the spread
-/// model outputs for that direction (realization-independent).
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn compute_edges(
+/// A neighbour fire can spread into: in the grid, fuelled, spreading.
+struct EdgeTarget {
+    row: usize,
+    col: usize,
+    idx_to: usize,
+}
+
+/// Static spreadability of `(row, col)`'s `neighbour`-th edge.
+#[inline]
+fn edge_target(
+    shared: &SharedInputs<'_>,
+    row: usize,
+    col: usize,
+    neighbour: usize,
+) -> Option<EdgeTarget> {
+    let (dr, dc) = NEIGHBOURS[neighbour];
+    let row_to = row as i64 + dr;
+    let col_to = col as i64 + dc;
+    if !shared.veg.in_bounds(row_to, col_to) {
+        return None;
+    }
+    let (row_to, col_to) = (row_to as usize, col_to as usize);
+    if shared.veg[(row_to, col_to)] == NO_FUEL {
+        return None;
+    }
+    let idx_to = shared.fuel_idx[(row_to, col_to)] as usize;
+    if !shared.fuels.burn[idx_to] {
+        return None;
+    }
+    Some(EdgeTarget {
+        row: row_to,
+        col: col_to,
+        idx_to,
+    })
+}
+
+/// Geometry and target moisture of one edge.
+struct EdgeGeometry {
+    /// metres
+    dist: f64,
+    /// radians, propagation direction
+    angle: f64,
+    /// target minus source elevation, metres
+    dh: f64,
+    /// target moisture, fraction
+    moist: f64,
+}
+
+#[inline]
+fn edge_geometry(
     shared: &SharedInputs<'_>,
     geometry: &[(f64, f64); N_NEIGHBOURS],
     row: usize,
     col: usize,
+    neighbour: usize,
+    target: &EdgeTarget,
+) -> EdgeGeometry {
+    let (dist_cells, angle) = geometry[neighbour];
+    EdgeGeometry {
+        dist: dist_cells * shared.cellsize,
+        angle,
+        dh: shared.dem[(target.row, target.col)] - shared.dem[(row, col)],
+        moist: shared.moisture[(target.row, target.col)] as f64,
+    }
+}
+
+#[inline]
+fn edge_probability(
+    shared: &SharedInputs<'_>,
     idx_from: usize,
+    target: &EdgeTarget,
+    geo: &EdgeGeometry,
     w_dir: f64,
     w_speed: f64,
-) -> [Edge; N_NEIGHBOURS] {
-    let mut edges = [Edge::BLOCKED; N_NEIGHBOURS];
-    for (neighbour, &(dr, dc)) in NEIGHBOURS.iter().enumerate() {
-        let row_to = row as i64 + dr;
-        let col_to = col as i64 + dc;
-        if !shared.veg.in_bounds(row_to, col_to) {
-            continue;
-        }
-        let (row_to, col_to) = (row_to as usize, col_to as usize);
-        if shared.veg[(row_to, col_to)] == NO_FUEL {
-            continue;
-        }
-        let idx_to = shared.fuel_idx[(row_to, col_to)] as usize;
-        if !shared.fuels.burn[idx_to] {
-            continue;
-        }
+) -> f64 {
+    probability_to_neighbour(
+        shared.moisture_model,
+        geo.angle,
+        geo.dist,
+        w_dir,
+        w_speed,
+        geo.moist,
+        geo.dh,
+        shared.fuels.transition_probability(idx_from, target.idx_to),
+    )
+}
 
-        let (dist_cells, angle) = geometry[neighbour];
-        let dist = dist_cells * shared.cellsize;
-        let dh = shared.dem[(row_to, col_to)] - shared.dem[(row, col)];
-        let moist = shared.moisture[(row_to, col_to)] as f64;
-        let p0 = shared.fuels.transition_probability(idx_from, idx_to);
-
-        let p = probability_to_neighbour(
-            shared.moisture_model,
-            angle,
-            dist,
-            w_dir,
-            w_speed,
-            moist,
-            dh,
-            p0,
-        );
-        let (transition, ros, fli) = calculate_fire_behavior(
-            shared, idx_from, idx_to, dh, dist, angle, moist, w_dir, w_speed,
-        );
-        edges[neighbour] = Edge {
-            p,
-            transition,
-            ros: ros as f32,
-            fli: fli as f32,
-        };
-    }
-    edges
+/// (transition time [s, >= 1], ROS [m/min], fireline intensity [kW/m]).
+#[inline]
+fn edge_behavior(
+    shared: &SharedInputs<'_>,
+    idx_from: usize,
+    target: &EdgeTarget,
+    geo: &EdgeGeometry,
+    w_dir: f64,
+    w_speed: f64,
+) -> (i64, f64, f64) {
+    calculate_fire_behavior(
+        shared,
+        idx_from,
+        target.idx_to,
+        geo.dh,
+        geo.dist,
+        geo.angle,
+        geo.moist,
+        w_dir,
+        w_speed,
+    )
 }
 
 /// (transition time [s, >= 1], ROS [m/min], fireline intensity [kW/m]).

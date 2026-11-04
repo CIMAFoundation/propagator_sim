@@ -5,120 +5,75 @@
 //! ignition probability, transition time and the ROS / fireline intensity
 //! carried into a neighbour depend only on the source cell and the
 //! direction, not on the realization. The heap kernel therefore evaluates
-//! the spread models once per cell per *generation* of the inputs and
+//! the spread models once per edge per *generation* of the inputs and
 //! every realization reuses the result; only the Bernoulli draw stays per
 //! realization.
 //!
 //! The cache is block-sparse like the state tiles: a 32x32 tile is
-//! allocated the first time any realization pops a cell inside it, and
-//! cells are filled lazily, so the work done is never more than what the
-//! uncached kernel would do (the first realization to reach a cell pays
-//! for it, the others read). Each cell carries the generation stamp it was
-//! filled for, so invalidating after a boundary-condition change is O(1)
-//! and needs no reallocation. All accesses go through atomics so the
-//! realization threads can fill and read concurrently without locks: a
-//! race between two fillers writes identical bits.
+//! allocated the first time any realization pops a cell inside it. Edges
+//! are filled lazily and in two stages, probability first and fire
+//! behaviour only once a draw accepts the edge, so the cached kernel never
+//! evaluates more of the models than the uncached one did: the first
+//! realization to need a quantity pays for it, the others read it. Each
+//! cell carries the generation stamp its entries are valid for, so
+//! invalidating after a boundary-condition change is O(1) and needs no
+//! reallocation.
+//!
+//! All accesses go through atomics so the realization threads can fill
+//! and read concurrently without locks: every edge quantity has its own
+//! word (or its own half of a word, updated with bitwise RMWs), a cell's
+//! readiness bits are published with one compare-and-swap per lookup, and
+//! a race between two fillers writes identical bits. A cell's record is 21
+//! consecutive 64-bit words, so a lookup touches at most three cache lines.
+//! With a single realization the cache is bypassed: a cell is popped at
+//! most once per realization, so nothing would be reused.
 
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 
 use crate::kernel::N_NEIGHBOURS;
 use crate::tiles::{local_index, TILE_CELLS, TILE_SHIFT, TILE_SIZE};
 
-/// Spread quantities for one directed edge.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Edge {
-    /// ignition probability; negative when the edge can never carry fire
-    /// (target off-grid, unburnable or not a spreading fuel)
-    pub p: f64,
-    /// transition time, seconds (>= 1)
-    pub transition: i64,
-    /// rate of spread carried into the target, m/min
-    pub ros: f32,
-    /// fireline intensity carried into the target, kW/m
-    pub fli: f32,
-}
+/// Words per cell record: 8 x `p` (f64 bits), 8 x (`transition` << 32 |
+/// `ros`), 4 x two packed `fli` f32, 1 stamp (`generation` << 32 | ready
+/// mask: bit `d` = probability of edge `d` ready, bit `8 + d` = behaviour).
+const WORDS_PER_CELL: usize = N_NEIGHBOURS + N_NEIGHBOURS + N_NEIGHBOURS / 2 + 1;
+const P_OFFSET: usize = 0;
+const TR_OFFSET: usize = N_NEIGHBOURS;
+const FLI_OFFSET: usize = 2 * N_NEIGHBOURS;
+const STAMP_OFFSET: usize = WORDS_PER_CELL - 1;
+const MASK_BITS: u64 = 0xffff;
 
-impl Edge {
-    /// An edge that never carries fire.
-    pub const BLOCKED: Edge = Edge {
-        p: -1.0,
-        transition: 0,
-        ros: 0.0,
-        fli: 0.0,
-    };
-
-    #[inline]
-    pub fn is_blocked(&self) -> bool {
-        self.p < 0.0
-    }
-}
-
-const EDGES_PER_TILE: usize = TILE_CELLS * N_NEIGHBOURS;
+/// Bytes held by one allocated 32x32 tile of the cache: a packed 168-byte
+/// record per cell. Shared by all realizations (not multiplied by their
+/// count).
+pub const EDGE_TILE_BYTES: usize = TILE_CELLS * WORDS_PER_CELL * 8;
 
 /// Generation stamp meaning "never filled".
 const UNFILLED: u32 = 0;
 
-/// One tile of cached edges (struct-of-arrays, cell-major: edge `d` of the
-/// cell with local index `l` sits at `l * 8 + d`).
+/// Probability stored for an edge fire can never cross (target off-grid,
+/// unburnable or not a spreading fuel).
+pub const BLOCKED: f64 = -1.0;
+
+/// One tile of cached edges: `TILE_CELLS` consecutive cell records.
 struct EdgeTile {
-    /// generation each cell was filled for (`UNFILLED` = never)
-    ready: Box<[AtomicU32]>,
-    p: Box<[AtomicU64]>,
-    /// transition time, saturated to `u32::MAX` by `get_or_fill`
-    transition: Box<[AtomicU32]>,
-    ros: Box<[AtomicU32]>,
-    fli: Box<[AtomicU32]>,
-}
-
-fn zeroed_u32(n: usize) -> Box<[AtomicU32]> {
-    (0..n).map(|_| AtomicU32::new(0)).collect()
-}
-
-fn zeroed_u64(n: usize) -> Box<[AtomicU64]> {
-    (0..n).map(|_| AtomicU64::new(0)).collect()
+    words: Box<[AtomicU64]>,
 }
 
 impl EdgeTile {
     fn new() -> Box<EdgeTile> {
         Box::new(EdgeTile {
-            ready: zeroed_u32(TILE_CELLS),
-            p: zeroed_u64(EDGES_PER_TILE),
-            transition: zeroed_u32(EDGES_PER_TILE),
-            ros: zeroed_u32(EDGES_PER_TILE),
-            fli: zeroed_u32(EDGES_PER_TILE),
+            words: (0..TILE_CELLS * WORDS_PER_CELL)
+                .map(|_| AtomicU64::new(0))
+                .collect(),
         })
     }
 
-    /// Bytes held by one tile (for memory accounting).
-    pub const BYTES: usize = TILE_CELLS * 4 + EDGES_PER_TILE * (8 + 4 + 4 + 4);
-
     #[inline]
-    fn read(&self, local: usize) -> [Edge; N_NEIGHBOURS] {
-        let base = local * N_NEIGHBOURS;
-        let mut edges = [Edge::BLOCKED; N_NEIGHBOURS];
-        for (d, edge) in edges.iter_mut().enumerate() {
-            let i = base + d;
-            *edge = Edge {
-                p: f64::from_bits(self.p[i].load(Ordering::Relaxed)),
-                transition: self.transition[i].load(Ordering::Relaxed) as i64,
-                ros: f32::from_bits(self.ros[i].load(Ordering::Relaxed)),
-                fli: f32::from_bits(self.fli[i].load(Ordering::Relaxed)),
-            };
-        }
-        edges
-    }
-
-    #[inline]
-    fn write(&self, local: usize, edges: &[Edge; N_NEIGHBOURS]) {
-        let base = local * N_NEIGHBOURS;
-        for (d, edge) in edges.iter().enumerate() {
-            let i = base + d;
-            self.p[i].store(edge.p.to_bits(), Ordering::Relaxed);
-            self.transition[i].store(edge.transition as u32, Ordering::Relaxed);
-            self.ros[i].store(edge.ros.to_bits(), Ordering::Relaxed);
-            self.fli[i].store(edge.fli.to_bits(), Ordering::Relaxed);
-        }
+    fn record(&self, local: usize) -> &[AtomicU64] {
+        let base = local * WORDS_PER_CELL;
+        &self.words[base..base + WORDS_PER_CELL]
     }
 }
 
@@ -129,6 +84,9 @@ pub struct EdgeCache {
     /// generation of the inputs the cache currently describes (never
     /// `UNFILLED`)
     generation: u32,
+    /// compute every lookup instead of caching (a single realization pops
+    /// each cell once per generation, so there is nothing to reuse)
+    bypass: bool,
     tiles: Vec<OnceLock<Box<EdgeTile>>>,
 }
 
@@ -141,8 +99,22 @@ impl EdgeCache {
             tiles_h,
             tiles_w,
             generation: UNFILLED + 1,
+            bypass: false,
             tiles: (0..tiles_h * tiles_w).map(|_| OnceLock::new()).collect(),
         }
+    }
+
+    /// A cache for `realizations` realizations: caching is bypassed for a
+    /// single realization, where no edge is ever looked up twice.
+    pub fn for_realizations(rows: usize, cols: usize, realizations: usize) -> EdgeCache {
+        let mut cache = EdgeCache::new(rows, cols);
+        cache.bypass = realizations <= 1;
+        cache
+    }
+
+    /// `true` when lookups are computed rather than cached.
+    pub fn is_bypassed(&self) -> bool {
+        self.bypass
     }
 
     /// Current generation of the inputs.
@@ -164,9 +136,29 @@ impl EdgeCache {
         }
     }
 
+    /// Mark the records of the given cells stale, leaving everything else
+    /// valid. For a change confined to a few cells (decaying action
+    /// moisture) this replaces a full [`invalidate`](Self::invalidate).
+    /// Cells in unallocated tiles need nothing.
+    pub fn invalidate_cells(&mut self, cells: impl IntoIterator<Item = (usize, usize)>) {
+        if self.bypass {
+            return;
+        }
+        for (row, col) in cells {
+            let tile_row = row >> TILE_SHIFT;
+            let tile_col = col >> TILE_SHIFT;
+            if let Some(tile) = self.tiles[tile_row * self.tiles_w + tile_col].get() {
+                let record = tile.record(local_index(row, col));
+                record[STAMP_OFFSET].store((UNFILLED as u64) << 32, Ordering::Release);
+            }
+        }
+    }
+
     /// Drop everything and adopt a new grid shape (tile indices change).
     pub fn reset(&mut self, rows: usize, cols: usize) {
+        let bypass = self.bypass;
         *self = EdgeCache::new(rows, cols);
+        self.bypass = bypass;
     }
 
     /// Free the tile covering block `(tile_row, tile_col)`; it is
@@ -182,107 +174,273 @@ impl EdgeCache {
 
     /// Bytes held by the allocated tiles.
     pub fn allocated_bytes(&self) -> usize {
-        self.allocated_tiles() * EdgeTile::BYTES
-    }
-
-    /// The eight edges leaving `(row, col)`, filling the cell with `fill`
-    /// when it is missing or stale. Safe to call concurrently.
-    #[inline]
-    pub fn get_or_fill(
-        &self,
-        row: usize,
-        col: usize,
-        fill: impl FnOnce() -> [Edge; N_NEIGHBOURS],
-    ) -> [Edge; N_NEIGHBOURS] {
-        let tile_row = row >> TILE_SHIFT;
-        let tile_col = col >> TILE_SHIFT;
-        let tile = self.tiles[tile_row * self.tiles_w + tile_col].get_or_init(EdgeTile::new);
-        let local = local_index(row, col);
-        if tile.ready[local].load(Ordering::Acquire) == self.generation {
-            return tile.read(local);
-        }
-        let mut edges = fill();
-        for edge in &mut edges {
-            // stored as u32; never reached within a simulation (arrival
-            // times are i32), so saturating keeps every observable the same
-            edge.transition = edge.transition.clamp(0, u32::MAX as i64);
-        }
-        tile.write(local, &edges);
-        tile.ready[local].store(self.generation, Ordering::Release);
-        edges
+        self.allocated_tiles() * EDGE_TILE_BYTES
     }
 
     /// Tile-grid shape.
     pub fn tiles_shape(&self) -> (usize, usize) {
         (self.tiles_h, self.tiles_w)
     }
+
+    /// Open the record of `(row, col)` for reading and lazy filling. Call
+    /// [`CellEdges::commit`] afterwards to publish what was filled. Safe to
+    /// call concurrently for the same cell.
+    #[inline]
+    pub fn lookup(&self, row: usize, col: usize) -> CellEdges<'_> {
+        if self.bypass {
+            return CellEdges {
+                record: None,
+                generation: self.generation,
+                mask: 0,
+                new_bits: 0,
+            };
+        }
+        let tile_row = row >> TILE_SHIFT;
+        let tile_col = col >> TILE_SHIFT;
+        let tile = self.tiles[tile_row * self.tiles_w + tile_col].get_or_init(EdgeTile::new);
+        let record = tile.record(local_index(row, col));
+        let stamp = record[STAMP_OFFSET].load(Ordering::Acquire);
+        let mask = if (stamp >> 32) as u32 == self.generation {
+            (stamp & MASK_BITS) as u16
+        } else {
+            0
+        };
+        CellEdges {
+            record: Some(record),
+            generation: self.generation,
+            mask,
+            new_bits: 0,
+        }
+    }
+}
+
+/// One cell's cached edges, opened by [`EdgeCache::lookup`]. Readers see
+/// what the stamp published at open time; what this handle fills becomes
+/// visible to others on `commit`.
+pub struct CellEdges<'a> {
+    /// `None` when the cache is bypassed
+    record: Option<&'a [AtomicU64]>,
+    generation: u32,
+    /// ready bits valid for `generation` at open time
+    mask: u16,
+    /// ready bits filled through this handle
+    new_bits: u16,
+}
+
+impl CellEdges<'_> {
+    /// Probability of edge `d` (`BLOCKED` when fire cannot cross it), if
+    /// cached.
+    #[inline]
+    pub fn p(&self, d: usize) -> Option<f64> {
+        let record = self.record?;
+        if self.mask & (1 << d) == 0 {
+            return None;
+        }
+        Some(f64::from_bits(record[P_OFFSET + d].load(Ordering::Relaxed)))
+    }
+
+    /// Cache the probability of edge `d`.
+    #[inline]
+    pub fn set_p(&mut self, d: usize, p: f64) {
+        let Some(record) = self.record else {
+            return;
+        };
+        record[P_OFFSET + d].store(p.to_bits(), Ordering::Relaxed);
+        self.new_bits |= 1 << d;
+    }
+
+    /// (transition time [s], ROS [m/min], FLI [kW/m]) of edge `d`, if
+    /// cached.
+    #[inline]
+    pub fn behavior(&self, d: usize) -> Option<(i64, f32, f32)> {
+        let record = self.record?;
+        if self.mask & (1 << (N_NEIGHBOURS + d)) == 0 {
+            return None;
+        }
+        let tr = record[TR_OFFSET + d].load(Ordering::Relaxed);
+        let fli_pair = record[FLI_OFFSET + d / 2].load(Ordering::Relaxed);
+        let fli = (fli_pair >> (32 * (d % 2))) as u32;
+        Some((
+            (tr >> 32) as i64,
+            f32::from_bits(tr as u32),
+            f32::from_bits(fli),
+        ))
+    }
+
+    /// Cache the fire behaviour of edge `d`. The transition time is stored
+    /// as `u32`; saturating is unobservable within a simulation (arrival
+    /// times are `i32`), and callers must use the returned value so that a
+    /// first fill and later reads agree.
+    #[inline]
+    pub fn set_behavior(&mut self, d: usize, transition: i64, ros: f32, fli: f32) -> i64 {
+        let transition = transition.clamp(0, u32::MAX as i64);
+        let Some(record) = self.record else {
+            return transition;
+        };
+        let tr = (transition as u64) << 32 | ros.to_bits() as u64;
+        record[TR_OFFSET + d].store(tr, Ordering::Relaxed);
+        // the fli word is shared with the paired edge, which may be filled
+        // concurrently: replace only this half, atomically, so a reader
+        // never observes a cleared half
+        let shift = 32 * (d % 2);
+        let half = 0xffff_ffffu64 << shift;
+        let value = (fli.to_bits() as u64) << shift;
+        let _ =
+            record[FLI_OFFSET + d / 2].fetch_update(Ordering::Relaxed, Ordering::Relaxed, |word| {
+                Some((word & !half) | value)
+            });
+        self.new_bits |= 1 << (N_NEIGHBOURS + d);
+        transition
+    }
+
+    /// Publish the entries filled through this handle.
+    #[inline]
+    pub fn commit(self) {
+        let Some(record) = self.record else {
+            return;
+        };
+        if self.new_bits == 0 {
+            return;
+        }
+        let generation = (self.generation as u64) << 32;
+        let bits = self.new_bits as u64;
+        // merge with bits other threads published meanwhile; a stale stamp
+        // (older generation) is replaced outright
+        let _ = record[STAMP_OFFSET].fetch_update(Ordering::AcqRel, Ordering::Acquire, |stamp| {
+            if stamp & !MASK_BITS == generation {
+                Some(stamp | bits)
+            } else {
+                Some(generation | bits)
+            }
+        });
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::Cell;
 
-    fn sample(seed: f64) -> [Edge; N_NEIGHBOURS] {
-        let mut edges = [Edge::BLOCKED; N_NEIGHBOURS];
-        for (d, edge) in edges.iter_mut().enumerate() {
-            *edge = Edge {
-                p: seed + d as f64 * 0.01,
-                transition: 100 + d as i64,
-                ros: 1.5 + d as f32,
-                fli: 2.5 + d as f32,
-            };
+    fn fill_all(cache: &EdgeCache, row: usize, col: usize, seed: f64) -> usize {
+        let mut edges = cache.lookup(row, col);
+        let mut computed = 0;
+        for d in 0..N_NEIGHBOURS {
+            if edges.p(d).is_none() {
+                edges.set_p(
+                    d,
+                    if d == 3 {
+                        BLOCKED
+                    } else {
+                        seed + d as f64 * 0.01
+                    },
+                );
+                computed += 1;
+            }
+            if edges.behavior(d).is_none() {
+                edges.set_behavior(d, 100 + d as i64, 1.5 + d as f32, 2.5 + d as f32);
+                computed += 1;
+            }
         }
-        edges[3] = Edge::BLOCKED;
-        edges
+        edges.commit();
+        computed
+    }
+
+    fn check_all(cache: &EdgeCache, row: usize, col: usize, seed: f64) {
+        let edges = cache.lookup(row, col);
+        for d in 0..N_NEIGHBOURS {
+            let expected = if d == 3 {
+                BLOCKED
+            } else {
+                seed + d as f64 * 0.01
+            };
+            assert_eq!(edges.p(d), Some(expected), "p of edge {d}");
+            assert_eq!(
+                edges.behavior(d),
+                Some((100 + d as i64, 1.5 + d as f32, 2.5 + d as f32)),
+                "behaviour of edge {d}"
+            );
+        }
     }
 
     #[test]
     fn fills_once_then_reads_back_identical_edges() {
         let cache = EdgeCache::new(100, 70);
         assert_eq!(cache.tiles_shape(), (4, 3));
-        let calls = Cell::new(0);
-        let fill = || {
-            calls.set(calls.get() + 1);
-            sample(0.25)
-        };
-        let first = cache.get_or_fill(40, 65, fill);
-        let second = cache.get_or_fill(40, 65, fill);
-        assert_eq!(calls.get(), 1);
-        assert_eq!(first, sample(0.25));
-        assert_eq!(second, first);
-        assert!(second[3].is_blocked());
+        assert_eq!(fill_all(&cache, 40, 65, 0.25), 16);
+        assert_eq!(fill_all(&cache, 40, 65, 0.25), 0);
+        check_all(&cache, 40, 65, 0.25);
         assert_eq!(cache.allocated_tiles(), 1);
-        assert_eq!(cache.allocated_bytes(), EdgeTile::BYTES);
+        assert_eq!(cache.allocated_bytes(), EDGE_TILE_BYTES);
+    }
+
+    #[test]
+    fn probability_and_behaviour_fill_independently() {
+        let cache = EdgeCache::new(64, 64);
+        let mut edges = cache.lookup(2, 2);
+        edges.set_p(5, 0.4);
+        edges.commit();
+        let mut edges = cache.lookup(2, 2);
+        assert_eq!(edges.p(5), Some(0.4));
+        assert_eq!(edges.p(4), None);
+        assert_eq!(edges.behavior(5), None);
+        // the paired edge 4 shares the fli word with edge 5
+        edges.set_behavior(4, 7, 0.5, 9.0);
+        edges.commit();
+        let mut edges = cache.lookup(2, 2);
+        assert_eq!(edges.behavior(4), Some((7, 0.5, 9.0)));
+        assert_eq!(edges.behavior(5), None);
+        edges.set_behavior(5, 8, 0.6, 10.0);
+        edges.commit();
+        let edges = cache.lookup(2, 2);
+        assert_eq!(edges.behavior(4), Some((7, 0.5, 9.0)));
+        assert_eq!(edges.behavior(5), Some((8, 0.6, 10.0)));
+    }
+
+    #[test]
+    fn uncommitted_fills_are_not_visible() {
+        let cache = EdgeCache::new(64, 64);
+        {
+            let mut edges = cache.lookup(1, 1);
+            edges.set_p(0, 0.9);
+            // dropped without commit
+        }
+        assert_eq!(cache.lookup(1, 1).p(0), None);
     }
 
     #[test]
     fn invalidate_refills_without_reallocating() {
         let mut cache = EdgeCache::new(64, 64);
-        let calls = Cell::new(0);
-        let fill = || {
-            calls.set(calls.get() + 1);
-            sample(0.5)
-        };
-        cache.get_or_fill(1, 1, fill);
-        cache.get_or_fill(1, 2, fill);
-        assert_eq!(calls.get(), 2);
+        assert_eq!(fill_all(&cache, 1, 1, 0.5), 16);
+        assert_eq!(fill_all(&cache, 1, 2, 0.5), 16);
         cache.invalidate();
         assert_eq!(cache.allocated_tiles(), 1);
-        cache.get_or_fill(1, 1, fill);
-        assert_eq!(calls.get(), 3);
-        // the neighbour cell is still stale, the refilled one is fresh
-        cache.get_or_fill(1, 1, fill);
-        assert_eq!(calls.get(), 3);
-        cache.get_or_fill(1, 2, fill);
-        assert_eq!(calls.get(), 4);
+        assert_eq!(cache.lookup(1, 1).p(0), None);
+        assert_eq!(fill_all(&cache, 1, 1, 0.7), 16);
+        check_all(&cache, 1, 1, 0.7);
+        // the neighbour cell is still stale
+        assert_eq!(fill_all(&cache, 1, 2, 0.7), 16);
+    }
+
+    #[test]
+    fn invalidate_cells_is_local() {
+        let mut cache = EdgeCache::new(64, 64);
+        fill_all(&cache, 1, 1, 0.5);
+        fill_all(&cache, 1, 2, 0.5);
+        fill_all(&cache, 40, 40, 0.5);
+        // cells in unallocated tiles are fine to name
+        cache.invalidate_cells([(1, 1), (40, 40), (33, 1)]);
+        assert_eq!(cache.allocated_tiles(), 2);
+        assert_eq!(cache.lookup(1, 1).p(0), None);
+        assert_eq!(cache.lookup(40, 40).p(0), None);
+        check_all(&cache, 1, 2, 0.5);
+        assert_eq!(fill_all(&cache, 1, 1, 0.6), 16);
+        check_all(&cache, 1, 1, 0.6);
     }
 
     #[test]
     fn release_and_reset_drop_tiles() {
         let mut cache = EdgeCache::new(64, 64);
-        cache.get_or_fill(0, 0, || sample(0.1));
-        cache.get_or_fill(40, 40, || sample(0.1));
+        fill_all(&cache, 0, 0, 0.1);
+        fill_all(&cache, 40, 40, 0.1);
         assert_eq!(cache.allocated_tiles(), 2);
         cache.release_tile(0, 0);
         assert_eq!(cache.allocated_tiles(), 1);
@@ -292,13 +450,34 @@ mod tests {
     }
 
     #[test]
+    fn single_realization_bypasses_the_cache() {
+        let cache = EdgeCache::for_realizations(64, 64, 1);
+        assert!(cache.is_bypassed());
+        assert_eq!(fill_all(&cache, 5, 5, 0.3), 16);
+        assert_eq!(fill_all(&cache, 5, 5, 0.3), 16);
+        assert_eq!(cache.allocated_tiles(), 0);
+        let mut cache = cache;
+        cache.reset(32, 32);
+        assert!(cache.is_bypassed());
+        assert!(!EdgeCache::for_realizations(64, 64, 2).is_bypassed());
+    }
+
+    #[test]
+    fn record_layout_is_three_cache_lines() {
+        assert_eq!(WORDS_PER_CELL * 8, 168);
+        assert_eq!(EDGE_TILE_BYTES, TILE_CELLS * 168);
+    }
+
+    #[test]
     fn transition_saturates_to_u32() {
         let cache = EdgeCache::new(32, 32);
-        let mut edges = sample(0.2);
-        edges[0].transition = i64::MAX;
-        let read = cache.get_or_fill(0, 0, || edges);
-        assert_eq!(read[0].transition, u32::MAX as i64);
-        assert_eq!(read[1], edges[1]);
+        let mut edges = cache.lookup(0, 0);
+        assert_eq!(edges.set_behavior(0, i64::MAX, 1.0, 2.0), u32::MAX as i64);
+        assert_eq!(edges.set_behavior(1, 42, 1.0, 2.0), 42);
+        edges.commit();
+        let edges = cache.lookup(0, 0);
+        assert_eq!(edges.behavior(0), Some((u32::MAX as i64, 1.0, 2.0)));
+        assert_eq!(edges.behavior(1), Some((42, 1.0, 2.0)));
     }
 
     #[test]
@@ -309,11 +488,32 @@ mod tests {
                 let cache = &cache;
                 scope.spawn(move || {
                     for i in 0..64usize {
-                        let edges = cache.get_or_fill(i, (i + t) % 64, || sample(i as f64));
-                        assert_eq!(edges, sample(i as f64));
+                        // each thread fills a different edge of the same
+                        // cells first, then everything that is missing
+                        let mut edges = cache.lookup(i, i);
+                        let d = t % N_NEIGHBOURS;
+                        if edges.p(d).is_none() {
+                            edges.set_p(
+                                d,
+                                if d == 3 {
+                                    BLOCKED
+                                } else {
+                                    i as f64 + d as f64 * 0.01
+                                },
+                            );
+                        }
+                        if edges.behavior(d).is_none() {
+                            edges.set_behavior(d, 100 + d as i64, 1.5 + d as f32, 2.5 + d as f32);
+                        }
+                        edges.commit();
+                        fill_all(cache, i, i, i as f64);
+                        check_all(cache, i, i, i as f64);
                     }
                 });
             }
         });
+        for i in 0..64usize {
+            check_all(&cache, i, i, i as f64);
+        }
     }
 }

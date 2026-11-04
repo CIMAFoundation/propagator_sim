@@ -543,6 +543,13 @@ impl Propagator {
         self.inner.freeze_inactive_tiles().map_err(err)
     }
 
+    /// Bytes held by the shared per-cell edge cache (spread quantities
+    /// reused across realizations; grows with the reached area, not with
+    /// the realization count).
+    fn edge_cache_bytes(&self) -> usize {
+        self.inner.edge_cache_bytes()
+    }
+
     /// Snapshot as a dict of numpy rasters plus a nested `stats` dict; the
     /// Python adapter re-wraps this into the core's dataclasses.
     fn get_output<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {

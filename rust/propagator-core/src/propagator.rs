@@ -108,6 +108,10 @@ pub struct Propagator {
     wind_dir: Option<Grid2<f32>>,
     wind_speed: Option<Grid2<f32>>,
     actions_moisture: Option<Grid2<f32>>,
+    /// cells whose cached edges depend on `actions_moisture`: every cell
+    /// with action moisture plus its 8 neighbours (edges read the target's
+    /// moisture). Decay only invalidates these.
+    actions_footprint: Vec<(usize, usize)>,
     scheduler: Scheduler,
     reals: Vec<Realization>,
     /// realization-independent spread quantities per cell edge, valid for
@@ -176,9 +180,10 @@ impl Propagator {
             wind_dir: None,
             wind_speed: None,
             actions_moisture: None,
+            actions_footprint: Vec::new(),
             scheduler: Scheduler::new(),
             reals,
-            edges: EdgeCache::new(rows, cols),
+            edges: EdgeCache::for_realizations(rows, cols, config.realizations),
             store,
             fold_blocks: HashMap::new(),
             fold_dirty: HashSet::new(),
@@ -229,6 +234,17 @@ impl Propagator {
     /// realization's heap, so nothing in that realization advances again.
     pub fn set_oob_mode(&mut self, mode: OobMode) {
         self.oob_mode = mode;
+    }
+
+    /// Tiles currently held by the shared edge cache (spread quantities
+    /// per cell edge, see [`EdgeCache`]).
+    pub fn edge_cache_tiles(&self) -> usize {
+        self.edges.allocated_tiles()
+    }
+
+    /// Bytes currently held by the shared edge cache.
+    pub fn edge_cache_bytes(&self) -> usize {
+        self.edges.allocated_bytes()
     }
 
     /// Which domain edges the front is pressing against, as
@@ -537,11 +553,7 @@ impl Propagator {
         if time_delta > 0 {
             self.decay_actions_moisture(time_delta);
         }
-        if event.moisture.is_some()
-            || event.additional_moisture.is_some()
-            || event.wind_dir.is_some()
-            || event.wind_speed.is_some()
-        {
+        if event.moisture.is_some() || event.wind_dir.is_some() || event.wind_speed.is_some() {
             self.edges.invalidate();
         }
         if let Some(moisture) = &event.moisture {
@@ -559,6 +571,11 @@ impl Propagator {
             {
                 *a = (*a + *b).clamp(0.0, 1.0);
             }
+            // action moisture only ever accumulates, so the new footprint
+            // covers every cell whose edges changed
+            self.rebuild_actions_footprint();
+            self.edges
+                .invalidate_cells(self.actions_footprint.iter().copied());
         }
         if let Some(wind_dir) = &event.wind_dir {
             self.wind_dir = Some(wind_dir.clone());
@@ -621,7 +638,42 @@ impl Propagator {
         for value in actions.as_mut_slice() {
             *value *= factor;
         }
-        self.edges.invalidate();
+        // only edges into cells with action moisture changed
+        self.edges
+            .invalidate_cells(self.actions_footprint.iter().copied());
+    }
+
+    /// Recompute `actions_footprint` from `actions_moisture`: the cells with
+    /// action moisture, dilated by one cell in every direction.
+    fn rebuild_actions_footprint(&mut self) {
+        self.actions_footprint.clear();
+        let Some(actions) = &self.actions_moisture else {
+            return;
+        };
+        let (rows, cols) = actions.shape();
+        let mut marked = vec![false; rows * cols];
+        for row in 0..rows {
+            for col in 0..cols {
+                if actions[(row, col)] == 0.0 {
+                    continue;
+                }
+                for dr in -1i64..=1 {
+                    for dc in -1i64..=1 {
+                        let r = row as i64 + dr;
+                        let c = col as i64 + dc;
+                        if r >= 0 && c >= 0 && (r as usize) < rows && (c as usize) < cols {
+                            marked[r as usize * cols + c as usize] = true;
+                        }
+                    }
+                }
+            }
+        }
+        self.actions_footprint = marked
+            .iter()
+            .enumerate()
+            .filter(|(_, &m)| m)
+            .map(|(i, _)| (i / cols, i % cols))
+            .collect();
     }
 
     /// Base moisture plus action-derived increments, clipped to [0, 1].
@@ -1288,6 +1340,7 @@ impl Propagator {
             self.actions_moisture =
                 Some(grid.pad_const(new_shape, row_shift, col_shift, 0.0));
         }
+        self.rebuild_actions_footprint();
 
         for (_, event) in self.scheduler.events_mut() {
             reanchor_event(event, row_shift, col_shift, old_shape, new_shape);
@@ -1366,6 +1419,7 @@ impl Propagator {
                 grid.clone()
             }
         });
+        self.rebuild_actions_footprint();
 
         self.scheduler = Scheduler::new();
         for (event_time, event) in &checkpoint.scheduler_events {

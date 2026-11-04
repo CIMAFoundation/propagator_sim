@@ -20,8 +20,14 @@ CELL_REALIZATION_BUDGET = 2.5e8
 # Peak-memory guardrail adapted to this branch's block-sparse engine. It
 # includes fully populated state tiles, the dense fold used to produce web
 # results, shared input/state grids, tile indexes, and the initial front heap.
+# The Rust core additionally keeps a per-cell edge cache (ignition
+# probability, transition time, ROS and FLI for each of the 8 directions,
+# packed in 21 64-bit words per cell) shared by all realizations: counted
+# once per padded cell, not per realization (see
+# `rust/propagator-core/src/edges.rs`, EDGE_TILE_BYTES).
 _TILE_SIZE = 32
 _FRONT_INITIAL_CAPACITY = 4096
+_EDGE_CACHE_BYTES_PER_CELL = 21 * 8
 _FRONT_HEAP_BYTES_PER_EVENT = 5 * 4
 _TILED_STATE_BYTES_PER_CELL = 1 + 4 + 4 + 4
 _FOLD_BYTES_PER_CELL = 48
@@ -30,10 +36,17 @@ _TILE_INDEX_BYTES = 4
 MAX_ESTIMATED_MEMORY_BYTES = 4 * 1024**3  # 4 GiB
 
 
-def _estimate_memory_bytes(grid_cells: float, realizations: int) -> float:
+def _estimate_memory_bytes(
+    grid_cells: float, realizations: int, core: str = "numba"
+) -> float:
     grid_side = math.ceil(math.sqrt(grid_cells))
     tiles_per_side = math.ceil(grid_side / _TILE_SIZE)
     padded_cells = (tiles_per_side * _TILE_SIZE) ** 2
+    shared_bytes = (
+        _FOLD_BYTES_PER_CELL + _SHARED_GRID_BYTES_PER_CELL
+    ) * grid_cells
+    if core == "rust":
+        shared_bytes += _EDGE_CACHE_BYTES_PER_CELL * padded_cells
     return (
         realizations
         * (
@@ -41,7 +54,7 @@ def _estimate_memory_bytes(grid_cells: float, realizations: int) -> float:
             + _TILE_INDEX_BYTES * tiles_per_side**2
             + _FRONT_HEAP_BYTES_PER_EVENT * _FRONT_INITIAL_CAPACITY
         )
-        + (_FOLD_BYTES_PER_CELL + _SHARED_GRID_BYTES_PER_CELL) * grid_cells
+        + shared_bytes
     )
 
 
@@ -99,7 +112,9 @@ class SimulateRequest(BaseModel):
                 f"{CELL_REALIZATION_BUDGET:,.0f}). Lower the radius, "
                 "increase the cellsize, or reduce realizations."
             )
-        estimated_bytes = _estimate_memory_bytes(grid_cells, self.realizations)
+        estimated_bytes = _estimate_memory_bytes(
+            grid_cells, self.realizations, self.core
+        )
         if estimated_bytes > MAX_ESTIMATED_MEMORY_BYTES:
             raise ValueError(
                 "This combination of radius_km/cellsize/realizations would "

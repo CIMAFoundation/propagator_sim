@@ -48,7 +48,7 @@ mod tile_store;
 mod tiles;
 
 pub use checkpoint::{PropagatorCheckpoint, ResumeOptions, CHECKPOINT_VERSION};
-pub use edges::{Edge, EdgeCache};
+pub use edges::{CellEdges, EdgeCache, EDGE_TILE_BYTES};
 pub use error::{PropagatorError, Result};
 pub use fold::{PropagatorOutput, PropagatorStats, StateFold};
 pub use fuels::{

@@ -510,6 +510,12 @@ impl Propagator {
         Ok(out.stats.area_mean / 10_000.0)
     }
 
+    /// Bytes held by the shared per-cell edge cache (spread quantities
+    /// reused across realizations).
+    pub fn edge_cache_bytes(&self) -> usize {
+        self.inner.edge_cache_bytes()
+    }
+
     /// All per-cell output variables packed into one row-major buffer, so a
     /// single [`Propagator::get_output`] call feeds every layer the browser
     /// wants to render or animate.
