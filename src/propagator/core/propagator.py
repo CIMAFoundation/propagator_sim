@@ -44,6 +44,7 @@ from propagator.core.numba import (
     TILE_SHIFT,
     TILE_SIZE,
     FuelSystem,
+    accumulate_flame_block,
     advance_front_until,
     build_fuel_index_grid,
     flood_reachable,
@@ -88,6 +89,12 @@ class StateFold:
     ros_max: npt.NDArray[np.float32]
     fli_sum: npt.NDArray[np.float64]
     fli_max: npt.NDArray[np.float32]
+    # sum of per-realization flame height (m) over burning realizations
+    flame_sum: npt.NDArray[np.float64]
+    flame_max: npt.NDArray[np.float32]
+    # radiant reach (m) of each burning realization: sum and max
+    radiant_sum: npt.NDArray[np.float64]
+    radiant_max: npt.NDArray[np.float32]
 
 
 def _empty_fold(shape: tuple[int, int]) -> StateFold:
@@ -101,6 +108,10 @@ def _empty_fold(shape: tuple[int, int]) -> StateFold:
         ros_max=np.zeros(shape, dtype=np.float32),
         fli_sum=np.zeros(shape, dtype=np.float64),
         fli_max=np.zeros(shape, dtype=np.float32),
+        flame_sum=np.zeros(shape, dtype=np.float64),
+        flame_max=np.zeros(shape, dtype=np.float32),
+        radiant_sum=np.zeros(shape, dtype=np.float64),
+        radiant_max=np.zeros(shape, dtype=np.float32),
     )
 
 
@@ -139,6 +150,15 @@ def _accumulate_frozen_record(
         masked = np.where(valid, values, 0)
         the_sum += masked
         np.maximum(the_max, masked.astype(np.float32), out=the_max)
+
+    accumulate_flame_block(
+        flags,
+        fli,
+        block.flame_sum,
+        block.flame_max,
+        block.radiant_sum,
+        block.radiant_max,
+    )
 
 
 @dataclass
@@ -414,6 +434,39 @@ class Propagator:
         fold = self._fold_state()
         return self._masked_mean(fold.fli_sum, fold.count)
 
+    def compute_flame_height_max(self) -> npt.NDArray[np.floating]:
+        """Return per-cell maximum flame height (m) across realizations.
+
+        Returns
+        -------
+        numpy.ndarray
+            2D array of max flame height values (0 where never burnt).
+        """
+        return self._fold_state().flame_max
+
+    def compute_flame_height_mean(self) -> npt.NDArray[np.floating]:
+        """Return per-cell mean flame height (m) over the realizations
+        that burned the cell (NaN where never burnt).
+
+        Returns
+        -------
+        numpy.ndarray
+            2D array of mean flame height values.
+        """
+        fold = self._fold_state()
+        return self._masked_mean(fold.flame_sum, fold.count)
+
+    def compute_radiant_reach_max(self) -> npt.NDArray[np.floating]:
+        """Return per-cell maximum radiant reach (m) across realizations
+        (0 where never burnt)."""
+        return self._fold_state().radiant_max
+
+    def compute_radiant_reach_mean(self) -> npt.NDArray[np.floating]:
+        """Return per-cell mean radiant reach (m) over the realizations
+        that burned the cell (NaN where never burnt)."""
+        fold = self._fold_state()
+        return self._masked_mean(fold.radiant_sum, fold.count)
+
     def _fold_state(self) -> StateFold:
         """Aggregate the tiled state into per-cell 2D maps in one pass."""
         fold = _empty_fold(self.veg.shape)
@@ -432,6 +485,10 @@ class Propagator:
             fold.ros_max,
             fold.fli_sum,
             fold.fli_max,
+            fold.flame_sum,
+            fold.flame_max,
+            fold.radiant_sum,
+            fold.radiant_max,
         )
         self._fold_frozen(fold)
         return fold
@@ -1086,6 +1143,10 @@ class Propagator:
         ros_mean = self._masked_mean(fold.ros_sum, fold.count)
         fireline_intensity_max = fold.fli_max
         fireline_intensity_mean = self._masked_mean(fold.fli_sum, fold.count)
+        flame_height_max = fold.flame_max
+        flame_height_mean = self._masked_mean(fold.flame_sum, fold.count)
+        radiant_reach_max = fold.radiant_max
+        radiant_reach_mean = self._masked_mean(fold.radiant_sum, fold.count)
         stats = self.compute_stats(fire_probability)
 
         return PropagatorOutput(
@@ -1099,6 +1160,10 @@ class Propagator:
             ros_max=ros_max,
             fli_mean=fireline_intensity_mean,
             fli_max=fireline_intensity_max,
+            flame_height_mean=flame_height_mean,
+            flame_height_max=flame_height_max,
+            radiant_reach_mean=radiant_reach_mean,
+            radiant_reach_max=radiant_reach_max,
             stats=stats,
         )
 
@@ -1500,6 +1565,8 @@ class Propagator:
             fold.arrival_sum[rows, cols] += block.arrival_sum[:height, :width]
             fold.ros_sum[rows, cols] += block.ros_sum[:height, :width]
             fold.fli_sum[rows, cols] += block.fli_sum[:height, :width]
+            fold.flame_sum[rows, cols] += block.flame_sum[:height, :width]
+            fold.radiant_sum[rows, cols] += block.radiant_sum[:height, :width]
             np.maximum(
                 fold.ros_max[rows, cols],
                 block.ros_max[:height, :width],
@@ -1509,6 +1576,16 @@ class Propagator:
                 fold.fli_max[rows, cols],
                 block.fli_max[:height, :width],
                 out=fold.fli_max[rows, cols],
+            )
+            np.maximum(
+                fold.flame_max[rows, cols],
+                block.flame_max[:height, :width],
+                out=fold.flame_max[rows, cols],
+            )
+            np.maximum(
+                fold.radiant_max[rows, cols],
+                block.radiant_max[:height, :width],
+                out=fold.radiant_max[rows, cols],
             )
 
     def _scatter_frozen(self, out: npt.NDArray, component: int) -> None:
