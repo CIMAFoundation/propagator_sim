@@ -14,14 +14,14 @@
         <link rel="prev" href="../outputs/">
       
       
-        <link rel="next" href="../reference/">
+        <link rel="next" href="../checkpoints/">
       
       
         
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -29,7 +29,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
       
       
 
@@ -258,6 +258,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive Demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../programmatic/" class="md-nav__link">
         
   
@@ -293,6 +320,33 @@
     
   
     CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Demo
   
 
     
@@ -578,6 +632,114 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../checkpoints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Checkpoints & Domain Growth
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rust-vs-numba/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust vs numba Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
     
     
       
@@ -604,7 +766,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -626,14 +788,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+              <label class="md-nav__link " for="__nav_13" id="__nav_13_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1003,10 +1165,10 @@ sim = Propagator(
 </code></pre>
 <h2 id="model">Model</h2>
 <p>When a spotting-prone cell burns, it emits a Poisson-distributed number of
-embers (mean <code>LAMBDA_SPOTTING = 2</code>). Each ember is thrown at a
-uniformly random azimuth <code>θ</code>, lands some distance away, and — if it clears the
-landing-cell checks — ignites a new fire after a delay. The landing distance is
-the heart of the model and is documented in full below.</p>
+embers (mean <code>LAMBDA_SPOTTING = 2</code>). Each ember is thrown at a uniformly random
+azimuth <code>θ</code>, lands some distance away, and — if it clears the landing-cell
+checks — ignites a new fire after a delay. The landing distance is the heart of
+the model and is documented in full below.</p>
 <h3 id="landing-distance">Landing distance</h3>
 <p>Each ember's landing distance is drawn from a <strong>lognormal distribution</strong> whose
 median scales with wind speed and with the source cell's fireline intensity,
@@ -1021,10 +1183,13 @@ landing_time = distance / ( U · max(alignment, MIN_ALIGNMENT) )    # seconds
 cell's wind speed, and <code>I</code> the source cell's fireline intensity (kW/m, carried
 on the propagation front from when the source cell ignited). If <code>U ≤ 0</code> or
 <code>I ≤ 0</code> the ember travels no distance (no transport medium / no fire to loft
-it). The model lives in <code>fire_spotting</code> / <code>compute_spotting</code> in
-<code>propagator.core.numba.propagation</code>.</p>
-<p>Reference values (the values below are injected from the code at docs-build
-time, so they always match the running constants):</p>
+it). The same formulation and the same RNG draw order are used by
+both the numba core (<code>fire_spotting</code> / <code>compute_spotting</code> in
+<code>propagator.core.numba.propagation</code>) and the Rust core
+(<code>rust/propagator-core/src/kernel.rs</code>), so the two remain statistically
+equivalent.</p>
+<p>Reference values (both cores; the values below are injected from the code at
+docs-build time, so they always match the running constants):</p>
 <!-- markdownlint-disable MD060 -->
 <table>
 <thead>
@@ -1171,9 +1336,9 @@ magnitude. Downwind embers (<code>cos ≈ 1</code>) are carried at nearly full w
 off-axis embers move downrange more slowly and take longer to land. The
 projection is floored at <code>SPOTTING_MIN_ALIGNMENT = 0.2</code> to
 remove the <code>cos → 0</code> singularity for near-crosswind embers and to prevent
-implausibly long flight times; because the <code>directional</code> factor and the
-<code>2·cellsize</code> filter already suppress off-axis throws, this floor affects only a
-small tail of embers.</p>
+implausibly long flight
+times; because the <code>directional</code> factor and the <code>2·cellsize</code> filter already
+suppress off-axis throws, this floor affects only a small tail of embers.</p>
 <h2 id="calibration-and-tuning">Calibration and tuning</h2>
 <p>All behaviour is controlled by the reference constants. To recalibrate:</p>
 <ul>
@@ -1266,10 +1431,10 @@ receiving probability maps, is available in the repository at
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
       
         <script src="../javascripts/cima-brand.js"></script>
       

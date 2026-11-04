@@ -1,0 +1,1154 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="PROPAGATOR: An Operational Cellular-Automata Based Wildfire Simulator">
+      
+      
+      
+      
+        <link rel="prev" href="../core-internals/">
+      
+      
+        <link rel="next" href="../reference/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Migration Guide - PROPAGATOR Sim</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../stylesheets/cima-theme.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#migration-guide-from-01x-main" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="PROPAGATOR Sim" class="md-header__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
+      
+  <img src="../img/cima.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            PROPAGATOR Sim
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Migration Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="PROPAGATOR Sim" class="md-nav__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
+      
+  <img src="../img/cima.png" alt="logo">
+
+    </a>
+    PROPAGATOR Sim
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive Demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../programmatic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programmatic Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../outputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulation Outputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spotting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fire Spotting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../checkpoints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Checkpoints & Domain Growth
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rust-vs-numba/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust vs numba Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migration Guide
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Breaking changes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Breaking changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-dense-state-fields-getter-methods-and-a-new-axis-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Dense state fields → getter methods (and a new axis order)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-out_of_bounds_moderaise-now-suspends-instead-of-burning-the-edge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. out_of_bounds_mode="raise" now suspends instead of burning the edge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-removed-low-level-kernel-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Removed low-level kernel API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-construct-propagator-with-keyword-arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Construct Propagator with keyword arguments
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#new-capabilities-opt-in-no-action-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New capabilities (opt-in, no action required)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behavioural-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavioural notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../reference/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_13" id="__nav_13_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/propagator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/numba/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Numba Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bibliography/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bibliography
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Breaking changes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Breaking changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-dense-state-fields-getter-methods-and-a-new-axis-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Dense state fields → getter methods (and a new axis order)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-out_of_bounds_moderaise-now-suspends-instead-of-burning-the-edge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. out_of_bounds_mode="raise" now suspends instead of burning the edge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-removed-low-level-kernel-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Removed low-level kernel API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-construct-propagator-with-keyword-arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Construct Propagator with keyword arguments
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#new-capabilities-opt-in-no-action-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New capabilities (opt-in, no action required)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behavioural-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavioural notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="migration-guide-from-01x-main">Migration Guide (from 0.1.x / <code>main</code>)</h1>
+<p>This release reworks how simulation state is stored: per-cell state
+moved from dense per-realization arrays into block-sparse 32×32 tiles
+allocated on demand, which cut peak memory ~5× at scale (4.7 GB →
+0.94 GB at 1000×1000 cells × 100 realizations) and enabled
+checkpointing, rollback, domain growth and freezing burned-out interior
+tiles to disk. Most of the public API is unchanged; the breaking
+changes below all stem from the dense state arrays no longer existing.</p>
+<h2 id="breaking-changes">Breaking changes</h2>
+<h3 id="1-dense-state-fields-getter-methods-and-a-new-axis-order">1. Dense state fields → getter methods (and a new axis order)</h3>
+<p>The public arrays <code>fire</code>, <code>arrival_time</code>, <code>ros</code>, <code>fireline_int</code>,
+<code>spotting_generation</code> and <code>spotting_receiving</code> no longer exist as
+attributes. Dense views are materialized on demand by getters — and the
+layout changed from <code>(rows, cols, realizations)</code> to
+<code>(realizations, rows, cols)</code> so each realization's grid is contiguous:</p>
+<table>
+<thead>
+<tr>
+<th>0.1.x</th>
+<th>now</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sim.fire[row, col, r]</code></td>
+<td><code>sim.get_fire()[r, row, col]</code></td>
+</tr>
+<tr>
+<td><code>sim.arrival_time[row, col, r]</code></td>
+<td><code>sim.get_arrival_time()[r, row, col]</code></td>
+</tr>
+<tr>
+<td><code>sim.ros[row, col, r]</code></td>
+<td><code>sim.get_ros()[r, row, col]</code></td>
+</tr>
+<tr>
+<td><code>sim.fireline_int[row, col, r]</code></td>
+<td><code>sim.get_fireline_int()[r, row, col]</code></td>
+</tr>
+<tr>
+<td><code>sim.spotting_generation[...]</code></td>
+<td><code>sim.get_spotting_generation()[r, row, col]</code></td>
+</tr>
+<tr>
+<td><code>sim.spotting_receiving[...]</code></td>
+<td><code>sim.get_spotting_receiving()[r, row, col]</code></td>
+</tr>
+</tbody>
+</table>
+<p>Notes:</p>
+<ul>
+<li>The getters allocate a full dense array per call — they are meant for
+  analysis and tests, not for per-step hot loops. Cache the result if
+  you need several reads.</li>
+<li>The spotting getters return zero-filled arrays (never <code>None</code>) when
+  spotting is disabled; code that checked <code>spotting_generation is None</code>
+  should check <code>sim.do_spotting</code> instead.</li>
+<li>Aggregations you computed manually from the dense arrays (e.g.
+  <code>np.mean(sim.fire, axis=2)</code>) have first-class equivalents that are
+  much faster: <code>compute_fire_probability()</code>, <code>compute_ros_max()</code>,
+  <code>compute_arrival_time_min()</code>, … or a single <code>get_output()</code>.</li>
+<li>Writing into the state arrays directly is no longer possible; enqueue
+  ignitions through <code>BoundaryConditions(ignitions=...)</code>.</li>
+</ul>
+<p><code>PropagatorOutput</code> and all <code>compute_*</code> methods are unchanged: 2D maps
+with the same meanings and dtypes as before.</p>
+<h3 id="2-out_of_bounds_moderaise-now-suspends-instead-of-burning-the-edge">2. <code>out_of_bounds_mode="raise"</code> now suspends instead of burning the edge</h3>
+<p>Previously the boundary cell burned, its out-of-grid spreads were
+silently dropped, and the error was raised afterwards. Now the kernel
+suspends the affected realization <em>before</em> igniting the boundary-ring
+cell, leaving its event heap intact, and <code>step()</code> raises
+<code>PropagatorOutOfBoundsError</code>. The simulation state remains valid and
+resumable: grow the domain with <code>expand()</code> /
+<code>Propagator.from_checkpoint()</code> and call <code>step()</code> again, or set
+<code>out_of_bounds_mode="ignore"</code> to let the fire stop at the boundary as
+before.</p>
+<p>If you catch this error today just to terminate the run, no change is
+needed — but note the fire no longer burns the outermost ring in
+<code>"raise"</code> mode before raising.</p>
+<h3 id="3-removed-low-level-kernel-api">3. Removed low-level kernel API</h3>
+<p>The <code>UpdateBatch</code>-based spread path is gone: <code>next_updates_fn</code> and
+<code>single_cell_updates</code> no longer exist. Propagation runs entirely inside
+the <code>advance_front_until</code> front-tracking kernel, whose signature changed
+(tiled state pools instead of dense arrays). If you called these
+directly, drive the simulation through <code>Propagator.step()</code> /
+<code>set_boundary_conditions()</code> instead.</p>
+<h3 id="4-construct-propagator-with-keyword-arguments">4. Construct <code>Propagator</code> with keyword arguments</h3>
+<p>New optional fields (<code>origin</code>, <code>seed</code>, <code>freeze_dir</code>) were inserted
+before <code>p_time_fn</code> / <code>p_moist_fn</code> in the dataclass, so positional
+construction beyond <code>veg, dem</code> will silently bind the wrong parameters.
+Use keywords (the documented style) for everything after <code>veg</code> and
+<code>dem</code>.</p>
+<h2 id="new-capabilities-opt-in-no-action-required">New capabilities (opt-in, no action required)</h2>
+<ul>
+<li><strong>Checkpoints &amp; rollback</strong> — <code>checkpoint()</code>, <code>restore()</code>,
+  <code>PropagatorCheckpoint.save()/load()</code>,
+  <code>Propagator.from_checkpoint()</code>.</li>
+<li><strong>World coordinates &amp; domain growth</strong> — <code>origin=(row, col)</code>,
+  <code>world_bounds()</code>, in-place <code>expand()</code>.</li>
+<li><strong>Deterministic seeding</strong> — <code>seed=...</code> / <code>reseed()</code>; same seed,
+  machine and numba thread count → bitwise-identical runs.</li>
+<li><strong>Tile freezing</strong> — <code>freeze_dir=...</code> + <code>freeze_inactive_tiles()</code>
+  pages burned-out interior tiles to disk with a precomputed output
+  cache, keeping RAM proportional to the active front.</li>
+</ul>
+<p>See <a href="../checkpoints/">Checkpoints, Rollback &amp; Domain Growth</a> for all of
+these.</p>
+<h2 id="behavioural-notes">Behavioural notes</h2>
+<ul>
+<li>Memory is allocated on demand (front heaps and tile pools start small
+  and grow), so fresh instances are cheap even on large grids;
+  first-step latency can include a growth step or two.</li>
+<li><code>get_output()</code> computes all maps from a single aggregation pass and
+  is dramatically faster (~20 ms vs ~1.4 s at 1000×1000 × 100
+  realizations).</li>
+<li>Kernel event throughput is at or above the 0.1.x baseline
+  (~800–860k events/s vs 788–829k in the benchmark scenario).</li>
+<li>The Rust core can be compared against the numba core with
+  <code>benchmarks/compare_cores.py</code>. On the local development machine, a
+  1000×1000 grid with 100 realizations over 12 simulated hours used
+  ~459 MB peak RSS for Rust vs ~626 MB for numba in single-thread mode,
+  with timed loop runtimes of 1.485 s vs 2.154 s. The benchmark excludes
+  numba JIT warmup from the timed loop by running a one-second warmup
+  step first; warmup is reported separately.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+        <script src="../javascripts/cima-brand.js"></script>
+      
+    
+  </body>
+</html>

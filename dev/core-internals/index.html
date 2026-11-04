@@ -1,0 +1,1649 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="PROPAGATOR: An Operational Cellular-Automata Based Wildfire Simulator">
+      
+      
+      
+      
+        <link rel="prev" href="../rust-vs-numba/">
+      
+      
+        <link rel="next" href="../migration/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Core Internals - PROPAGATOR Sim</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../stylesheets/cima-theme.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#core-internals" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="PROPAGATOR Sim" class="md-header__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
+      
+  <img src="../img/cima.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            PROPAGATOR Sim
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Core Internals
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="PROPAGATOR Sim" class="md-nav__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
+      
+  <img src="../img/cima.png" alt="logo">
+
+    </a>
+    PROPAGATOR Sim
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive Demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../programmatic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programmatic Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../outputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulation Outputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spotting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fire Spotting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../checkpoints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Checkpoints & Domain Growth
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rust-vs-numba/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust vs numba Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Internals
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-shared-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The shared model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#block-sparse-tiling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Block-sparse tiling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Block-sparse tiling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-tiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why tiles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#coordinate-decomposition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coordinate decomposition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-tile-grid-an-index-plus-a-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The tile grid: an index plus a pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#numba-layout-shared-pools-capacity-doubling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        numba layout: shared pools + capacity doubling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rust-layout-per-realization-owned-pools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rust layout: per-realization owned pools
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aggregating-outputs-the-fold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggregating outputs (the fold)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-front-event-heaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The front event heaps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The front event heaps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#numba-preallocation-with-suspend-and-regrow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        numba: preallocation with suspend-and-regrow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rust-grow-on-demand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rust: grow on demand
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#growing-the-domain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Growing the domain
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Growing the domain">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#world-coordinates-and-origin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        World coordinates and origin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#boundary-halt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Boundary halt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-northwest-growth-must-be-tile-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why north/west growth must be tile-aligned
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#in-place-growth-expand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In-place growth: expand()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#growth-through-a-checkpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Growth through a checkpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#freezing-burned-out-tiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Freezing burned-out tiles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-look-in-the-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to look in the source
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../reference/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_13" id="__nav_13_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/propagator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/numba/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Numba Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bibliography/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bibliography
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-shared-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The shared model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#block-sparse-tiling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Block-sparse tiling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Block-sparse tiling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-tiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why tiles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#coordinate-decomposition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coordinate decomposition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-tile-grid-an-index-plus-a-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The tile grid: an index plus a pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#numba-layout-shared-pools-capacity-doubling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        numba layout: shared pools + capacity doubling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rust-layout-per-realization-owned-pools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rust layout: per-realization owned pools
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aggregating-outputs-the-fold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggregating outputs (the fold)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-front-event-heaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The front event heaps
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The front event heaps">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#numba-preallocation-with-suspend-and-regrow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        numba: preallocation with suspend-and-regrow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rust-grow-on-demand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rust: grow on demand
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#growing-the-domain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Growing the domain
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Growing the domain">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#world-coordinates-and-origin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        World coordinates and origin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#boundary-halt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Boundary halt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-northwest-growth-must-be-tile-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why north/west growth must be tile-aligned
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#in-place-growth-expand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In-place growth: expand()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#growth-through-a-checkpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Growth through a checkpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#freezing-burned-out-tiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Freezing burned-out tiles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-look-in-the-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to look in the source
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="core-internals">Core Internals</h1>
+<p>This page explains how the simulation <strong>core</strong> works under the hood: how it
+stores per-cell state, schedules the fire front, grows the domain at
+runtime, and pages burned-out interior to disk. It covers both
+interchangeable cores — the Python/numba core (<code>propagator.core</code>) and the
+Rust core (<code>propagator-core</code>, exposed to Python as <code>propagator_rust</code> behind
+the <code>propagator.rust_core</code> adapter) — and calls out where their internal
+layouts diverge.</p>
+<p>It is the implementation companion to the user-facing
+<a href="../checkpoints/">Checkpoints, Rollback &amp; Domain Growth</a> page and to the
+<a href="../rust-core-spec/">Rust Core Specification</a>; read those first for the
+<em>what</em>, and this page for the <em>how</em>. For choosing between the two cores and
+their observable trade-offs, see <a href="../rust-vs-numba/">Rust vs numba Core</a>.</p>
+<h2 id="the-shared-model">The shared model</h2>
+<p>Both cores implement the same stochastic cellular-automaton model as an
+<strong>event-driven</strong> simulation: each of the <code>R</code> realizations owns a min-heap of
+pending ignition events, and the kernel repeatedly pops the earliest event,
+marks the cell burnt, and pushes spread (and ember) events for its
+neighbours. Realizations are independent given the shared read-only inputs
+(vegetation, terrain, weather, fuels), so both cores parallelize over them.</p>
+<p>They agree on the observable model — outputs match to Monte-Carlo noise —
+but make different internal choices for storage, front-buffer growth,
+random-number generation and parallelism (compared in detail in
+<a href="../rust-vs-numba/">Rust vs numba Core</a>). Everything below — tiling, world
+coordinates, freezing, growth rules — is shared design; the per-core notes
+call out the layout differences.</p>
+<h2 id="block-sparse-tiling">Block-sparse tiling</h2>
+<h3 id="why-tiles">Why tiles</h3>
+<p>A dense per-cell, per-realization store costs <code>rows × cols × R</code> for every
+tracked quantity. At 1000×1000 cells × 100 realizations that is 100 M cells
+per array — several GB across flags, arrival time, rate of spread and
+fireline intensity — even though at any instant the fire only touches a thin
+front and a growing burned interior.</p>
+<p>Instead, per-cell state lives in fixed <strong>32×32 tiles</strong> allocated on demand
+as the fire reaches them, so memory scales with <em>burned area</em> rather than
+grid area. This is what cut peak memory ~5× at scale (see the
+<a href="../migration/">Migration Guide</a>) and what makes checkpointing, domain
+growth and disk freezing tractable.</p>
+<h3 id="coordinate-decomposition">Coordinate decomposition</h3>
+<p>The tile size is a power of two (<code>TILE_SIZE = 32 = 1 &lt;&lt; TILE_SHIFT</code>,
+<code>TILE_MASK = 31</code>), so splitting a cell coordinate into <em>which tile</em> and
+<em>where inside it</em> is pure bit-twiddling, no division:</p>
+<pre><code>row  ──▶  tile_row = row &gt;&gt; TILE_SHIFT   (which tile block)
+          local_row = row &amp; TILE_MASK    (0..31 inside the tile)
+col  ──▶  tile_col = col &gt;&gt; TILE_SHIFT
+          local_col = col &amp; TILE_MASK
+</code></pre>
+<p>A tile's top-left cell is therefore at <code>(tile_row &lt;&lt; TILE_SHIFT,
+tile_col &lt;&lt; TILE_SHIFT)</code>. Four coordinate spaces coexist:</p>
+<ul>
+<li><strong>world</strong> — absolute cell coordinates, stable across domain growth (see
+  <a href="#world-coordinates-and-origin">World coordinates</a>).</li>
+<li><strong>local</strong> — cell coordinates in the current grid (<code>world − origin</code>).</li>
+<li><strong>tile</strong> — the <code>(tile_row, tile_col)</code> block index.</li>
+<li><strong>in-tile</strong> — the <code>(local_row, local_col)</code> offset within a 32×32 tile.</li>
+</ul>
+<h3 id="the-tile-grid-an-index-plus-a-pool">The tile grid: an index plus a pool</h3>
+<p>Each realization has a small dense <strong>tile-index grid</strong> — one <code>i32</code> per
+32×32 block — that maps a block to one of:</p>
+<table>
+<thead>
+<tr>
+<th>value</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-1</code> (<code>UNALLOCATED</code>)</td>
+<td>never touched; reads as empty</td>
+</tr>
+<tr>
+<td><code>-2</code> (<code>FROZEN_TILE</code>)</td>
+<td>paged to disk; reads as fully <strong>burnt</strong></td>
+</tr>
+<tr>
+<td><code>≥ 0</code></td>
+<td>slot index into the realization's tile <strong>pool</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The actual per-cell arrays (a <code>uint8</code> flags byte, <code>int32</code> arrival time,
+<code>float32</code> rate of spread, <code>float32</code> fireline intensity) live in the pool,
+one 32×32 block per array per allocated tile. The flags byte is a bitfield:</p>
+<pre><code>FLAG_FIRE      = 1   cell has burnt
+FLAG_SPOT_GEN  = 2   cell emitted embers (spotting source)
+FLAG_SPOT_RECV = 4   cell was ignited by an ember
+</code></pre>
+<p>Reading a cell is: look up its tile in the index; if <code>FROZEN_TILE</code> return
+"burnt"; if <code>&lt; 0</code> return "empty"; otherwise index the pool at
+<code>[slot][local_row][local_col]</code>. The frozen sentinel reading as burnt is
+exact — a tile is only frozen once every in-domain cell is provably burnt or
+fuel-free (see <a href="#freezing-burned-out-tiles">Freezing</a>), so the kernel never
+needs the stored bytes to know the answer.</p>
+<h3 id="numba-layout-shared-pools-capacity-doubling">numba layout: shared pools + capacity doubling</h3>
+<p>The numba core keeps everything in shared N-D NumPy arrays so the JIT
+kernels can index them without Python objects:</p>
+<pre><code>_tile_idx      (R, tiles_h, tiles_w)          int32   the index grid
+_tile_counts   (R,)                            int32   next free slot per realization
+_tile_capacity  scalar                                 pool depth (shared across R)
+_tile_flags    (R, capacity, 32, 32)          uint8
+_tile_arrival  (R, capacity, 32, 32)          int32
+_tile_ros      (R, capacity, 32, 32)          float32
+_tile_fli      (R, capacity, 32, 32)          float32
+</code></pre>
+<p>Allocating a tile bumps <code>_tile_counts[r]</code> and stores the new slot in the
+index. When a realization's count would exceed <code>_tile_capacity</code>,
+<code>_grow_tiles()</code> <strong>doubles</strong> the pool depth (capped at <code>tiles_h × tiles_w</code>)
+and copies the old contents forward. Pool depth is shared across
+realizations, so it tracks the busiest realization.</p>
+<h3 id="rust-layout-per-realization-owned-pools">Rust layout: per-realization owned pools</h3>
+<p>The Rust core gives each realization its own <code>TileGrid</code>:</p>
+<pre><code class="language-rust">struct TileGrid {
+    idx:  Vec&lt;i32&gt;,          // tiles_h * tiles_w, row-major index grid
+    pool: Vec&lt;Box&lt;Tile&gt;&gt;,    // one heap-boxed tile per allocated block
+}
+struct Tile {                // struct-of-arrays, ~13 KiB
+    flags:   [u8;  1024],
+    arrival: [i32; 1024],
+    ros:     [f32; 1024],
+    fli:     [f32; 1024],
+}
+</code></pre>
+<p><code>ensure_slot()</code> pushes a zeroed <code>Box&lt;Tile&gt;</code> and records its slot; the <code>Vec</code>
+grows naturally, so there is no capacity ceiling and no doubling copy —
+each realization allocates exactly what it uses. <code>remove_slots()</code> compacts
+the pool and remaps the index when tiles are frozen out.</p>
+<h3 id="aggregating-outputs-the-fold">Aggregating outputs (the fold)</h3>
+<p>Outputs (<code>get_output()</code>, the dense getters) are produced by a single
+<strong>fold</strong> pass that reduces the tiled state across realizations into 2D
+per-cell maps: burn <code>count</code>, spotting counts, <code>arrival_min</code>/<code>arrival_sum</code>,
+<code>ros_sum</code>/<code>ros_max</code>, <code>fli_sum</code>/<code>fli_max</code>. Dividing a <code>*_sum</code> by <code>count</code>
+yields the per-cell mean over the realizations that burned it.</p>
+<ul>
+<li>numba folds in parallel <strong>over spatial tiles</strong> (<code>fold_state_tiles</code>, a
+  <code>prange</code> kernel): each output cell is owned by exactly one tile, so the
+  in-place accumulation is race-free.</li>
+<li>Rust folds each realization's allocated tiles into a shared <code>StateFold</code>
+  (<code>fold_realization</code>), then merges the frozen-tile cache blocks.</li>
+</ul>
+<p>Frozen tiles are folded from the on-disk store (numba) or the in-memory
+fold cache (both), never re-simulated — see below.</p>
+<h2 id="the-front-event-heaps">The front event heaps</h2>
+<p>Each realization's pending events are a <strong>binary min-heap keyed by event
+time</strong>, stored struct-of-arrays (<code>times</code>, <code>rows</code>, <code>cols</code>, <code>ros</code>, <code>fli</code>
+permuted together). The heap ordering is by <code>times</code> alone; the other arrays
+are payload that rides along with its key. <code>push</code> sifts up, <code>pop_min</code> swaps
+the root with the last leaf and sifts down — both <code>O(log n)</code>.</p>
+<p>The cores differ in <em>how the buffers grow</em>:</p>
+<h3 id="numba-preallocation-with-suspend-and-regrow">numba: preallocation with suspend-and-regrow</h3>
+<p>The numba heaps are shared preallocated arrays (<code>(R, capacity)</code>), driven
+inside one JIT kernel. Because a kernel invocation cannot resize a NumPy
+array mid-flight, the kernel guarantees it never overruns: before each pop
+it checks there is headroom for the <strong>worst case</strong> that pop can generate —
+<code>FRONT_RESERVE = 8 neighbours + 32 embers = 40</code> new heap entries, and
+<code>TILE_RESERVE = 1 + 32 = 33</code> new tile allocations. If either would exceed
+capacity it sets <code>overflow[r] = 1</code> and <strong>suspends that realization with its
+heap intact</strong>. Control returns to the driver (<code>_propagate_until</code>), which
+grows the front and/or tile buffers (<code>_grow_front</code>, <code>_grow_tiles</code>) and
+re-enters the kernel to resume. This is the <em>suspend-and-regrow</em> protocol.</p>
+<h3 id="rust-grow-on-demand">Rust: grow on demand</h3>
+<p>The Rust heaps are per-realization <code>Vec</code>s (<code>FrontHeap</code>). Pushing simply
+grows the <code>Vec</code>, so there is <strong>no capacity suspension and no reserve
+accounting</strong> — the kernel runs a realization to completion in one call. The
+only reason a Rust realization suspends mid-window is the boundary halt
+below, which both cores share.</p>
+<h2 id="growing-the-domain">Growing the domain</h2>
+<h3 id="world-coordinates-and-origin">World coordinates and origin</h3>
+<p>Every simulator is anchored in an absolute <strong>world</strong> cell coordinate
+system. <code>origin = (row, col)</code> is the world position of local cell <code>(0, 0)</code>;
+<code>world_bounds()</code> returns the inclusive world extent. Local and world
+coordinates coincide for the default <code>origin = (0, 0)</code>. The origin is what
+lets state captured on one grid be re-anchored onto another — state
+transfers where the world coordinates overlap.</p>
+<p>Frozen-tile store keys are <code>(realization, world_row, world_col)</code> of the
+tile's top-left cell, so they too survive growth unchanged.</p>
+<h3 id="boundary-halt">Boundary halt</h3>
+<p>With the default <code>out_of_bounds_mode = "raise"</code> (<code>OobMode::Raise</code> in Rust),
+the kernel <strong>suspends a realization before igniting a boundary-ring cell</strong>
+— any cell with <code>row ≤ 0</code>, <code>col ≤ 0</code>, <code>row ≥ n_rows−1</code> or <code>col ≥ n_cols−1</code>
+that is not already burnt. The triggering event is left at the heap root
+(not popped), the realization is flagged <code>out_of_bounds</code> / <code>halted_on_
+boundary</code>, and <code>step()</code> raises <code>PropagatorOutOfBoundsError</code>. Nothing is
+lost: the exact spread that would have crossed the edge is still pending.</p>
+<p><code>boundary_pressure()</code> reports <strong>which</strong> edges are under pressure as
+<code>(north, south, west, east)</code> by inspecting the heap-root cell of every
+halted realization. A domain-growth wrapper uses this to enlarge only the
+sides the fire actually reached, rather than padding all four.</p>
+<h3 id="the-rules">The rules</h3>
+<p>Both growth paths enforce the same constraints (<code>growth_shifts</code> in Rust,
+<code>_growth_shifts</code> in numba):</p>
+<ul>
+<li><strong>Containment</strong> — the new grid must fully contain the old one; the origin
+  may only move north/west (toward smaller world coordinates), never
+  south/east. Formally <code>row_shift = old_origin − new_origin ≥ 0</code> on both
+  axes.</li>
+<li><strong>Tile alignment</strong> — the north/west shift must be a multiple of
+  <code>TILE_SIZE</code> (32 cells). This is the crucial one (see below). Growth to
+  the south/east has no alignment constraint.</li>
+<li><strong>Invariant fields</strong> — <code>realizations</code>, <code>cellsize</code> and <code>do_spotting</code> must
+  match (checkpoint growth).</li>
+</ul>
+<h3 id="why-northwest-growth-must-be-tile-aligned">Why north/west growth must be tile-aligned</h3>
+<p>Growing south/east only appends new blocks past the old extent, so the
+existing tile grid keeps its indices. Growing north/west <strong>shifts every
+existing cell</strong> to a higher local coordinate. If that shift were not a
+multiple of 32, cells would move to a different in-tile offset and every
+tile's contents would have to be re-binned — an expensive full rewrite.</p>
+<p>By forcing the shift to whole tiles, the shift in <em>tile</em> space is exactly
+<code>tile_row0 = row_shift &gt;&gt; TILE_SHIFT</code>, <code>tile_col0 = col_shift &gt;&gt;
+TILE_SHIFT</code>. The tile <strong>pools transfer byte-for-byte</strong>; only the small
+tile-index grid is re-anchored — the old index is copied into a fresh,
+larger <code>-1</code>-filled grid at <code>(tile_row0, tile_col0)</code>. This is what makes
+growth cheap regardless of how much has already burnt.</p>
+<h3 id="in-place-growth-expand">In-place growth: <code>expand()</code></h3>
+<p><code>expand(veg, dem, origin)</code> grows the live simulator without copying heaps or
+pools. Step by step it:</p>
+<ol>
+<li>Validates the request and computes <code>(row_shift, col_shift)</code>.</li>
+<li>Blits the current vegetation into the new grid at the shift (so past
+   <code>vegetation_changes</code> in the overlap survive), replaces <code>dem</code>, rebuilds
+   the fuel-index grid, and updates <code>origin</code>.</li>
+<li>Shifts pending front events: <code>rows += row_shift</code>, <code>cols += col_shift</code>.</li>
+<li>Re-anchors each realization's tile-index grid into the enlarged shape at
+   <code>(tile_row0, tile_col0)</code>; the pools are untouched.</li>
+<li>Pads the 2D fields — <code>moisture</code>/<code>wind_dir</code>/<code>wind_speed</code> by <strong>edge
+   replication</strong> (so the boundary keeps sane weather until fresh conditions
+   arrive), <code>actions_moisture</code> with <strong>zeros</strong>.</li>
+<li>Re-anchors every queued scheduler event: shift its ignition coordinates
+   and pad any attached field grids (<code>reanchor_event</code>).</li>
+</ol>
+<h3 id="growth-through-a-checkpoint">Growth through a checkpoint</h3>
+<p><code>checkpoint()</code> + <code>from_checkpoint(...)</code> performs the same re-anchoring but
+through an immutable snapshot, for when growth coincides with a save/restore
+boundary (e.g. moving the run to another process). <code>_load_state</code> (Rust:
+<code>load_state</code>) applies the identical shift/pad/re-anchor logic to the
+checkpoint's heaps, tiles, fields and scheduler events, then re-attaches its
+frozen tiles. A same-grid <code>restore()</code> is just the zero-shift special case.</p>
+<h2 id="freezing-burned-out-tiles">Freezing burned-out tiles</h2>
+<p>On long runs the burned interior grows without bound while the kernel only
+works at the front. With a <code>freeze_dir</code>, a tile can be <strong>frozen</strong> — paged to
+an append-only disk file and dropped from memory, its index entry set to the
+<code>FROZEN_TILE</code> sentinel — once propagation can provably never touch it again:</p>
+<ul>
+<li>with spotting <strong>disabled</strong>: no pending front event can reach any unburnt
+  fuel cell of the tile (decided by an 8-connected <code>flood_reachable</code> flood
+  from the pending events through unburnt fuel);</li>
+<li>with spotting <strong>enabled</strong>: the stricter "every in-domain cell of the tile
+  is burnt or fuel-free" criterion.</li>
+</ul>
+<p>Because frozen tiles read as fully burnt and the criterion guarantees that
+is correct, freezing changes neither the dynamics nor the RNG streams — a
+seeded run is bitwise-identical with or without it. Records are fixed-size
+(<strong>~13 KB</strong>: 1024 flags bytes + three 32×32 <code>int32</code>/<code>float32</code> arrays),
+world-keyed, and never overwritten within a session, so a checkpoint can
+reference them by offset for <strong>incremental</strong> snapshots.</p>
+<p>Rendering outputs never re-reads frozen tiles from disk: each tile's
+contribution to the fold aggregates is kept in an in-memory <strong>fold cache</strong>,
+one 32×32 <code>StateFold</code> block per world tile position. Freezing adds a block;
+thawing marks its position dirty (min/max cannot be un-merged, so it is
+rebuilt lazily from the remaining records); restoring invalidates the cache.</p>
+<p>See <a href="../checkpoints/#freezing-inactive-tiles-to-disk">Checkpoints, Rollback &amp; Domain Growth</a>
+for the operational view, sidecar persistence and the floating-point caveat.</p>
+<h2 id="where-to-look-in-the-source">Where to look in the source</h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>numba core</th>
+<th>Rust core</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tile constants, index/pool, fold, flood</td>
+<td><code>core/numba/tiles.py</code></td>
+<td><code>propagator-core/src/tiles.rs</code>, <code>fold.rs</code></td>
+</tr>
+<tr>
+<td>Front heap</td>
+<td><code>core/numba/front_tracking.py</code></td>
+<td><code>propagator-core/src/front.rs</code></td>
+</tr>
+<tr>
+<td>Spread kernel</td>
+<td><code>core/numba/front_tracking.py</code>, <code>propagation.py</code></td>
+<td><code>propagator-core/src/kernel.rs</code></td>
+</tr>
+<tr>
+<td>Driver, growth, freezing</td>
+<td><code>core/propagator.py</code></td>
+<td><code>propagator-core/src/propagator.rs</code></td>
+</tr>
+<tr>
+<td>Frozen-tile store</td>
+<td><code>core/tile_store.py</code></td>
+<td><code>propagator-core/src/tile_store.rs</code></td>
+</tr>
+<tr>
+<td>Checkpoints &amp; re-anchoring</td>
+<td><code>core/checkpoint.py</code></td>
+<td><code>propagator-core/src/checkpoint.rs</code></td>
+</tr>
+<tr>
+<td>Python ↔ Rust bindings</td>
+<td>—</td>
+<td><code>propagator-py/src/lib.rs</code>, <code>propagator/rust_core.py</code></td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+        <script src="../javascripts/cima-brand.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,1183 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="PROPAGATOR: An Operational Cellular-Automata Based Wildfire Simulator">
+      
+      
+      
+      
+        <link rel="prev" href="../checkpoints/">
+      
+      
+        <link rel="next" href="../core-internals/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Rust vs numba Core - PROPAGATOR Sim</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../stylesheets/cima-theme.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#rust-vs-numba-core" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="PROPAGATOR Sim" class="md-header__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
+      
+  <img src="../img/cima.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            PROPAGATOR Sim
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Rust vs numba Core
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="PROPAGATOR Sim" class="md-nav__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
+      
+  <img src="../img/cima.png" alt="logo">
+
+    </a>
+    PROPAGATOR Sim
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive Demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../programmatic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programmatic Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../outputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulation Outputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spotting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fire Spotting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../checkpoints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Checkpoints & Domain Growth
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust vs numba Core
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust vs numba Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#same-behaviour-different-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Same behaviour, different engine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducibility-and-threading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducibility and threading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#selecting-a-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selecting a core
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-the-rust-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building the Rust core
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-use-which" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to use which
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../reference/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_13" id="__nav_13_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/propagator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/numba/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Numba Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bibliography/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bibliography
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#same-behaviour-different-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Same behaviour, different engine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducibility-and-threading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducibility and threading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#selecting-a-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selecting a core
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-the-rust-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building the Rust core
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-to-use-which" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to use which
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="rust-vs-numba-core">Rust vs numba Core</h1>
+<p>PROPAGATOR ships two interchangeable simulation cores behind the same public
+interface:</p>
+<ul>
+<li>the <strong>numba core</strong> (<code>propagator.core</code>) — the reference implementation,
+  pure Python with numba-JIT-compiled kernels; always available.</li>
+<li>the <strong>Rust core</strong> (<code>propagator-core</code>) — a native implementation exposed to
+  Python as the <code>propagator_rust</code> extension and driven through the
+  <code>propagator.rust_core</code> adapter; opt-in, requires building a wheel.</li>
+</ul>
+<p>Both drive the identical model and produce the same maps and statistics.
+This page covers how they differ and how to choose; for the mechanics they
+share (tiling, front heaps, domain growth, freezing) see
+<a href="../core-internals/">Core Internals</a>, and for the full engine specification
+see the <a href="../rust-core-spec/">Rust Core Specification</a>.</p>
+<h2 id="same-behaviour-different-engine">Same behaviour, different engine</h2>
+<p>The cores agree on the observable model. Given the same inputs they produce
+statistically equivalent outputs — burn probabilities, arrival times, rate
+of spread and intensity maps all match to Monte-Carlo noise. They are <strong>not</strong>
+bitwise-identical to each other, and are not meant to be: each draws from an
+independent random-number stream, so individual realizations differ while
+the ensemble statistics converge. Bitwise cross-core parity is an explicit
+non-goal.</p>
+<p>Fuel definitions are supplied to both cores in the same <strong>config units</strong>
+(rate of spread <code>v0</code> in m/h, humidity in percent); each core applies the
+identical internal conversions (<code>÷60</code>, <code>÷100</code>), so a given fuel table means
+the same thing to both.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>numba core</th>
+<th>Rust core</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Language / runtime</td>
+<td>Python + numba JIT</td>
+<td>native (Rust), via PyO3</td>
+</tr>
+<tr>
+<td>Availability</td>
+<td>always installed</td>
+<td>build the <code>propagator_rust</code> wheel</td>
+</tr>
+<tr>
+<td>Per-realization state</td>
+<td>slices of shared N-D arrays</td>
+<td>independent owned structures</td>
+</tr>
+<tr>
+<td>Front-heap growth</td>
+<td>preallocate + <em>suspend-and-regrow</em></td>
+<td>grow <code>Vec</code>s on demand</td>
+</tr>
+<tr>
+<td>RNG</td>
+<td>one per <strong>thread</strong></td>
+<td>one per <strong>realization</strong></td>
+</tr>
+<tr>
+<td>Reproducibility</td>
+<td>fixed machine <strong>and</strong> thread count</td>
+<td>any thread count</td>
+</tr>
+<tr>
+<td>Parallelism</td>
+<td>numba <code>prange</code> / OpenMP</td>
+<td>scoped OS threads over realizations</td>
+</tr>
+<tr>
+<td>First-step latency</td>
+<td>includes JIT warm-up</td>
+<td>none</td>
+</tr>
+</tbody>
+</table>
+<h2 id="reproducibility-and-threading">Reproducibility and threading</h2>
+<p>This is the sharpest practical difference.</p>
+<p>The <strong>numba core</strong> gives each worker <em>thread</em> its own RNG (<code>reseed(seed)</code>
+seeds thread <code>i</code> with <code>seed + i</code>) and partitions realizations statically
+across threads. Two runs with the same seed are bitwise-identical only on the
+same machine <strong>and</strong> with the same numba thread count (<code>NUMBA_NUM_THREADS</code>);
+change the thread count and the per-realization streams shift.</p>
+<p>The <strong>Rust core</strong> seeds each <em>realization</em> independently (from
+<code>seed ⊕ realization</code>), so a seeded run is bitwise reproducible <strong>regardless
+of thread count</strong> — the same 100 realizations come out identically on 1 or 32
+threads. This also makes tile freezing provably behaviour-neutral: it never
+perturbs the RNG stream.</p>
+<p>Neither core captures RNG state in a checkpoint, so a run resumed from a
+checkpoint is statistically — not bitwise — equivalent to the original
+continuation, unless you <code>reseed()</code> explicitly. See
+<a href="../checkpoints/#reproducibility">Reproducibility</a>.</p>
+<h2 id="performance">Performance</h2>
+<p>Both cores allocate on demand, so memory scales with burned area rather than
+grid size in either case. The Rust core additionally trims peak RSS (owned
+per-realization pools, no shared over-allocation) and removes JIT warm-up
+from the first step.</p>
+<p>Representative measurements on the development machine — a homogeneous
+1000×1000 grassland grid, 100 realizations, 12 simulated hours, point
+ignition, spotting disabled, fixed seed, via <code>benchmarks/compare_cores.py</code>
+(numba JIT warm-up excluded from the timed loop):</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th style="text-align: right;">Core</th>
+<th style="text-align: right;">Timed loop</th>
+<th style="text-align: right;">Peak RSS</th>
+<th style="text-align: right;">Output fold</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>default threads</td>
+<td style="text-align: right;">numba</td>
+<td style="text-align: right;">5.846 s</td>
+<td style="text-align: right;">618.8 MB</td>
+<td style="text-align: right;">0.534 s</td>
+</tr>
+<tr>
+<td>default threads</td>
+<td style="text-align: right;">Rust</td>
+<td style="text-align: right;">0.205 s</td>
+<td style="text-align: right;">465.3 MB</td>
+<td style="text-align: right;">0.027 s</td>
+</tr>
+<tr>
+<td>single thread</td>
+<td style="text-align: right;">numba</td>
+<td style="text-align: right;">2.154 s</td>
+<td style="text-align: right;">625.5 MB</td>
+<td style="text-align: right;">0.498 s</td>
+</tr>
+<tr>
+<td>single thread</td>
+<td style="text-align: right;">Rust</td>
+<td style="text-align: right;">1.485 s</td>
+<td style="text-align: right;">458.0 MB</td>
+<td style="text-align: right;">0.026 s</td>
+</tr>
+</tbody>
+</table>
+<p>In this scenario the Rust core reduced peak RSS by ~150–170 MB and ran ~1.45×
+faster in the controlled single-thread run; the larger default-thread gap
+also reflects thread-pool configuration differences between numba/OpenMP and
+the Rust core. Treat the numbers as indicative — they are workload- and
+machine-dependent — and re-run <code>benchmarks/compare_cores.py</code> for your own.</p>
+<h2 id="selecting-a-core">Selecting a core</h2>
+<p><strong>From the CLI</strong> — pass <code>--core</code>:</p>
+<pre><code class="language-bash">propagator run ...                 # numba (default)
+propagator run ... --core rust     # Rust (requires the wheel)
+</code></pre>
+<p><strong>Programmatically</strong> — the Rust adapter is a keyword-for-keyword drop-in for
+the numba <code>Propagator</code>; switch the import:</p>
+<pre><code class="language-python"># numba core
+from propagator.core import Propagator
+
+# Rust core (identical constructor and methods)
+from propagator.rust_core import Propagator
+</code></pre>
+<p>The adapter marshals NumPy arrays to and from the native core and re-raises
+its out-of-bounds condition as the same <code>PropagatorOutOfBoundsError</code> the
+numba core uses, so <code>expand()</code> / <code>checkpoint()</code> growth loops work unchanged.</p>
+<h2 id="building-the-rust-core">Building the Rust core</h2>
+<p>The native extension is not installed by default. Build and install the
+wheel into the project virtualenv with:</p>
+<pre><code class="language-bash">./rust/build.sh
+</code></pre>
+<p>The script runs <code>maturin</code> against the project's <code>.venv</code> (working around the
+interpreter-selection conflict when both <code>CONDA_PREFIX</code> and <code>VIRTUAL_ENV</code> are
+set) and installs the resulting <code>propagator_rust</code> wheel. Until it is built,
+<code>--core rust</code> and <code>from propagator.rust_core import Propagator</code> raise an
+<code>ImportError</code> pointing back to this script.</p>
+<h2 id="when-to-use-which">When to use which</h2>
+<ul>
+<li><strong>numba</strong> — the default. Zero extra setup, always present, and the
+  reference for correctness. Best for interactive/exploratory work,
+  development, and any environment where building a native wheel is
+  inconvenient.</li>
+<li><strong>Rust</strong> — for throughput and memory-bound runs: large grids, many
+  realizations, long horizons, batch/operational pipelines, and
+  thread-count-independent reproducibility. Requires building the wheel once.</li>
+</ul>
+<p>Both honour the same checkpoints, domain growth and freezing semantics, so
+you can develop against numba and deploy on Rust without changing your
+driver code.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+        <script src="../javascripts/cima-brand.js"></script>
+      
+    
+  </body>
+</html>

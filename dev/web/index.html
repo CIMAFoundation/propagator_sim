@@ -1,0 +1,1261 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="PROPAGATOR: An Operational Cellular-Automata Based Wildfire Simulator">
+      
+      
+      
+      
+        <link rel="prev" href="../cli/">
+      
+      
+        <link rel="next" href="../outputs/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Local Web Demo - PROPAGATOR Sim</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../stylesheets/cima-theme.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#local-web-demo" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="PROPAGATOR Sim" class="md-header__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
+      
+  <img src="../img/cima.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            PROPAGATOR Sim
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Local Web Demo
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="PROPAGATOR Sim" class="md-nav__button md-logo" aria-label="PROPAGATOR Sim" data-md-component="logo">
+      
+  <img src="../img/cima.png" alt="logo">
+
+    </a>
+    PROPAGATOR Sim
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive Demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../programmatic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programmatic Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Demo
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Web Demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#install-and-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install and Run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-app-manual" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In-app Manual
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using It
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#firefighting-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Firefighting Actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-the-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading the Results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guardrails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guardrails
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#downloaded-data-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Downloaded Data Cache
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pre-caching-all-of-italy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-caching All of Italy
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../outputs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulation Outputs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../spotting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fire Spotting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../checkpoints/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Checkpoints & Domain Growth
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rust-vs-numba/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust vs numba Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_13" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../reference/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_13" id="__nav_13_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/propagator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/numba/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Numba Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bibliography/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bibliography
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#install-and-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install and Run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-app-manual" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In-app Manual
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using It
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#firefighting-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Firefighting Actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-the-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading the Results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guardrails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guardrails
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#downloaded-data-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Downloaded Data Cache
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pre-caching-all-of-italy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-caching All of Italy
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="local-web-demo">Local Web Demo</h1>
+<p>A local, interactive debug and demonstration interface lets you pick an area
+on a map, set weather and simulation parameters, and watch the fire spread
+animate — without writing a config file or GeoTIFFs by hand. It is built on
+top of the same <code>Propagator</code> engine and the public-data pipeline described in
+<a href="../getting-started/">Getting Started</a>, not a separate implementation.</p>
+<p>It is an <strong>optional, local-only debug/demo tool</strong>, not the primary operational
+interface. The server binds to <code>127.0.0.1</code> and is meant to run on your own
+machine, not to be exposed on a network.</p>
+<h2 id="install-and-run">Install and Run</h2>
+<pre><code class="language-bash">uv sync --extra web
+uv run propagator-web
+</code></pre>
+<p>Then open <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a> in a browser.</p>
+<p>The server is deliberately local and binds only to <code>127.0.0.1</code>. The demo is
+not an internet-hosted service and should not be exposed as an operational
+multi-user server.</p>
+<h2 id="in-app-manual">In-app Manual</h2>
+<p>Select <strong>Manual</strong> in the app header to open the built-in guide. It
+explains wildfire behaviour, every input and output, the simulation algorithm,
+and the limits of interpreting model results in plain English. The guide is
+served locally at <a href="http://127.0.0.1:8765/manual.html">http://127.0.0.1:8765/manual.html</a> while the app is running.</p>
+<h2 id="using-it">Using It</h2>
+<ol>
+<li>Click the map to place the simulation area's center, then click again to
+   place the ignition point (the two "pick" modes switch automatically after
+   the first click).</li>
+<li>Select the numba core or the optional native Rust core, then adjust radius,
+   cell size, wind, moisture, duration, output frequency, and number of
+   realizations. Enable spotting if the scenario should include wind-carried
+   embers. The Rust option requires the locally built <code>propagator_rust</code> wheel.</li>
+<li>Optionally add one or more firefighting actions. Choose the action and its
+   scheduled time, select <strong>Draw line</strong>, click points on the map, and select
+   <strong>Finish line</strong>. The queued actions appear below the controls and can be
+   removed before starting the run.</li>
+<li>Click <strong>Run simulation</strong>. The server downloads DEM (Copernicus
+   GLO-30) and land-cover (ESA WorldCover 10 m) tiles for the area, builds
+   the fuel grid, and runs the simulation, reporting progress as it goes.</li>
+<li>Once done, scrub the time slider to see the fire-probability heatmap and
+   isochrone lines for each hour, alongside area/active-realization stats
+   and a growth chart.</li>
+</ol>
+<p>If the ignition point falls on a non-burnable fuel class (fuel code 3,
+non-vegetated — typically urban areas), a warning is shown but the run still
+completes (it will simply show no spread). If the ignition point falls
+outside the selected area, the run fails immediately with a clear error.</p>
+<h2 id="firefighting-actions">Firefighting Actions</h2>
+<p>Actions are scheduled relative to the start of the simulation and applied
+when that simulation time is reached. Each drawn WGS84 line is rasterized on
+the scenario grid through the same <code>TimedInput</code> boundary-condition machinery
+used by the CLI.</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Simulated effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Canadair</td>
+<td>Adds 25 percentage points of fuel moisture on the line and 22 points in its one-cell buffer.</td>
+</tr>
+<tr>
+<td>Helicopter</td>
+<td>Adds 22 percentage points at deterministic scattered drop points near the line and 20 points in their one-cell buffer.</td>
+</tr>
+<tr>
+<td>Waterline</td>
+<td>Adds 27 percentage points of fuel moisture across the line and its one-cell buffer.</td>
+</tr>
+<tr>
+<td>Heavy vehicles</td>
+<td>Replaces fuel across the line and its one-cell buffer with the non-vegetated fuel class, creating a persistent firebreak.</td>
+</tr>
+</tbody>
+</table>
+<p>Moisture effects are added only inside the affected cells, stack on top of
+the scenario's existing moisture, and then decay according to the simulation's
+moisture-relief model. Heavy-vehicle actions change the fuel rather than its
+moisture.</p>
+<p>Actions are scenario inputs, not live controls: add or remove them before
+selecting <strong>Run simulation</strong>. To compare intervention strategies, run the
+same scenario again with a different action type, line, or scheduled time.</p>
+<h2 id="reading-the-results">Reading the Results</h2>
+<ul>
+<li>The heatmap shows the fraction of realizations in which each cell burned.</li>
+<li>Isochrones outline the selected probability thresholds at the displayed
+  time; the defaults are 50%, 75%, and 90%.</li>
+<li>Expected burned area sums each cell's probability multiplied by its area.</li>
+<li>Threshold areas report how much land reached at least 50%, 75%, or 90%
+  probability.</li>
+<li>Active realizations count the simulations whose fire front is still moving.</li>
+<li>The growth chart compares expected area with the area above the 50%
+  threshold through time.</li>
+</ul>
+<p>These products describe a stochastic scenario, not a precise fire perimeter.
+Use them to compare likely trends and intervention assumptions, never as the
+sole basis for operational decisions.</p>
+<h2 id="how-it-works">How It Works</h2>
+<ul>
+<li><code>propagator.io.data_prep</code> (shared with <code>example/italy/prepare_area_data.py</code>)
+  downloads and reprojects DEM/land-cover tiles into an aligned grid, then
+  maps ESA WorldCover classes onto PROPAGATOR's legacy fuel codes. See that
+  module's docstring for the limitations of this default mapping.</li>
+<li><code>propagator.web.runner</code> builds a <code>Propagator</code> from that grid and steps it
+  one <code>time_resolution_h</code> at a time, capturing a <code>fire_probability</code> frame
+  after each step. Every frame is built on the exact same grid, so its map
+  bounds never change while scrubbing the time slider.</li>
+<li><code>propagator.web.jobs.JobManager</code> runs one simulation at a time in a
+  background thread and keeps its state in memory — there's no database and
+  state doesn't survive a server restart.</li>
+<li>Isochrone lines reuse <code>propagator.io.writer.isochrones_geojson.extract_isochrone</code>
+  (the same code the CLI uses to write <code>isochrones_*.json</code>), reprojected to
+  WGS84 for the map.</li>
+<li>Firefighting actions are converted to <code>CanadairAction</code>, <code>HelicopterAction</code>,
+  <code>WaterlineAction</code>, or <code>HeavyAction</code> objects and scheduled as future
+  <code>BoundaryConditions</code>. This keeps Web UI and CLI action semantics aligned.</li>
+</ul>
+<h2 id="guardrails">Guardrails</h2>
+<p>Request parameters are validated by <code>propagator.web.schemas.SimulateRequest</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Range</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>radius_km</code></td>
+<td>&gt;0–50</td>
+<td>15</td>
+</tr>
+<tr>
+<td><code>cellsize</code></td>
+<td>20–100 m</td>
+<td>30 m</td>
+</tr>
+<tr>
+<td><code>realizations</code></td>
+<td>1–50</td>
+<td>10</td>
+</tr>
+<tr>
+<td><code>time_limit_h</code></td>
+<td>&gt;0–48</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>time_resolution_h</code></td>
+<td>&gt;0–6, ≤ <code>time_limit_h</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td>action time</td>
+<td>0–<code>time_limit_h</code></td>
+<td>1 h in the UI</td>
+</tr>
+</tbody>
+</table>
+<p>Combinations of radius/cellsize/realizations that would produce an
+unreasonably large grid for an interactive local run are rejected outright
+(422 response) rather than left to run for a long time — lower the radius,
+raise the cellsize, or reduce realizations if you hit this. A second check
+estimates the peak memory the block-sparse engine and its result fold would
+allocate and rejects the request (422) if it exceeds a 4 GiB budget, even if
+it stays under the cell-realizations cap above — lower the radius, raise the
+cellsize, or reduce realizations if you hit this. With <code>core: "rust"</code> the
+estimate also counts the engine's shared per-cell edge cache (168 KiB per
+reached 32x32 tile, independent of the realization count).</p>
+<p>Only one simulation runs at a time; starting a new one while another is
+still running/preparing data returns a 429 response.</p>
+<h2 id="downloaded-data-cache">Downloaded Data Cache</h2>
+<p>Downloaded DEM/land-cover tiles are cached under
+<code>~/.propagator/cache</code> (override with the <code>PROPAGATOR_CACHE_DIR</code> environment
+variable) so repeated runs over the same area don't re-download tiles.</p>
+<h2 id="pre-caching-all-of-italy">Pre-caching All of Italy</h2>
+<p>The first simulation over a given area downloads its DEM/land-cover tiles
+on the fly, which adds a network wait during the "preparing_data" phase.
+To skip that wait entirely for any point in Italy, pre-download every tile
+covering the country once:</p>
+<pre><code class="language-bash">uv run python example/italy/download_national_data.py
+</code></pre>
+<p>This is a one-off operation, roughly <strong>5–7 GB</strong> total (mostly WorldCover
+land-cover tiles), so run it once on a good connection — bandwidth is the
+only limit. It's safe to interrupt and re-run: tiles already downloaded are
+skipped, so it resumes where it left off. It writes into the same cache
+directory the web app already uses (<code>~/.propagator/cache</code> by default, or
+<code>PROPAGATOR_CACHE_DIR</code>), so no further configuration is needed — the next
+time you run a simulation anywhere in Italy, <code>preparing_data</code> skips
+straight to building the grid, with no download step.</p>
+<p>To use a different disk/location for the cache:</p>
+<pre><code class="language-bash">uv run python example/italy/download_national_data.py --cache-dir /path/to/big/disk
+</code></pre>
+<p>This only pre-fetches raw source tiles; it does not build or store a
+national mosaic — <code>prepare_area_data</code> still builds each simulation's small
+local grid on demand from the cached tiles, which is fast (a few seconds)
+once there's no download involved.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "content.code.copy", "toc.follow"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+        <script src="../javascripts/cima-brand.js"></script>
+      
+    
+  </body>
+</html>

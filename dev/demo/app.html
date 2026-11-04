@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PROPAGATOR WebAssembly demo</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f4f4f6;
+    --border: #dcdce3;
+    --text: #1c1c22;
+    --muted: #6b6b78;
+    --accent: #e8552a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16161a;
+      --panel: #202028;
+      --border: #35353f;
+      --text: #e8e8ee;
+      --muted: #9a9aa8;
+      --accent: #ff6b3d;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap {
+    display: flex;
+    gap: 20px;
+    padding: 16px;
+    height: 100vh;
+    align-items: stretch;
+  }
+  .stage {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .canvas-box {
+    flex: 1 1 auto;
+    min-height: 0;
+    container-type: size;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  /* Largest square that fits the box: 100cqmin is the smaller of the
+     container's width/height, so the map fills the available space and
+     never forces the page to scroll. */
+  .canvas-wrap {
+    position: relative;
+    width: 100cqmin;
+    height: 100cqmin;
+  }
+  #veg, #fire {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+  }
+  #fire {
+    cursor: crosshair;
+    touch-action: none;
+  }
+  .clock {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    padding: 4px 9px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+  }
+  .clock.live::before {
+    content: "";
+    display: inline-block;
+    width: 7px; height: 7px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: #ff5b39;
+    vertical-align: middle;
+    animation: pulse 1s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+  .hint {
+    color: var(--muted);
+    font-size: 12px;
+    margin: 8px 2px 0;
+  }
+  .panel {
+    flex: 0 0 300px;
+    max-width: 100%;
+    align-self: stretch;
+    overflow-y: auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  @media (max-width: 680px) {
+    body { overflow: auto; }
+    .wrap { height: auto; flex-direction: column; }
+    .panel { flex: 0 0 auto; }
+  }
+  .panel h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+  .control { margin-bottom: 16px; }
+  .control label {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .control label span { color: var(--accent); font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  select {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+  }
+  .buttons { display: flex; gap: 8px; }
+  button {
+    flex: 1;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg);
+    color: var(--text);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 16px;
+    margin-top: 4px;
+  }
+  .stats .k { color: var(--muted); }
+  .stats .v { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+  .legend { margin-top: 16px; font-size: 12px; color: var(--muted); }
+  .bar {
+    height: 10px;
+    border-radius: 5px;
+    margin: 6px 0 4px;
+    border: 1px solid var(--border);
+    background: linear-gradient(90deg, #96161a, #d63414, #ff821c, #ffca3c, #fff0be);
+  }
+  .barlabels { display: flex; justify-content: space-between; }
+  .fuel-key {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px 10px;
+  }
+  .fuel-key .row { display: flex; align-items: center; gap: 6px; }
+  .fuel-key .sw {
+    width: 11px; height: 11px; border-radius: 2px; flex: 0 0 auto;
+    border: 1px solid rgba(128,128,128,0.4);
+  }
+  #status { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage">
+    <div class="canvas-box">
+      <div class="canvas-wrap">
+        <canvas id="veg"></canvas>
+        <canvas id="fire"></canvas>
+        <div id="clock" class="clock">0.0 h</div>
+      </div>
+    </div>
+    <p class="hint">Real terrain and EU 12-class fuel around <b>Alexandroupolis / Evros</b> (Greece), read from the <code>eu_fuel12</code> / <code>eu_dem</code> COGs. Click or drag on the map to (re)place ignition points, tune the weather, then press <b>Run</b>. The glowing overlay is the fire-arrival probability across all realizations.</p>
+    <p id="status">Loading WebAssembly core…</p>
+  </div>
+
+  <div class="panel">
+    <h2>Weather</h2>
+    <div class="control">
+      <label for="wspeed">Wind speed <span id="wspeed-v">30 km/h</span></label>
+      <input id="wspeed" type="range" min="0" max="60" step="1" value="30" />
+    </div>
+    <div class="control">
+      <label for="wdir">Wind direction <span id="wdir-v">30°</span></label>
+      <input id="wdir" type="range" min="0" max="359" step="1" value="30" />
+    </div>
+    <div class="control">
+      <label for="moist">Fuel moisture <span id="moist-v">6 %</span></label>
+      <input id="moist" type="range" min="1" max="40" step="1" value="6" />
+    </div>
+
+    <h2 style="margin-top:20px">Simulation</h2>
+    <div class="control">
+      <label for="reals">Realizations <span id="reals-v">20</span></label>
+      <input id="reals" type="range" min="1" max="100" step="1" value="20" />
+    </div>
+    <div class="control">
+      <label for="ros">Rate-of-spread model</label>
+      <select id="ros">
+        <option value="wang" selected>Wang</option>
+        <option value="rothermel">Rothermel</option>
+        <option value="standard">Standard</option>
+      </select>
+    </div>
+    <div class="control">
+      <label style="font-weight:600"><input type="checkbox" id="spotting" checked /> &nbsp;Enable fire spotting</label>
+    </div>
+
+    <div class="buttons">
+      <button id="run" class="primary" disabled>Play</button>
+      <button id="step" disabled>Step</button>
+      <button id="reset" disabled>Reset</button>
+    </div>
+
+    <div class="stats">
+      <div class="k">Sim time</div><div class="v" id="stat-time">0.0 h</div>
+      <div class="k">Burned area</div><div class="v" id="stat-area">0 ha</div>
+      <div class="k">Ignitions</div><div class="v" id="stat-ign">0</div>
+    </div>
+
+    <div class="legend">
+      Fire-arrival probability
+      <div class="bar"></div>
+      <div class="barlabels"><span>low</span><span>high</span></div>
+      <div id="fuel-key" class="fuel-key"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import init, { Propagator, FuelSystemBuilder } from "./pkg/propagator_wasm.js";
+
+// Real Alexandroupolis / Evros terrain + EU 12-class fuel, extracted from the
+// eu_fuel12 / eu_dem COGs (see ../demo.md). Dimensions and cell size come from
+// the binary header.
+const DATA_URL = "./alexandroupolis.bin.gz";
+const STEP_SECONDS = 1800;  // sim seconds advanced per step (30 sim-minutes)
+const MAX_HOURS = 48;       // stop the animation after this much sim time
+
+// EU 12-class fuel system (config units: v0 m/h, humidity percent), mirroring
+// example/pedrogao/fuels_eu12.yaml. Kept here in JS and handed to the Rust
+// core through FuelSystemBuilder, so the fuel model lives outside the wasm
+// binary. `p` lists spread probability toward burnable classes 1..=12; the
+// non-vegetated targets (-1, 0) are constant.
+const NOVEG = Array(12).fill(0.005);
+function fuel(id, name, v0, d0, d1, hhv, humidity, spotting, probIgn, burn, p) {
+  return { id, name, v0, d0, d1, hhv, humidity, spotting, probIgn, burn, p };
+}
+const EU12_FUELS = [
+  fuel(-1, "not vegetated", 20, 0.1, 0, 100, null, false, 0, false, NOVEG),
+  fuel(0, "not vegetated", 20, 0.1, 0, 100, null, false, 0, false, NOVEG),
+  fuel(1, "grassland - low", 60, 0.5, 0, 17000, null, false, 0, true,
+    [0.075, 0.475, 0.475, 0.075, 0.25, 0.25, 0.075, 0.375, 0.375, 0.075, 0.35, 0.35]),
+  fuel(2, "grassland - medium", 120, 0.5, 0, 17000, null, false, 0, true,
+    [0.075, 0.475, 0.475, 0.075, 0.25, 0.25, 0.075, 0.35, 0.35, 0.075, 0.25, 0.25]),
+  fuel(3, "grassland - high", 120, 0.5, 0, 17000, null, false, 0, true,
+    [0.075, 0.475, 0.475, 0.075, 0.25, 0.25, 0.075, 0.35, 0.35, 0.075, 0.25, 0.25]),
+  fuel(4, "broadleaves - low", 60, 1.5, 3, 20000, 60, false, 0, true,
+    [0.075, 0.475, 0.475, 0.075, 0.25, 0.25, 0.075, 0.375, 0.375, 0.075, 0.35, 0.35]),
+  fuel(5, "broadleaves - medium", 140, 1.5, 3, 20000, 60, false, 0, true,
+    [0.075, 0.45, 0.45, 0.075, 0.3, 0.3, 0.075, 0.375, 0.375, 0.075, 0.225, 0.225]),
+  fuel(6, "broadleaves - high", 140, 1.5, 3, 20000, 60, false, 0, true,
+    [0.075, 0.45, 0.45, 0.075, 0.3, 0.3, 0.075, 0.375, 0.375, 0.075, 0.225, 0.225]),
+  fuel(7, "shrubs - low", 60, 1, 3, 21000, 45, false, 0, true,
+    [0.075, 0.475, 0.475, 0.075, 0.25, 0.25, 0.075, 0.375, 0.375, 0.075, 0.35, 0.35]),
+  fuel(8, "shrubs - medium", 140, 1, 3, 21000, 45, false, 0, true,
+    [0.1, 0.475, 0.475, 0.1, 0.375, 0.375, 0.1, 0.375, 0.375, 0.1, 0.325, 0.325]),
+  fuel(9, "shrubs - high", 140, 1, 3, 21000, 45, false, 0, true,
+    [0.1, 0.475, 0.475, 0.1, 0.375, 0.375, 0.1, 0.375, 0.375, 0.1, 0.325, 0.325]),
+  fuel(10, "conifers - low", 60, 1, 4, 21000, 55, true, 0.4, true,
+    [0.075, 0.475, 0.475, 0.075, 0.25, 0.25, 0.075, 0.375, 0.375, 0.075, 0.35, 0.35]),
+  fuel(11, "conifers - medium", 200, 1, 4, 21000, 55, true, 0.4, true,
+    [0.275, 0.475, 0.475, 0.275, 0.275, 0.275, 0.275, 0.4, 0.4, 0.275, 0.35, 0.35]),
+  fuel(12, "conifers - high", 200, 1, 4, 21000, 55, true, 0.4, true,
+    [0.275, 0.475, 0.475, 0.275, 0.275, 0.275, 0.275, 0.4, 0.4, 0.275, 0.35, 0.35]),
+];
+
+// Assemble a FuelSystemBuilder from the table above.
+function buildFuelSystem() {
+  const b = new FuelSystemBuilder();
+  for (const f of EU12_FUELS) {
+    const to = [-1, 0];
+    const pr = [0.0, 0.005];
+    for (let i = 0; i < 12; i++) { to.push(i + 1); pr.push(f.p[i]); }
+    b.add_fuel(
+      f.id, f.name, f.v0, f.d0, f.d1, f.hhv,
+      f.humidity === null ? undefined : f.humidity,
+      f.spotting, f.probIgn, f.burn,
+      new Int32Array(to), new Float64Array(pr),
+    );
+  }
+  return b;
+}
+
+// EU 12-class fuel palette (eu_fuel12 colormap from the titiler WMS config).
+// Code 0 (no data / sea) is drawn as a neutral water tone rather than clear.
+const FUEL_COLORS = {
+  0:  [170, 190, 205], 1: [153, 255, 153], 2: [0, 234, 0],   3: [0, 102, 0],
+  4:  [255, 255, 153], 5: [232, 232, 0],   6: [204, 153, 0], 7: [204, 153, 255],
+  8:  [157, 54, 208],  9: [102, 0, 153],  10: [255, 123, 123], 11: [255, 0, 0],
+  12: [153, 0, 0],
+};
+const FUEL_NAMES = {
+  1: "grassland (low)", 2: "grassland (med)", 3: "grassland (high)",
+  4: "broadleaves (low)", 5: "broadleaves (med)", 6: "broadleaves (high)",
+  7: "shrubs (low)", 8: "shrubs (med)", 9: "shrubs (high)",
+  10: "conifers (low)", 11: "conifers (med)", 12: "conifers (high)",
+};
+
+const el = (id) => document.getElementById(id);
+
+// Filled in once the data asset is parsed.
+let N = 0, CELL = 20.0;
+let veg = null;   // Int32Array (wasm wants i32)
+let dem = null;   // Float64Array (wasm wants f64)
+let shade = null; // Float32Array hillshade factor per cell
+let defaultIgnition = null;
+
+let vegCanvas, fireCanvas, vegCtx, fireCtx;
+let ignitions = [];
+let sim = null, running = false, rafId = null;
+
+// ---- data asset ----------------------------------------------------------
+async function loadData() {
+  // The asset is gzip-compressed on disk; inflate it in the browser.
+  const resp = await fetch(DATA_URL);
+  const stream = resp.body.pipeThrough(new DecompressionStream("gzip"));
+  const buf = await new Response(stream).arrayBuffer();
+  const dv = new DataView(buf);
+  const rows = dv.getUint32(0, true);
+  const cols = dv.getUint32(4, true);
+  CELL = dv.getFloat32(8, true);
+  const igR = dv.getInt32(12, true);
+  const igC = dv.getInt32(16, true);
+  N = rows; // grid is square
+  const n = rows * cols;
+
+  const veg8 = new Int8Array(buf, 20, n);
+  const pad = n % 2;                 // int16 dem is 2-byte aligned
+  const demI16 = new Int16Array(buf, 20 + n + pad, n);
+
+  veg = new Int32Array(n);
+  dem = new Float64Array(n);
+  for (let i = 0; i < n; i++) { veg[i] = veg8[i]; dem[i] = demI16[i]; }
+  defaultIgnition = [igR, igC];
+  computeShade();
+}
+
+// Simple hillshade (light from the NW) so the terrain reads as relief.
+function computeShade() {
+  shade = new Float32Array(N * N);
+  const lx = -0.6, ly = -0.6, lz = 0.9; // light direction
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      const i = r * N + c;
+      const l = dem[i - (c > 0 ? 1 : 0)];
+      const rt = dem[i + (c < N - 1 ? 1 : 0)];
+      const up = dem[i - (r > 0 ? N : 0)];
+      const dn = dem[i + (r < N - 1 ? N : 0)];
+      const dzdx = (rt - l) / (2 * CELL);
+      const dzdy = (dn - up) / (2 * CELL);
+      const nl = Math.hypot(dzdx, dzdy, 1);
+      const dot = (-dzdx * lx - dzdy * ly + lz) / nl;
+      shade[i] = 0.78 + 0.42 * Math.max(0, Math.min(1, dot));
+    }
+  }
+}
+
+// ---- rendering -----------------------------------------------------------
+function drawVeg() {
+  const img = vegCtx.createImageData(N, N);
+  for (let i = 0; i < N * N; i++) {
+    const rgb = FUEL_COLORS[veg[i]] || FUEL_COLORS[0];
+    const s = shade[i];
+    img.data[i * 4]     = Math.min(255, rgb[0] * s);
+    img.data[i * 4 + 1] = Math.min(255, rgb[1] * s);
+    img.data[i * 4 + 2] = Math.min(255, rgb[2] * s);
+    img.data[i * 4 + 3] = 255;
+  }
+  vegCtx.putImageData(img, 0, 0);
+}
+
+// probability -> RGBA on a "hot" ramp: dark red (low) through orange to a
+// near-white hot core (high). Brightness rises with probability so the fire
+// stands apart from the warm fuel colours, and the alpha floor keeps even
+// faint edges above the basemap dimming.
+function probColor(p) {
+  if (p <= 0.004) return [0, 0, 0, 0];
+  const stops = [
+    [0.0, [150, 22, 26]],
+    [0.3, [214, 52, 20]],
+    [0.6, [255, 130, 28]],
+    [0.85, [255, 202, 60]],
+    [1.0, [255, 240, 190]],
+  ];
+  let lo = stops[0], hi = stops[stops.length - 1];
+  for (let k = 0; k < stops.length - 1; k++) {
+    if (p >= stops[k][0] && p <= stops[k + 1][0]) { lo = stops[k]; hi = stops[k + 1]; break; }
+  }
+  const t = (p - lo[0]) / Math.max(1e-6, hi[0] - lo[0]);
+  const mix = (a, b) => Math.round(a + (b - a) * t);
+  const a = Math.min(255, 165 + p * 90);
+  return [mix(lo[1][0], hi[1][0]), mix(lo[1][1], hi[1][1]), mix(lo[1][2], hi[1][2]), a];
+}
+
+// While a run exists, dim the (un-burnt) basemap so the fire overlay reads
+// clearly against the multi-coloured fuel map instead of blending into it.
+const SCRIM_ALPHA = 135;
+
+function drawFire(prob) {
+  const img = fireCtx.createImageData(N, N);
+  const d = img.data;
+  const scrim = sim ? SCRIM_ALPHA : 0;
+  for (let i = 0; i < prob.length; i++) {
+    const j = i * 4;
+    const p = prob[i];
+    if (p <= 0.004) {
+      d[j] = 8; d[j + 1] = 7; d[j + 2] = 10; d[j + 3] = scrim;
+    } else {
+      const [rr, gg, bb, aa] = probColor(p);
+      d[j] = rr; d[j + 1] = gg; d[j + 2] = bb; d[j + 3] = aa;
+    }
+  }
+  fireCtx.putImageData(img, 0, 0);
+}
+
+function drawIgnitions() {
+  fireCtx.clearRect(0, 0, N, N);
+  fireCtx.fillStyle = "#111";
+  fireCtx.strokeStyle = "#fff";
+  fireCtx.lineWidth = 0.5;
+  for (const [r, c] of ignitions) {
+    fireCtx.fillRect(c - 1, r - 1, 3, 3);
+    fireCtx.strokeRect(c - 1.25, r - 1.25, 3.5, 3.5);
+  }
+}
+
+function buildFuelKey() {
+  const key = el("fuel-key");
+  key.innerHTML = "";
+  for (const code of Object.keys(FUEL_NAMES)) {
+    const rgb = FUEL_COLORS[code];
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<span class="sw" style="background:rgb(${rgb.join(",")})"></span>${FUEL_NAMES[code]}`;
+    key.appendChild(row);
+  }
+}
+
+// ---- controls ------------------------------------------------------------
+const bind = (id, fmt) => {
+  const input = el(id), out = el(id + "-v");
+  const update = () => { if (out) out.textContent = fmt(input.value); };
+  input.addEventListener("input", update); update();
+  return input;
+};
+bind("wspeed", (v) => `${v} km/h`);
+bind("wdir", (v) => `${v}°`);
+bind("moist", (v) => `${v} %`);
+bind("reals", (v) => v);
+
+function canvasToCell(ev) {
+  const rect = fireCanvas.getBoundingClientRect();
+  const x = (ev.clientX - rect.left) / rect.width;
+  const y = (ev.clientY - rect.top) / rect.height;
+  const c = Math.max(0, Math.min(N - 1, Math.floor(x * N)));
+  const r = Math.max(0, Math.min(N - 1, Math.floor(y * N)));
+  return [r, c];
+}
+function addIgnition(ev) {
+  if (sim) return; // ignition set is locked once a run is built
+  const [r, c] = canvasToCell(ev);
+  if (veg[r * N + c] <= 0) return; // don't ignite sea / non-vegetated
+  if (!ignitions.some(([ir, ic]) => ir === r && ic === c)) ignitions.push([r, c]);
+  el("stat-ign").textContent = ignitions.length;
+  drawIgnitions();
+}
+let dragging = false;
+
+// ---- run loop ------------------------------------------------------------
+function fmtTime(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return `${h}h ${String(m).padStart(2, "0")}m`;
+}
+
+// Lock the construction-time controls (they can't change mid-run); the
+// weather sliders stay live and reset is always available.
+function lockBuildControls(d) {
+  for (const id of ["reals", "ros", "spotting"]) el(id).disabled = d;
+}
+
+function readouts() {
+  const t = Number(sim.time);
+  el("clock").textContent = fmtTime(t);
+  el("stat-time").textContent = fmtTime(t);
+  el("stat-area").textContent = Math.round(sim.burned_area_ha()).toLocaleString() + " ha";
+}
+
+// Apply the current weather sliders as a boundary condition at the current
+// sim time, so wind/moisture can be steered live during a run.
+function applyWeather() {
+  if (!sim) return;
+  sim.set_boundary_conditions(
+    BigInt(Number(sim.time)),
+    parseFloat(el("moist").value),
+    parseFloat(el("wdir").value),
+    parseFloat(el("wspeed").value),
+    new Int32Array(0),
+  );
+}
+
+// Build the propagator from the current controls + ignitions (once).
+function ensureSim() {
+  if (sim) return true;
+  if (ignitions.length === 0) {
+    el("status").textContent = "Place at least one ignition point first.";
+    return false;
+  }
+  const reals = parseInt(el("reals").value, 10);
+  sim = new Propagator(
+    N, N, veg, dem, buildFuelSystem(), reals, 42,
+    el("spotting").checked, CELL, el("ros").value, "trucchia",
+  );
+  sim.set_boundary_conditions(
+    0n,
+    parseFloat(el("moist").value),
+    parseFloat(el("wdir").value),
+    parseFloat(el("wspeed").value),
+    new Int32Array(ignitions.flat()),
+  );
+  lockBuildControls(true);
+  return true;
+}
+
+// Advance one window; render + update readouts. Returns false when the run
+// is finished (front exhausted or time cap reached).
+function advanceOne() {
+  try {
+    sim.step(BigInt(STEP_SECONDS));
+  } catch (e) {
+    el("status").textContent = "Simulation error: " + e;
+    return false;
+  }
+  drawFire(sim.fire_probability());
+  readouts();
+  return sim.next_time() >= 0 && Number(sim.time) < MAX_HOURS * 3600;
+}
+
+function frame() {
+  if (!running) return;
+  if (advanceOne()) {
+    rafId = requestAnimationFrame(frame);
+  } else {
+    pause();
+    el("status").textContent = "Simulation complete.";
+  }
+}
+
+function play() {
+  if (!ensureSim()) return;
+  running = true;
+  if (rafId) cancelAnimationFrame(rafId);
+  el("run").textContent = "Pause";
+  el("run").classList.remove("primary");
+  el("clock").classList.add("live");
+  el("status").textContent = "Running…";
+  rafId = requestAnimationFrame(frame);
+}
+
+function pause() {
+  running = false;
+  if (rafId) cancelAnimationFrame(rafId);
+  rafId = null;
+  el("run").textContent = "Play";
+  el("run").classList.add("primary");
+  el("clock").classList.remove("live");
+}
+
+function togglePlay() {
+  if (running) { pause(); el("status").textContent = "Paused."; }
+  else play();
+}
+
+function stepOnce() {
+  if (running) pause();
+  if (!ensureSim()) return;
+  const more = advanceOne();
+  el("status").textContent = more ? "Paused (stepped)." : "Simulation complete.";
+}
+
+function resetSim() {
+  pause();
+  sim = null;
+  lockBuildControls(false);
+  ignitions = defaultIgnition ? [defaultIgnition.slice()] : [];
+  el("stat-ign").textContent = ignitions.length;
+  el("clock").textContent = fmtTime(0);
+  el("stat-time").textContent = fmtTime(0);
+  el("stat-area").textContent = "0 ha";
+  el("status").textContent = "Ready. Click the map to move the ignition, then press Play or Step.";
+  drawFire(new Float32Array(N * N));
+  drawIgnitions();
+}
+
+// ---- boot ----------------------------------------------------------------
+Promise.all([init(), loadData()]).then(() => {
+  vegCanvas = el("veg");
+  fireCanvas = el("fire");
+  vegCanvas.width = fireCanvas.width = N;
+  vegCanvas.height = fireCanvas.height = N;
+  vegCtx = vegCanvas.getContext("2d");
+  fireCtx = fireCanvas.getContext("2d");
+
+  fireCanvas.addEventListener("pointerdown", (e) => { dragging = true; addIgnition(e); });
+  fireCanvas.addEventListener("pointermove", (e) => { if (dragging) addIgnition(e); });
+  window.addEventListener("pointerup", () => { dragging = false; });
+  el("run").addEventListener("click", togglePlay);
+  el("step").addEventListener("click", stepOnce);
+  el("reset").addEventListener("click", resetSim);
+  for (const id of ["wspeed", "wdir", "moist"]) {
+    el(id).addEventListener("input", applyWeather);
+  }
+
+  drawVeg();
+  buildFuelKey();
+  el("run").disabled = false;
+  el("step").disabled = false;
+  el("reset").disabled = false;
+  resetSim();
+}).catch((e) => {
+  el("status").textContent = "Failed to load demo: " + e;
+});
+</script>
+</body>
+</html>
