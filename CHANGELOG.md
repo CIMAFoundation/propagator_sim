@@ -17,7 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   maps correlated > 0.999); contact spread only (no spotting, actions or
   growth yet). Within 1.5x of the 14-thread CPU core on an M4 Pro, not
   faster; see `docs/gpu-core.md`. The core exposes its fuel tables and the
-  two spread-model functions for such backends.
+  two spread-model functions for such backends. The backend also runs on
+  WebGPU in the browser (wasm crate feature `gpu`, bundle
+  `docs/demo/pkg-gpu`, demo `?engine=gpu`), where it is 4–8x faster end to
+  end than the 13-worker wasm core on the Alexandroupolis demo.
 - Multi-threaded WebAssembly demo. The core gained an opt-in `rayon` feature
   (realizations on rayon's pool instead of scoped std threads) and the wasm
   crate a `threads` feature on top of it (`wasm-bindgen-rayon`, exporting

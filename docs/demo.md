@@ -39,6 +39,9 @@ Two bundles ship with these docs and `docs/demo/app.html` picks one at load
 time:
 
 - `docs/demo/pkg/` — single-threaded; runs on any page.
+- `docs/demo/pkg-gpu/` — the single-threaded core plus the experimental
+  WebGPU backend; `app.html?engine=gpu` runs the simulation on it (contact
+  spread only, no spotting; see [GPU Core](gpu-core.md)).
 - `docs/demo/pkg-threads/` — multi-threaded: the core's realizations run on
   a [rayon](https://docs.rs/rayon) pool of web workers
   (`wasm-bindgen-rayon`). It needs `SharedArrayBuffer`, which browsers only

@@ -4,6 +4,7 @@
 #   docs/demo/pkg/          single-threaded, runs on any page
 #   docs/demo/pkg-threads/  multi-threaded (rayon on web workers); picked by
 #                           the page when it is cross-origin isolated
+#   docs/demo/pkg-gpu/      CPU core plus the WebGPU backend (?engine=gpu)
 #
 # The threaded bundle needs wasm atomics, which the prebuilt wasm32 std lacks,
 # so it is built on nightly with `-Z build-std`:
@@ -42,6 +43,11 @@ RUSTUP_TOOLCHAIN=nightly \
   wasm-pack build "$here" --release --target web \
   --out-dir "$out/pkg-threads" --features threads
 
+echo "== WebGPU bundle -> docs/demo/pkg-gpu" >&2
+# single-threaded CPU core plus the propagator-gpu backend (GpuPropagator);
+# WebGPU needs no cross-origin isolation
+wasm-pack build "$here" --release --target web --out-dir "$out/pkg-gpu" --features gpu
+
 # wasm-pack writes a `*` .gitignore into each out-dir; the bundles are
 # committed, so drop them
-rm -f "$out/pkg/.gitignore" "$out/pkg-threads/.gitignore"
+rm -f "$out/pkg/.gitignore" "$out/pkg-threads/.gitignore" "$out/pkg-gpu/.gitignore"

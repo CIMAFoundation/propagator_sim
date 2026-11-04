@@ -23,10 +23,45 @@ fn main() {
     let bucket: u32 = arg(5, "900").parse().expect("bucket seconds");
     let sweeps: u32 = arg(6, "6").parse().expect("sweeps");
 
-    let veg = Grid2::filled(n, n, 4);
-    let dem = Grid2::filled(n, n, 0.0);
+    // scenario knobs (env): MOIST (percent), WIND (km/h), WDIR (deg),
+    // SLOPE (m per cell along columns), MIXED=1 (random legacy fuels 1..7)
+    let envf = |k: &str, d: f64| {
+        std::env::var(k)
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(d)
+    };
+    let moisture = envf("MOIST", 0.0);
+    let wind_speed = envf("WIND", 30.0);
+    let wind_dir = envf("WDIR", 90.0);
+    let slope = envf("SLOPE", 0.0);
+    let mixed = std::env::var("MIXED").is_ok();
     let c = n / 2;
-    let (wind_dir, wind_speed, moisture) = (90.0, 30.0, 0.0);
+    let mut veg = Grid2::filled(n, n, 4);
+    let mut dem = Grid2::filled(n, n, 0.0);
+    if mixed {
+        // deterministic pseudo-random legacy fuel codes 1..7 in 8x8 patches
+        let mut x = 0x9E37_79B9u32;
+        for row in 0..n {
+            for col in 0..n {
+                if row % 8 == 0 && col % 8 == 0 {
+                    x ^= x << 13;
+                    x ^= x >> 17;
+                    x ^= x << 5;
+                }
+                let patch = ((row / 8) * 7919 + (col / 8) * 104729) as u32 ^ x;
+                veg[(row, col)] = 1 + (patch % 7) as i32;
+            }
+        }
+    }
+    if slope != 0.0 {
+        for row in 0..n {
+            for col in 0..n {
+                dem[(row, col)] =
+                    slope * col as f64 + 0.3 * slope * ((row as f64) * 0.05).sin() * 10.0;
+            }
+        }
+    }
 
     // --- CPU ---
     let mut config = PropagatorConfig::new(veg.clone(), dem.clone());

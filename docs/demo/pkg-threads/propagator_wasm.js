@@ -33,17 +33,34 @@ export class FuelSystemBuilder {
      * @param {boolean} spotting
      * @param {number} prob_ign_by_embers
      * @param {boolean} burn
-     * @param {Int32Array} spread_to
-     * @param {Float64Array} spread_prob
+     * @param {Int32Array | number[]} spread_to
+     * @param {Float64Array | number[]} spread_prob
      */
     add_fuel(id, name, v0, d0, d1, hhv, humidity, spotting, prob_ign_by_embers, burn, spread_to, spread_prob) {
-        const ptr0 = passStringToWasm0(name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArray32ToWasm0(spread_to, wasm.__wbindgen_malloc);
-        const len1 = WASM_VECTOR_LEN;
-        const ptr2 = passArrayF64ToWasm0(spread_prob, wasm.__wbindgen_malloc);
-        const len2 = WASM_VECTOR_LEN;
-        const ret = wasm.fuelsystembuilder_add_fuel(this.__wbg_ptr, id, ptr0, len0, v0, d0, d1, hhv, !isLikeNone(humidity), isLikeNone(humidity) ? 0 : humidity, spotting, prob_ign_by_embers, burn, ptr1, len1, ptr2, len2);
+        const val4 = +id;
+        const val5 = +v0;
+        const val6 = +d0;
+        const val7 = +d1;
+        const val8 = +hhv;
+        const val9 = +(isLikeNone(humidity) ? 0 : humidity);
+        const val10 = +spotting;
+        const val11 = +prob_ign_by_embers;
+        const val12 = +burn;
+        let ptr0, len0, ptr1, len1, ptr2, len2;
+        try {
+            ptr0 = passStringToWasm0(name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            len0 = WASM_VECTOR_LEN;
+            ptr1 = passArray32ToWasm0(spread_to, wasm.__wbindgen_malloc);
+            len1 = WASM_VECTOR_LEN;
+            ptr2 = passArrayF64ToWasm0(spread_prob, wasm.__wbindgen_malloc);
+            len2 = WASM_VECTOR_LEN;
+        } catch (e) {
+            if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 8, 8); }
+            if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 4, 4); }
+            if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 1, 1); }
+            throw e;
+        }
+        const ret = wasm.fuelsystembuilder_add_fuel(this.__wbg_ptr, val4, ptr0, len0, val5, val6, val7, val8, !isLikeNone(humidity), val9, val10, val11, val12, ptr1, len1, ptr2, len2);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
@@ -130,17 +147,28 @@ export class Propagator {
      * be a multiple of [`tile_size`] cells.
      * @param {number} rows
      * @param {number} cols
-     * @param {Int32Array} veg
-     * @param {Float64Array} dem
+     * @param {Int32Array | number[]} veg
+     * @param {Float64Array | number[]} dem
      * @param {bigint} origin_row
      * @param {bigint} origin_col
      */
     expand(rows, cols, veg, dem, origin_row, origin_col) {
-        const ptr0 = passArray32ToWasm0(veg, wasm.__wbindgen_malloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF64ToWasm0(dem, wasm.__wbindgen_malloc);
-        const len1 = WASM_VECTOR_LEN;
-        const ret = wasm.propagator_expand(this.__wbg_ptr, rows, cols, ptr0, len0, ptr1, len1, origin_row, origin_col);
+        const val3 = +rows;
+        const val4 = +cols;
+        const val5 = BigInt.asIntN(64, origin_row);
+        const val6 = BigInt.asIntN(64, origin_col);
+        let ptr0, len0, ptr1, len1;
+        try {
+            ptr0 = passArray32ToWasm0(veg, wasm.__wbindgen_malloc);
+            len0 = WASM_VECTOR_LEN;
+            ptr1 = passArrayF64ToWasm0(dem, wasm.__wbindgen_malloc);
+            len1 = WASM_VECTOR_LEN;
+        } catch (e) {
+            if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 8, 8); }
+            if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 4, 4); }
+            throw e;
+        }
+        const ret = wasm.propagator_expand(this.__wbg_ptr, val3, val4, ptr0, len0, ptr1, len1, val5, val6);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
@@ -172,8 +200,8 @@ export class Propagator {
      * [`Propagator::expand`] and continue.
      * @param {number} rows
      * @param {number} cols
-     * @param {Int32Array} veg
-     * @param {Float64Array} dem
+     * @param {Int32Array | number[]} veg
+     * @param {Float64Array | number[]} dem
      * @param {FuelSystemBuilder} fuels
      * @param {number} realizations
      * @param {number} seed
@@ -185,16 +213,32 @@ export class Propagator {
      * @param {number | null} [threads]
      */
     constructor(rows, cols, veg, dem, fuels, realizations, seed, do_spotting, cellsize, ros_model, moisture_model, halt_on_boundary, threads) {
-        const ptr0 = passArray32ToWasm0(veg, wasm.__wbindgen_malloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF64ToWasm0(dem, wasm.__wbindgen_malloc);
-        const len1 = WASM_VECTOR_LEN;
         _assertClass(fuels, FuelSystemBuilder);
-        const ptr2 = passStringToWasm0(ros_model, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len2 = WASM_VECTOR_LEN;
-        const ptr3 = passStringToWasm0(moisture_model, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len3 = WASM_VECTOR_LEN;
-        const ret = wasm.propagator_new(rows, cols, ptr0, len0, ptr1, len1, fuels.__wbg_ptr, realizations, seed, do_spotting, cellsize, ptr2, len2, ptr3, len3, isLikeNone(halt_on_boundary) ? 0xFFFFFF : halt_on_boundary ? 1 : 0, isLikeNone(threads) ? Number.MAX_SAFE_INTEGER : (threads) >>> 0);
+        const val5 = +rows;
+        const val6 = +cols;
+        const val7 = +realizations;
+        const val8 = +seed;
+        const val9 = +do_spotting;
+        const val10 = +cellsize;
+        const val11 = +(isLikeNone(threads) ? Number.MAX_SAFE_INTEGER : (threads) >>> 0);
+        let ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3;
+        try {
+            ptr0 = passArray32ToWasm0(veg, wasm.__wbindgen_malloc);
+            len0 = WASM_VECTOR_LEN;
+            ptr1 = passArrayF64ToWasm0(dem, wasm.__wbindgen_malloc);
+            len1 = WASM_VECTOR_LEN;
+            ptr2 = passStringToWasm0(ros_model, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            len2 = WASM_VECTOR_LEN;
+            ptr3 = passStringToWasm0(moisture_model, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+            len3 = WASM_VECTOR_LEN;
+        } catch (e) {
+            if (ptr3) { wasm.__wbindgen_free(ptr3, len3 * 1, 1); }
+            if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 1, 1); }
+            if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 8, 8); }
+            if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 4, 4); }
+            throw e;
+        }
+        const ret = wasm.propagator_new(val5, val6, ptr0, len0, ptr1, len1, fuels.__wbg_ptr, val7, val8, val9, val10, ptr2, len2, ptr3, len3, isLikeNone(halt_on_boundary) ? 0xFFFFFF : halt_on_boundary ? 1 : 0, val11);
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
@@ -286,19 +330,29 @@ export class Propagator {
      * Pass empty arrays for whichever action kind is absent; a call with no
      * cells at all is a no-op.
      * @param {bigint} time
-     * @param {Int32Array} moisture_cells
-     * @param {Float32Array} moisture_values
-     * @param {Int32Array} veg_cells
+     * @param {Int32Array | number[]} moisture_cells
+     * @param {Float32Array | number[]} moisture_values
+     * @param {Int32Array | number[]} veg_cells
      * @param {number} veg_fuel
      */
     set_action_fields(time, moisture_cells, moisture_values, veg_cells, veg_fuel) {
-        const ptr0 = passArray32ToWasm0(moisture_cells, wasm.__wbindgen_malloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF32ToWasm0(moisture_values, wasm.__wbindgen_malloc);
-        const len1 = WASM_VECTOR_LEN;
-        const ptr2 = passArray32ToWasm0(veg_cells, wasm.__wbindgen_malloc);
-        const len2 = WASM_VECTOR_LEN;
-        const ret = wasm.propagator_set_action_fields(this.__wbg_ptr, time, ptr0, len0, ptr1, len1, ptr2, len2, veg_fuel);
+        const val4 = BigInt.asIntN(64, time);
+        const val5 = +veg_fuel;
+        let ptr0, len0, ptr1, len1, ptr2, len2;
+        try {
+            ptr0 = passArray32ToWasm0(moisture_cells, wasm.__wbindgen_malloc);
+            len0 = WASM_VECTOR_LEN;
+            ptr1 = passArrayF32ToWasm0(moisture_values, wasm.__wbindgen_malloc);
+            len1 = WASM_VECTOR_LEN;
+            ptr2 = passArray32ToWasm0(veg_cells, wasm.__wbindgen_malloc);
+            len2 = WASM_VECTOR_LEN;
+        } catch (e) {
+            if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 4, 4); }
+            if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 4, 4); }
+            if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 4, 4); }
+            throw e;
+        }
+        const ret = wasm.propagator_set_action_fields(this.__wbg_ptr, val4, ptr0, len0, ptr1, len1, ptr2, len2, val5);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
@@ -313,12 +367,16 @@ export class Propagator {
      * @param {number} moisture
      * @param {number} wind_dir
      * @param {number} wind_speed
-     * @param {Int32Array} ignitions
+     * @param {Int32Array | number[]} ignitions
      */
     set_boundary_conditions(time, moisture, wind_dir, wind_speed, ignitions) {
+        const val2 = BigInt.asIntN(64, time);
+        const val3 = +moisture;
+        const val4 = +wind_dir;
+        const val5 = +wind_speed;
         const ptr0 = passArray32ToWasm0(ignitions, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
-        const ret = wasm.propagator_set_boundary_conditions(this.__wbg_ptr, time, moisture, wind_dir, wind_speed, ptr0, len0);
+        const ret = wasm.propagator_set_boundary_conditions(this.__wbg_ptr, val2, val3, val4, val5, ptr0, len0);
         if (ret[1]) {
             throw takeFromExternrefTable0(ret[0]);
         }
@@ -375,11 +433,11 @@ if (Symbol.dispose) Propagator.prototype[Symbol.dispose] = Propagator.prototype.
  * coordinate nesting. Omitted optional arguments use the Python defaults.
  * Filtering, topology, smoothing, omitted-threshold, and empty-geometry
  * semantics are defined by `propagator-geo`.
- * @param {Float32Array} values
+ * @param {Float32Array | number[]} values
  * @param {number} rows
  * @param {number} cols
- * @param {Float64Array} transform
- * @param {Float64Array | null} [thresholds]
+ * @param {Float64Array | number[]} transform
+ * @param {Float64Array | number[] | null} [thresholds]
  * @param {number | null} [med_filt_val]
  * @param {number | null} [min_length]
  * @param {number | null} [smooth_sigma]
@@ -387,13 +445,27 @@ if (Symbol.dispose) Propagator.prototype[Symbol.dispose] = Propagator.prototype.
  * @returns {any}
  */
 export function extract_isochrone(values, rows, cols, transform, thresholds, med_filt_val, min_length, smooth_sigma, simp_fact) {
-    const ptr0 = passArrayF32ToWasm0(values, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF64ToWasm0(transform, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    var ptr2 = isLikeNone(thresholds) ? 0 : passArrayF64ToWasm0(thresholds, wasm.__wbindgen_malloc);
-    var len2 = WASM_VECTOR_LEN;
-    const ret = wasm.extract_isochrone(ptr0, len0, rows, cols, ptr1, len1, ptr2, len2, isLikeNone(med_filt_val) ? Number.MAX_SAFE_INTEGER : (med_filt_val) >>> 0, !isLikeNone(min_length), isLikeNone(min_length) ? 0 : min_length, !isLikeNone(smooth_sigma), isLikeNone(smooth_sigma) ? 0 : smooth_sigma, !isLikeNone(simp_fact), isLikeNone(simp_fact) ? 0 : simp_fact);
+    const val4 = +rows;
+    const val5 = +cols;
+    const val6 = +(isLikeNone(med_filt_val) ? Number.MAX_SAFE_INTEGER : (med_filt_val) >>> 0);
+    const val7 = +(isLikeNone(min_length) ? 0 : min_length);
+    const val8 = +(isLikeNone(smooth_sigma) ? 0 : smooth_sigma);
+    const val9 = +(isLikeNone(simp_fact) ? 0 : simp_fact);
+    let ptr0, len0, ptr1, len1, ptr2, len2;
+    try {
+        ptr0 = passArrayF32ToWasm0(values, wasm.__wbindgen_malloc);
+        len0 = WASM_VECTOR_LEN;
+        ptr1 = passArrayF64ToWasm0(transform, wasm.__wbindgen_malloc);
+        len1 = WASM_VECTOR_LEN;
+        ptr2 = isLikeNone(thresholds) ? 0 : passArrayF64ToWasm0(thresholds, wasm.__wbindgen_malloc);
+        len2 = WASM_VECTOR_LEN;
+    } catch (e) {
+        if (ptr2) { wasm.__wbindgen_free(ptr2, len2 * 8, 8); }
+        if (ptr1) { wasm.__wbindgen_free(ptr1, len1 * 8, 8); }
+        if (ptr0) { wasm.__wbindgen_free(ptr0, len0 * 4, 4); }
+        throw e;
+    }
+    const ret = wasm.extract_isochrone(ptr0, len0, val4, val5, ptr1, len1, ptr2, len2, val6, !isLikeNone(min_length), val7, !isLikeNone(smooth_sigma), val8, !isLikeNone(simp_fact), val9);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -494,25 +566,25 @@ function __wbg_get_imports(memory) {
             const ret = String(arg1);
             const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
             const len1 = WASM_VECTOR_LEN;
-            getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
-            getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
+            getDataViewMemory0().setInt32((arg0 >>> 0) + 4 * 1, len1, true);
+            getDataViewMemory0().setInt32((arg0 >>> 0) + 4 * 0, ptr1, true);
         },
-        __wbg___wbindgen_is_undefined_c05833b95a3cf397: function(arg0) {
+        __wbg___wbindgen_is_undefined_be5b34249ff1fc15: function(arg0) {
             const ret = arg0 === undefined;
             return ret;
         },
-        __wbg___wbindgen_memory_de265df8aadd6273: function() {
+        __wbg___wbindgen_memory_17a1178bc3328ea3: function() {
             const ret = wasm.memory;
             return ret;
         },
-        __wbg___wbindgen_module_a22faa8909381977: function() {
+        __wbg___wbindgen_module_2e98e71e8e96b4ac: function() {
             const ret = wasmModule;
             return ret;
         },
-        __wbg___wbindgen_throw_344f42d3211c4765: function(arg0, arg1) {
+        __wbg___wbindgen_throw_4c88d8bf264fd984: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
-        __wbg_instanceof_Window_05ba1ee4f6781663: function(arg0) {
+        __wbg_instanceof_Window_5cf453f5639aa1a2: function(arg0) {
             let result;
             try {
                 result = arg0 instanceof Window;
@@ -522,62 +594,61 @@ function __wbg_get_imports(memory) {
             const ret = result;
             return ret;
         },
-        __wbg_new_32b398fb48b6d94a: function() {
+        __wbg_new_37eb45aaf5eeb820: function() {
             const ret = new Array();
             return ret;
         },
-        __wbg_new_da52cf8fe3429cb2: function() {
+        __wbg_new_cd4348290afae586: function() {
             const ret = new Object();
             return ret;
         },
-        __wbg_set_6be42768c690e380: function(arg0, arg1, arg2) {
-            arg0[arg1] = arg2;
-        },
-        __wbg_set_8a16b38e4805b298: function(arg0, arg1, arg2) {
+        __wbg_set_d2d33b52458e984a: function(arg0, arg1, arg2) {
             arg0[arg1 >>> 0] = arg2;
+        },
+        __wbg_set_e4b9a833d288759a: function(arg0, arg1, arg2) {
+            arg0[arg1] = arg2;
         },
         __wbg_startWorkers_622cedd0d351664e: function(arg0, arg1, arg2) {
             const ret = startWorkers(arg0, arg1, wbg_rayon_PoolBuilder.__wrap(arg2));
             return ret;
         },
-        __wbg_static_accessor_GLOBAL_4ef717fb391d88b7: function() {
-            const ret = typeof global === 'undefined' ? null : global;
+        __wbg_static_accessor_GLOBAL_THIS_003ee833af9699fc: function() {
+            const ret = typeof globalThis === 'undefined' ? undefined : globalThis;
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
         },
-        __wbg_static_accessor_GLOBAL_THIS_8d1badc68b5a74f4: function() {
-            const ret = typeof globalThis === 'undefined' ? null : globalThis;
+        __wbg_static_accessor_GLOBAL_e4293fb22cbe77da: function() {
+            const ret = typeof global === 'undefined' ? undefined : global;
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
         },
-        __wbg_static_accessor_SELF_146583524fe1469b: function() {
-            const ret = typeof self === 'undefined' ? null : self;
+        __wbg_static_accessor_SELF_53bb20457401453d: function() {
+            const ret = typeof self === 'undefined' ? undefined : self;
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
         },
-        __wbg_static_accessor_URL_151cb8815849ce83: function() {
+        __wbg_static_accessor_URL_fac851ed3060f4eb: function() {
             const ret = import.meta.url;
             return ret;
         },
-        __wbg_static_accessor_WINDOW_f2829a2234d7819e: function() {
-            const ret = typeof window === 'undefined' ? null : window;
+        __wbg_static_accessor_WINDOW_b5e0810bfecb7feb: function() {
+            const ret = typeof window === 'undefined' ? undefined : window;
             return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
         },
-        __wbindgen_cast_0000000000000001: function(arg0) {
+        __wbindgen_generic_0000000000000001: function(arg0) {
             // Cast intrinsic for `F64 -> Externref`.
             const ret = arg0;
             return ret;
         },
-        __wbindgen_cast_0000000000000002: function(arg0, arg1) {
+        __wbindgen_generic_0000000000000002: function(arg0, arg1) {
             // Cast intrinsic for `Ref(String) -> Externref`.
             const ret = getStringFromWasm0(arg0, arg1);
             return ret;
         },
         __wbindgen_init_externref_table: function() {
             const table = wasm.__wbindgen_externrefs;
-            const offset = table.grow(4);
             table.set(0, undefined);
-            table.set(offset + 0, undefined);
-            table.set(offset + 1, null);
-            table.set(offset + 2, true);
-            table.set(offset + 3, false);
+            table.set(1024, undefined);
+            table.set(1025, null);
+            table.set(1026, true);
+            table.set(1027, false);
         },
         memory: memory || new WebAssembly.Memory({initial:18,maximum:32768,shared:true}),
     };
@@ -639,7 +710,8 @@ function getFloat64ArrayMemory0() {
 }
 
 function getStringFromWasm0(ptr, len) {
-    return decodeText(ptr >>> 0, len);
+    ptr = ptr >>> 0;
+    return decodeText(getUint8ArrayMemory0().subarray(ptr, ptr + len));
 }
 
 let cachedUint32ArrayMemory0 = null;
@@ -726,19 +798,19 @@ function takeFromExternrefTable0(idx) {
     return value;
 }
 
-let cachedTextDecoder = (typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { ignoreBOM: true, fatal: true }) : undefined);
+let cachedTextDecoder = (typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { ignoreBOM: true }) : undefined);
 if (cachedTextDecoder) cachedTextDecoder.decode();
 
 const MAX_SAFARI_DECODE_BYTES = 2146435072;
 let numBytesDecoded = 0;
-function decodeText(ptr, len) {
-    numBytesDecoded += len;
+function decodeText(bytes) {
+    numBytesDecoded += bytes.length;
     if (numBytesDecoded >= MAX_SAFARI_DECODE_BYTES) {
-        cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
+        cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true });
         cachedTextDecoder.decode();
-        numBytesDecoded = len;
+        numBytesDecoded = bytes.length;
     }
-    return cachedTextDecoder.decode(getUint8ArrayMemory0().slice(ptr, ptr + len));
+    return cachedTextDecoder.decode(bytes.slice());
 }
 
 const cachedTextEncoder = (typeof TextEncoder !== 'undefined' ? new TextEncoder() : undefined);
@@ -776,11 +848,15 @@ function __wbg_finalize_init(instance, module, thread_stack_size) {
 
 async function __wbg_load(module, imports) {
     if (typeof Response === 'function' && module instanceof Response) {
+        if (!module.ok) {
+            throw new Error(`failed to fetch Wasm: ${module.status} ${module.statusText} fetching '${module.url}'`);
+        }
+
         if (typeof WebAssembly.instantiateStreaming === 'function') {
             try {
                 return await WebAssembly.instantiateStreaming(module, imports);
             } catch (e) {
-                const validResponse = module.ok && expectedResponseType(module.type);
+                const validResponse = expectedResponseType(module.type);
 
                 if (validResponse && module.headers.get('Content-Type') !== 'application/wasm') {
                     console.warn("`WebAssembly.instantiateStreaming` failed because your server does not serve Wasm with `application/wasm` MIME type. Falling back to `WebAssembly.instantiate` which is slower. Original error:\n", e);
@@ -829,9 +905,17 @@ function initSync(module, memory) {
     return __wbg_finalize_init(instance, module, thread_stack_size);
 }
 
+let __wbg_init_promise;
 async function __wbg_init(module_or_path, memory) {
     if (wasm !== undefined) return wasm;
+    if (__wbg_init_promise === undefined) {
+        __wbg_init_promise = __wbg_init_once(module_or_path, memory);
+        __wbg_init_promise.catch(() => { __wbg_init_promise = undefined; });
+    }
+    return __wbg_init_promise;
+}
 
+async function __wbg_init_once(module_or_path, memory) {
     let thread_stack_size
     if (module_or_path !== undefined) {
         if (Object.getPrototypeOf(module_or_path) === Object.prototype) {

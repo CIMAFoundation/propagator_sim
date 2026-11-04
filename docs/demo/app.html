@@ -265,8 +265,30 @@
 // coi-serviceworker.js adds them and the page is reloaded once; browsers
 // where that does not take (no service workers, no COEP credentialless)
 // keep the single-threaded bundle.
-let Propagator, FuelSystemBuilder;
+let Propagator, FuelSystemBuilder, GpuPropagatorClass;
 let THREADS = 1;
+// "cpu" (single or multi-threaded wasm core) or "gpu" (WebGPU backend,
+// `?engine=gpu`; contact spread only, see ../gpu-core.md)
+let ENGINE = "cpu";
+
+// Adapts the async WebGPU backend to the synchronous-looking interface the
+// page drives: `step` also folds the outputs once, so `fire_probability` and
+// `burned_area_ha` read the cached snapshot.
+class GpuSim {
+  constructor(inner) { this.inner = inner; this.snap = new Float32Array(N * N + 1); }
+  get time() { return this.inner.time; }
+  async step(seconds) {
+    await this.inner.step(seconds);
+    this.snap = await this.inner.snapshot();
+  }
+  fire_probability() { return this.snap.subarray(0, N * N); }
+  burned_area_ha() { return this.snap[N * N]; }
+  // the GPU backend does not track front exhaustion; the time cap stops the run
+  next_time() { return 1; }
+  set_boundary_conditions(time, moisture, wdir, wspeed, ignitions) {
+    this.inner.set_boundary_conditions(time, moisture, wdir, wspeed, ignitions);
+  }
+}
 
 function ensureIsolation() {
   if (globalThis.crossOriginIsolated || !("serviceWorker" in navigator) || !window.isSecureContext) {
@@ -285,9 +307,19 @@ function ensureIsolation() {
 }
 
 async function loadCore() {
+  const query = new URLSearchParams(location.search);
+  if (query.get("engine") === "gpu") {
+    if (!navigator.gpu) throw new Error("WebGPU is not available in this browser");
+    const mod = await import("./pkg-gpu/propagator_wasm.js");
+    await mod.default();
+    ({ Propagator, FuelSystemBuilder } = mod);
+    GpuPropagatorClass = mod.GpuPropagator;
+    ENGINE = "gpu";
+    return;
+  }
   // `?threads=N` overrides the worker count; `?threads=1` forces the
   // single-threaded bundle (for comparisons)
-  const requested = parseInt(new URLSearchParams(location.search).get("threads") || "", 10);
+  const requested = parseInt(query.get("threads") || "", 10);
   const forceSingle = requested === 1;
   if (!forceSingle) ensureIsolation();
   const isolated = !forceSingle && globalThis.crossOriginIsolated === true
@@ -584,18 +616,25 @@ function applyWeather() {
 }
 
 // Build the propagator from the current controls + ignitions (once).
-function ensureSim() {
+async function ensureSim() {
   if (sim) return true;
   if (ignitions.length === 0) {
     el("status").textContent = "Place at least one ignition point first.";
     return false;
   }
   const reals = parseInt(el("reals").value, 10);
-  sim = new Propagator(
-    N, N, veg, dem, buildFuelSystem(), reals, 42,
-    el("spotting").checked, CELL, el("ros").value, "trucchia",
-    false, THREADS,
-  );
+  if (ENGINE === "gpu") {
+    const inner = await GpuPropagatorClass.create(
+      N, N, veg, dem, buildFuelSystem(), reals, 42, CELL, el("ros").value, "trucchia",
+    );
+    sim = new GpuSim(inner);
+  } else {
+    sim = new Propagator(
+      N, N, veg, dem, buildFuelSystem(), reals, 42,
+      el("spotting").checked, CELL, el("ros").value, "trucchia",
+      false, THREADS,
+    );
+  }
   sim.set_boundary_conditions(
     0n,
     parseFloat(el("moist").value),
@@ -609,9 +648,9 @@ function ensureSim() {
 
 // Advance one window; render + update readouts. Returns false when the run
 // is finished (front exhausted or time cap reached).
-function advanceOne() {
+async function advanceOne() {
   try {
-    sim.step(BigInt(STEP_SECONDS));
+    await sim.step(BigInt(STEP_SECONDS));
   } catch (e) {
     el("status").textContent = "Simulation error: " + e;
     return false;
@@ -621,9 +660,9 @@ function advanceOne() {
   return sim.next_time() >= 0 && Number(sim.time) < MAX_HOURS * 3600;
 }
 
-function frame() {
+async function frame() {
   if (!running) return;
-  if (advanceOne()) {
+  if (await advanceOne()) {
     rafId = requestAnimationFrame(frame);
   } else {
     pause();
@@ -631,8 +670,8 @@ function frame() {
   }
 }
 
-function play() {
-  if (!ensureSim()) return;
+async function play() {
+  if (!(await ensureSim())) return;
   running = true;
   if (rafId) cancelAnimationFrame(rafId);
   el("run").textContent = "Pause";
@@ -656,10 +695,10 @@ function togglePlay() {
   else play();
 }
 
-function stepOnce() {
+async function stepOnce() {
   if (running) pause();
-  if (!ensureSim()) return;
-  const more = advanceOne();
+  if (!(await ensureSim())) return;
+  const more = await advanceOne();
   el("status").textContent = more ? "Paused (stepped)." : "Simulation complete.";
 }
 
@@ -674,12 +713,15 @@ function resetSim() {
   el("stat-area").textContent = "0 ha";
   el("status").textContent =
     "Ready. Click the map to move the ignition, then press Play or Step. " +
-    (THREADS > 1 ? `Engine: ${THREADS} threads.` : "Engine: single-threaded.");
+    (ENGINE === "gpu" ? "Engine: WebGPU." : THREADS > 1 ? `Engine: ${THREADS} threads.` : "Engine: single-threaded.");
   drawFire(new Float32Array(N * N));
   drawIgnitions();
 }
 
 // ---- boot ----------------------------------------------------------------
+// hooks for automated measurements (not used by the UI)
+window.__demo = { ensureSim, advanceOne, engine: () => ENGINE, threads: () => THREADS, sim: () => sim, ignitions: () => ignitions };
+
 Promise.all([loadCore(), loadData()]).then(() => {
   vegCanvas = el("veg");
   fireCanvas = el("fire");

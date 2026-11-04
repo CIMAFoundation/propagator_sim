@@ -15,6 +15,8 @@ wasm-bindgen = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde-wasm-bindgen = "0.6"
 wasm-bindgen-rayon = { version = "1.3", optional = true, features = ["no-bundler"] }
+propagator-gpu = { path = "../propagator-gpu", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
 
 [features]
 # Multi-threaded build: realizations run on a rayon pool of web workers
@@ -23,6 +25,8 @@ wasm-bindgen-rayon = { version = "1.3", optional = true, features = ["no-bundler
 # `-C target-feature=+atomics,+bulk-memory,+mutable-globals`; see
 # build-demo.sh.
 threads = ["propagator-core/rayon", "dep:wasm-bindgen-rayon"]
+# WebGPU execution backend (`GpuPropagator`), see docs/gpu-core.md
+gpu = ["dep:propagator-gpu", "dep:wasm-bindgen-futures"]
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-O3", "--enable-threads", "--enable-bulk-memory", "--enable-mutable-globals"]

@@ -57,7 +57,11 @@ and the Trucchia and Baghino moisture models; scalar weather per window
 boundary mode "ignore".
 
 Not yet: ember spotting, per-cell weather fields, firefighting actions,
-domain growth, checkpoints, the browser (wasm) build of the backend.
+domain growth, checkpoints.
+
+The backend also builds for the browser: the wasm crate's `gpu` feature
+exposes `GpuPropagator` (async `create`, `step`, `snapshot`) on WebGPU, and
+the interactive demo runs on it with `?engine=gpu` (see below).
 
 ## Memory
 
@@ -90,8 +94,47 @@ wasm threads. Both remain to be measured.
 cd rust/propagator-gpu
 cargo run --release --bin gpu_bench -- 1000 100 12        # grid reals hours
 GPU_DEBUG=1 cargo run --release --bin gpu_bench -- 256 10 1  # per-edge model check
+MOIST=5 WIND=45 MIXED=1 SLOPE=2 cargo run --release --bin gpu_bench -- 512 100 12
 cargo test --release                                       # skips without a GPU
 ```
+
+### In the browser
+
+The demo page (`docs/demo/app.html?engine=gpu`) loads `docs/demo/pkg-gpu/`
+and drives the WebGPU backend instead of the wasm core. Measured in Chrome
+on the same M4 Pro, Alexandroupolis landscape (1024², 20 m), 48 steps of
+30 min, spotting off, times summed over the run (kernel = stepping, fold =
+outputs for the map and the area readout):
+
+| engine | scenario | kernel | fold | total | area |
+|---|---|---|---|---|---|
+| WebGPU | 45 km/h, 5 %, 50 real. | 0.9 s | 1.0 s | 1.9 s | 4519 ha |
+| wasm, 13 workers | same | 1.4 s | 6.4 s | 7.8 s | 4148 ha |
+| wasm, 1 thread | same | 6.0 s | 25.1 s | 31.1 s | 4148 ha |
+| WebGPU | 30 km/h, 0 %, 50 real. | 0.6 s | 1.0 s | 1.6 s | 4023 ha |
+| wasm, 13 workers | same | 1.8 s | 11.1 s | 12.9 s | 3981 ha |
+| WebGPU | 45 km/h, 5 %, 100 real. | 1.5 s | 1.5 s | 2.9 s | 4370 ha |
+| wasm, 13 workers | same | 0.9 s | 7.7 s | 8.6 s | 4202 ha |
+
+In the browser the GPU wins clearly, 4x to 8x end to end. Half of that is
+the fold: the GPU folds all cells in one pass and reads 28 MB back, while
+the wasm fold walks every allocated tile of every realization on the main
+thread and worker pool. Kernels alone are comparable; the wasm numbers
+varied by 2x between runs on this (thermally loaded) machine.
+
+Open item: on this landscape the WebGPU burned area runs 1–9 % above the
+CPU core (4519 vs 4148 ha at 50 realizations, 4370 vs 4202 at 100), where
+the synthetic native scenarios agree within 2 %. Whether that is ensemble
+noise or a systematic difference on real terrain and mixed fuels needs a
+native run on the demo data with several seeds.
+
+WebGPU limits matter: Chrome allows 10 storage buffers per shader stage,
+so the kernel packs its state into 8 (static inputs in one buffer,
+ping-pong pairs as two halves of one buffer selected by a phase flag,
+worklist counters together), and a buffer bound as storage cannot also be
+the indirect-dispatch source in the same dispatch, so the dispatch
+arguments are copied out first. A dispatch dimension is capped at 65535
+workgroups; worklists longer than that use two dimensions.
 
 ## Implementation notes
 

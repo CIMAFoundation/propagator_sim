@@ -54,10 +54,12 @@ struct Params {
     // end of the bucket the next sweep will process: tiles that receive an
     // arrival below it are queued for that sweep
     next_end: u32,
-    // 1 when a relaxation sweep over `list_cur` follows `prepare`: those
-    // tiles recompute their minimum; 0 at a bucket start (carry everything)
+    // 1 when a relaxation sweep over the current list follows `prepare`:
+    // those tiles recompute their minimum; 0 at a bucket start (carry all)
     processing: u32,
-    _pad2: u32,
+    // which half of the ping-pong buffers (tile_min, list, member, ctrl) is
+    // "current" (0 or 1); the other half is "next"
+    phase: u32,
 }
 
 struct Window {
@@ -67,32 +69,52 @@ struct Window {
     moisture: f32,
 }
 
-// per-fuel table, flattened: [v0, d0, d1, hhv, humidity] x n_fuels, then
-// spread probability n x n
+// WebGPU allows 10 storage buffers per stage, so everything is packed into
+// 8: static inputs in one u32 array (fuel index, dem bits, fuel table bits,
+// weather windows), the ping-pong pairs in single buffers with two halves
+// selected by `params.phase`, and the worklist counters together with the
+// indirect dispatch arguments.
 @group(0) @binding(0) var<uniform> params: Params;
-@group(0) @binding(1) var<storage, read> fuel_idx: array<u32>;
-@group(0) @binding(2) var<storage, read> dem: array<f32>;
-@group(0) @binding(3) var<storage, read> fuel_table: array<f32>;
-@group(0) @binding(4) var<storage, read> windows: array<Window>;
-@group(0) @binding(5) var<storage, read_write> key: array<atomic<u32>>;
-@group(0) @binding(6) var<storage, read_write> pushed_at: array<atomic<u32>>;
-@group(0) @binding(7) var<storage, read_write> tile_min_cur: array<atomic<u32>>;
-@group(0) @binding(8) var<storage, read_write> tile_min_next: array<atomic<u32>>;
-@group(0) @binding(9) var<storage, read_write> work: array<atomic<u32>>;
+// [fuel_idx (N)] [dem bits (N)] [fuel table bits: 5 per fuel, then n x n
+// spread probabilities] [windows: t_start, wind_dir, wind_speed, moisture
+// bits, 4 words each]
+@group(0) @binding(1) var<storage, read> inputs: array<u32>;
+@group(0) @binding(2) var<storage, read_write> key: array<atomic<u32>>;
+@group(0) @binding(3) var<storage, read_write> pushed_at: array<atomic<u32>>;
+// per (realization, tile) earliest unpushed arrival, two halves
+@group(0) @binding(4) var<storage, read_write> tile_min: array<atomic<u32>>;
 // fold accumulators per cell: count, arrival_min, arrival_sum (u32 seconds),
 // ros_sum, fli_sum (f32), ros_max, fli_max (f32); 7 x N
-@group(0) @binding(10) var<storage, read_write> fold: array<f32>;
-// worklist of (realization, tile) indices for the current sweep and the one
-// being built for the next; `count_next[0]` is also the indirect dispatch x
-@group(0) @binding(11) var<storage, read> list_cur: array<u32>;
-@group(0) @binding(12) var<storage, read_write> list_next: array<u32>;
-@group(0) @binding(13) var<storage, read> member_cur: array<u32>;
-@group(0) @binding(14) var<storage, read_write> member_next: array<atomic<u32>>;
-@group(0) @binding(15) var<storage, read_write> count_next: array<atomic<u32>>;
-// indirect dispatch arguments [x, y, z] for the sweep over `list_cur`
-// (x <= 65535 per dimension, so the list is laid out as x + 65535 * y)
-@group(0) @binding(16) var<storage, read_write> indirect_next: array<u32>;
-@group(0) @binding(17) var<storage, read> count_cur: array<u32>;
+@group(0) @binding(5) var<storage, read_write> fold: array<f32>;
+// worklists of (realization, tile) indices, two halves
+@group(0) @binding(6) var<storage, read_write> list: array<u32>;
+// membership flags of the worklists, two halves
+@group(0) @binding(7) var<storage, read_write> member: array<atomic<u32>>;
+// control words, 4 per half: [count, dispatch x, dispatch y, dispatch z]
+@group(0) @binding(8) var<storage, read_write> ctrl: array<atomic<u32>>;
+
+fn n_cells() -> u32 { return params.rows * params.cols; }
+fn n_rt() -> u32 { return params.n_reals * params.tiles_w * params.tiles_h; }
+fn cur_base() -> u32 { return params.phase * n_rt(); }
+fn next_base() -> u32 { return (1u - params.phase) * n_rt(); }
+fn ctrl_cur() -> u32 { return params.phase * 4u; }
+fn ctrl_next() -> u32 { return (1u - params.phase) * 4u; }
+
+fn fuel_idx_of(c: u32) -> u32 { return inputs[c]; }
+fn dem_of(c: u32) -> f32 { return bitcast<f32>(inputs[n_cells() + c]); }
+fn fuel_table(i: u32) -> f32 { return bitcast<f32>(inputs[2u * n_cells() + i]); }
+fn windows_base() -> u32 {
+    return 2u * n_cells() + params.n_fuels * 5u + params.n_fuels * params.n_fuels;
+}
+fn window_at(w: u32) -> Window {
+    let b = windows_base() + 4u * w;
+    var win: Window;
+    win.t_start = inputs[b];
+    win.wind_dir = bitcast<f32>(inputs[b + 1u]);
+    win.wind_speed = bitcast<f32>(inputs[b + 2u]);
+    win.moisture = bitcast<f32>(inputs[b + 3u]);
+    return win;
+}
 
 const NEIGHBOUR_DR = array<i32, 8>(-1, -1, -1, 0, 0, 1, 1, 1);
 const NEIGHBOUR_DC = array<i32, 8>(-1, 0, 1, -1, 1, -1, 0, 1);
@@ -116,13 +138,13 @@ fn neighbour_angle(d: u32) -> f32 {
     return NEIGHBOUR_ANGLE[d];
 }
 
-fn fuel_v0(i: u32) -> f32 { return fuel_table[i * 5u + 0u]; }
-fn fuel_d0(i: u32) -> f32 { return fuel_table[i * 5u + 1u]; }
-fn fuel_d1(i: u32) -> f32 { return fuel_table[i * 5u + 2u]; }
-fn fuel_hhv(i: u32) -> f32 { return fuel_table[i * 5u + 3u]; }
-fn fuel_humidity(i: u32) -> f32 { return fuel_table[i * 5u + 4u]; }
+fn fuel_v0(i: u32) -> f32 { return fuel_table(i * 5u + 0u); }
+fn fuel_d0(i: u32) -> f32 { return fuel_table(i * 5u + 1u); }
+fn fuel_d1(i: u32) -> f32 { return fuel_table(i * 5u + 2u); }
+fn fuel_hhv(i: u32) -> f32 { return fuel_table(i * 5u + 3u); }
+fn fuel_humidity(i: u32) -> f32 { return fuel_table(i * 5u + 4u); }
 fn fuel_p0(src_idx: u32, to: u32) -> f32 {
-    return fuel_table[params.n_fuels * 5u + src_idx * params.n_fuels + to];
+    return fuel_table(params.n_fuels * 5u + src_idx * params.n_fuels + to);
 }
 
 // lowbias32 hash -> uniform in [0, 1)
@@ -212,7 +234,7 @@ fn lhv_fuel(hhv: f32, moisture: f32) -> f32 {
 fn window_of(t: u32) -> u32 {
     var w = 0u;
     for (var i = 1u; i < params.n_windows; i = i + 1u) {
-        if windows[i].t_start <= t { w = i; }
+        if window_at(i).t_start <= t { w = i; }
     }
     return w;
 }
@@ -240,17 +262,17 @@ fn edge(r: u32, c: u32, d: u32, w: u32, draw: bool) -> Edge {
         return e;
     }
     let n = u32(row_to) * params.cols + u32(col_to);
-    let idx_from = fuel_idx[c];
-    let idx_to = fuel_idx[n];
+    let idx_from = fuel_idx_of(c);
+    let idx_to = fuel_idx_of(n);
     if idx_from == NO_FUEL_IDX || idx_to == NO_FUEL_IDX {
         return e;
     }
     e.blocked = false;
     e.to_cell = n;
-    let win = windows[w];
+    let win = window_at(w);
     let dist = neighbour_dist_cells(d) * params.cellsize;
     let angle = neighbour_angle(d);
-    let dh = dem[n] - dem[c];
+    let dh = dem_of(n) - dem_of(c);
     let moist = win.moisture;
     if draw {
         let p = probability_to_neighbour(angle, dist, win.wind_dir, win.wind_speed, moist, dh, fuel_p0(idx_from, idx_to));
@@ -275,9 +297,9 @@ fn tile_of(c: u32) -> u32 {
 }
 
 fn queue_next(rt: u32) {
-    if atomicExchange(&member_next[rt], 1u) == 0u {
-        let i = atomicAdd(&count_next[0], 1u);
-        list_next[i] = rt;
+    if atomicExchange(&member[next_base() + rt], 1u) == 0u {
+        let i = atomicAdd(&ctrl[ctrl_next()], 1u);
+        list[next_base() + i] = rt;
     }
 }
 
@@ -288,16 +310,16 @@ fn queue_next(rt: u32) {
 fn prepare(@builtin(global_invocation_id) gid: vec3<u32>) {
     let rt = gid.x;
     if rt == 0u {
-        atomicStore(&count_next[0], 0u);
+        atomicStore(&ctrl[ctrl_next()], 0u);
     }
-    if rt >= params.n_reals * params.tiles_w * params.tiles_h {
+    if rt >= n_rt() {
         return;
     }
-    atomicStore(&member_next[rt], 0u);
-    if params.processing != 0u && member_cur[rt] != 0u {
-        atomicStore(&tile_min_next[rt], INF);
+    atomicStore(&member[next_base() + rt], 0u);
+    if params.processing != 0u && atomicLoad(&member[cur_base() + rt]) != 0u {
+        atomicStore(&tile_min[next_base() + rt], INF);
     } else {
-        atomicStore(&tile_min_next[rt], atomicLoad(&tile_min_cur[rt]));
+        atomicStore(&tile_min[next_base() + rt], atomicLoad(&tile_min[cur_base() + rt]));
     }
 }
 
@@ -306,12 +328,22 @@ fn prepare(@builtin(global_invocation_id) gid: vec3<u32>) {
 @compute @workgroup_size(256)
 fn build_list(@builtin(global_invocation_id) gid: vec3<u32>) {
     let rt = gid.x;
-    if rt >= params.n_reals * params.tiles_w * params.tiles_h {
+    if rt >= n_rt() {
         return;
     }
-    if atomicLoad(&tile_min_next[rt]) < params.next_end {
+    if atomicLoad(&tile_min[next_base() + rt]) < params.next_end {
         queue_next(rt);
     }
+}
+
+// After a list has been built: turn its count into 2-D indirect dispatch
+// arguments (a dimension is limited to 65535 workgroups).
+@compute @workgroup_size(1)
+fn finalize_list() {
+    let c = atomicLoad(&ctrl[ctrl_next()]);
+    atomicStore(&ctrl[ctrl_next() + 1u], min(c, 65535u));
+    atomicStore(&ctrl[ctrl_next() + 2u], (c + 65534u) / 65535u);
+    atomicStore(&ctrl[ctrl_next() + 3u], 1u);
 }
 
 // One workgroup per queued (realization, tile): push every cell of the tile
@@ -321,92 +353,73 @@ fn build_list(@builtin(global_invocation_id) gid: vec3<u32>) {
 fn relax_list(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
     let n_tiles = params.tiles_w * params.tiles_h;
     let item = wg.x + 65535u * wg.y;
-    if item >= count_cur[0] {
+    if item >= atomicLoad(&ctrl[ctrl_cur()]) {
         return;
     }
-    let rt = list_cur[item];
+    let rt = list[cur_base() + item];
     let r = rt / n_tiles;
     let t = rt % n_tiles;
-    let n_cells = params.rows * params.cols;
+    let cells = n_cells();
     let tile_row = t / params.tiles_w;
     let tile_col = t % params.tiles_w;
     var local_min = INF;
-    for (var i = 0u; i < 1u; i = i + 1u) {
-        let local = lid.x;
-        let row = (tile_row << TILE_SHIFT) + local / TILE_SIZE;
-        let col = (tile_col << TILE_SHIFT) + local % TILE_SIZE;
-        if row >= params.rows || col >= params.cols {
-            continue;
-        }
+    let local = lid.x;
+    let row = (tile_row << TILE_SHIFT) + local / TILE_SIZE;
+    let col = (tile_col << TILE_SHIFT) + local % TILE_SIZE;
+    if row < params.rows && col < params.cols {
         let c = row * params.cols + col;
-        let idx = r * n_cells + c;
+        let idx = r * cells + c;
         let k = atomicLoad(&key[idx]);
         let a = k >> 4u;
-        if a == INF_ARRIVAL {
-            continue;
-        }
-        let pa = atomicLoad(&pushed_at[idx]);
-        if a >= pa {
-            continue;
-        }
-        if a >= params.bucket_end {
-            local_min = min(local_min, a);
-            continue;
-        }
-        if fuel_idx[c] != NO_FUEL_IDX {
-            let w = window_of(a);
-            for (var d = 0u; d < 8u; d = d + 1u) {
-                let e = edge(r, c, d, w, true);
-                if !e.open {
-                    continue;
-                }
-                let cand = a + e.transition;
-                let nk = (cand << 4u) | d;
-                let nidx = r * n_cells + e.to_cell;
-                let old = atomicMin(&key[nidx], nk);
-                if nk < old {
-                    let rt_n = r * n_tiles + tile_of(e.to_cell);
-                    atomicMin(&tile_min_next[rt_n], cand);
-                    if cand < params.next_end {
-                        queue_next(rt_n);
+        if a != INF_ARRIVAL {
+            let pa = atomicLoad(&pushed_at[idx]);
+            if a < pa {
+                if a >= params.bucket_end {
+                    local_min = a;
+                } else {
+                    if fuel_idx_of(c) != NO_FUEL_IDX {
+                        let w = window_of(a);
+                        for (var d = 0u; d < 8u; d = d + 1u) {
+                            let e = edge(r, c, d, w, true);
+                            if !e.open {
+                                continue;
+                            }
+                            let cand = a + e.transition;
+                            let nk = (cand << 4u) | d;
+                            let nidx = r * cells + e.to_cell;
+                            let old = atomicMin(&key[nidx], nk);
+                            if nk < old {
+                                let rt_n = r * n_tiles + tile_of(e.to_cell);
+                                atomicMin(&tile_min[next_base() + rt_n], cand);
+                                if cand < params.next_end {
+                                    queue_next(rt_n);
+                                }
+                            }
+                        }
                     }
+                    atomicMin(&pushed_at[idx], a);
                 }
             }
         }
-        atomicMin(&pushed_at[idx], a);
     }
     if local_min != INF {
-        atomicMin(&tile_min_next[rt], local_min);
+        atomicMin(&tile_min[next_base() + rt], local_min);
         if local_min < params.next_end {
             queue_next(rt);
         }
     }
 }
 
-// After a list has been built: turn its count into 2-D indirect dispatch
-// arguments (a dimension is limited to 65535 workgroups).
-@compute @workgroup_size(1)
-fn finalize_list() {
-    let c = atomicLoad(&count_next[0]);
-    indirect_next[0] = min(c, 65535u);
-    indirect_next[1] = (c + 65534u) / 65535u;
-    indirect_next[2] = 1u;
-}
-
-// Fill the state buffers with INF (unburnt / never pushed); `fold_time` is
-// reused as the element count.
+// Fill the state buffers with INF (unburnt / never pushed).
 @compute @workgroup_size(256)
 fn fill_inf(@builtin(global_invocation_id) gid: vec3<u32>) {
-    let n_cells = params.rows * params.cols;
-    let n_state = params.n_reals * n_cells;
-    let n_tiles = params.n_reals * params.tiles_w * params.tiles_h;
-    for (var i = gid.x; i < n_state; i = i + 65536u * 256u) {
+    let n_state = params.n_reals * n_cells();
+    for (var i = gid.x; i < n_state; i = i + 65535u * 256u) {
         atomicStore(&key[i], INF);
         atomicStore(&pushed_at[i], INF);
     }
-    if gid.x < n_tiles {
-        atomicStore(&tile_min_cur[gid.x], INF);
-        atomicStore(&tile_min_next[gid.x], INF);
+    if gid.x < 2u * n_rt() {
+        atomicStore(&tile_min[gid.x], INF);
     }
 }
 
@@ -415,9 +428,9 @@ fn fill_inf(@builtin(global_invocation_id) gid: vec3<u32>) {
 // the window of the source cell's arrival (deterministic, race-free).
 @compute @workgroup_size(256)
 fn fold_cells(@builtin(global_invocation_id) gid: vec3<u32>) {
-    let n_cells = params.rows * params.cols;
+    let cells = n_cells();
     let c = gid.x;
-    if c >= n_cells {
+    if c >= cells {
         return;
     }
     var count = 0u;
@@ -430,7 +443,7 @@ fn fold_cells(@builtin(global_invocation_id) gid: vec3<u32>) {
     let row = i32(c / params.cols);
     let col = i32(c % params.cols);
     for (var r = 0u; r < params.n_reals; r = r + 1u) {
-        let k = atomicLoad(&key[r * n_cells + c]);
+        let k = atomicLoad(&key[r * cells + c]);
         let a = k >> 4u;
         if a == INF_ARRIVAL || a > params.fold_time {
             continue;
@@ -444,7 +457,7 @@ fn fold_cells(@builtin(global_invocation_id) gid: vec3<u32>) {
             let src_row = row - NEIGHBOUR_DR[code];
             let src_col = col - NEIGHBOUR_DC[code];
             let src = u32(src_row) * params.cols + u32(src_col);
-            let a_src = atomicLoad(&key[r * n_cells + src]) >> 4u;
+            let a_src = atomicLoad(&key[r * cells + src]) >> 4u;
             let e = edge(r, src, code, window_of(a_src), false);
             ros_sum = ros_sum + e.ros;
             fli_sum = fli_sum + e.fli;
@@ -453,12 +466,12 @@ fn fold_cells(@builtin(global_invocation_id) gid: vec3<u32>) {
         }
     }
     fold[c] = f32(count);
-    fold[n_cells + c] = bitcast<f32>(arrival_min);
-    fold[2u * n_cells + c] = arrival_sum;
-    fold[3u * n_cells + c] = ros_sum;
-    fold[4u * n_cells + c] = fli_sum;
-    fold[5u * n_cells + c] = ros_max;
-    fold[6u * n_cells + c] = fli_max;
+    fold[cells + c] = bitcast<f32>(arrival_min);
+    fold[2u * cells + c] = arrival_sum;
+    fold[3u * cells + c] = ros_sum;
+    fold[4u * cells + c] = fli_sum;
+    fold[5u * cells + c] = ros_max;
+    fold[6u * cells + c] = fli_max;
 }
 
 // Debug: edge quantities of cell `fold_time` (reused as the cell index) under
@@ -475,13 +488,13 @@ fn debug_edges() {
         let row_to = row + NEIGHBOUR_DR[d];
         let col_to = col + NEIGHBOUR_DC[d];
         var p = -1.0;
+        let win = window_at(0u);
         if !e.blocked {
             let n = u32(row_to) * params.cols + u32(col_to);
-            let win = windows[0];
             let dist = neighbour_dist_cells(d) * params.cellsize;
             let angle = neighbour_angle(d);
-            let dh = dem[n] - dem[c];
-            p = probability_to_neighbour(angle, dist, win.wind_dir, win.wind_speed, win.moisture, dh, fuel_p0(fuel_idx[c], fuel_idx[n]));
+            let dh = dem_of(n) - dem_of(c);
+            p = probability_to_neighbour(angle, dist, win.wind_dir, win.wind_speed, win.moisture, dh, fuel_p0(fuel_idx_of(c), fuel_idx_of(n)));
         }
         fold[base] = p;
         fold[base + 1u] = f32(e.transition);
@@ -489,7 +502,7 @@ fn debug_edges() {
         fold[base + 3u] = e.fli;
         fold[base + 4u] = neighbour_angle(d);
         fold[base + 5u] = uniform01(0u, c, d);
-        fold[base + 6u] = windows[0].wind_dir;
-        fold[base + 7u] = windows[0].wind_speed;
+        fold[base + 6u] = win.wind_dir;
+        fold[base + 7u] = win.wind_speed;
     }
 }

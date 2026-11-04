@@ -6,13 +6,16 @@
 //! `(seed, realization, cell, direction)`, so each realization is a
 //! shortest-path problem on a fixed random graph whose edge weights depend on
 //! the weather window the source cell ignites in. Work is ordered in time
-//! buckets; per `(realization, tile)` the earliest unpushed arrival lets idle
-//! tiles exit after one load. Outputs are folded on the GPU and read back.
+//! buckets over a GPU-side worklist of active `(realization, tile)` pairs.
+//! Outputs are folded on the GPU and read back.
 //!
 //! Scope of this backend: contact spread with the three ROS models and the
 //! two moisture models, scalar (per-window) weather, forced point ignitions,
 //! boundary mode "ignore". Not yet: ember spotting, per-cell weather fields,
 //! firefighting actions, domain growth, checkpoints.
+//!
+//! The GPU-facing methods are async (they await buffer mappings) so the same
+//! code runs on WebGPU in the browser; native callers get blocking wrappers.
 
 use std::borrow::Cow;
 
@@ -26,6 +29,11 @@ const CODE_IGNITION: u32 = 8;
 const NO_FUEL_IDX: u32 = u32::MAX;
 const FOLD_FIELDS: usize = 7;
 const WORKGROUP: u32 = 256;
+/// words per weather window in the inputs buffer
+const WINDOW_WORDS: usize = 4;
+const MAX_WINDOWS: usize = 1024;
+/// control words per ping-pong half: count, dispatch x, y, z
+const CTRL_WORDS: usize = 4;
 
 #[derive(Debug)]
 pub enum GpuError {
@@ -66,11 +74,10 @@ struct Params {
     cellsize: f32,
     next_end: u32,
     processing: u32,
-    _pad: u32,
+    phase: u32,
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Debug)]
 struct Window {
     t_start: u32,
     /// radians
@@ -79,6 +86,17 @@ struct Window {
     wind_speed: f32,
     /// fraction
     moisture: f32,
+}
+
+impl Window {
+    fn words(&self) -> [u32; WINDOW_WORDS] {
+        [
+            self.t_start,
+            self.wind_dir.to_bits(),
+            self.wind_speed.to_bits(),
+            self.moisture.to_bits(),
+        ]
+    }
 }
 
 /// Construction parameters.
@@ -135,40 +153,40 @@ pub struct GpuOutput {
     pub area_50: f64,
 }
 
-/// GPU-resident simulation state for one scenario.
-pub struct GpuPropagator {
-    device: wgpu::Device,
-    queue: wgpu::Queue,
+struct Pipelines {
     relax: wgpu::ComputePipeline,
     prepare: wgpu::ComputePipeline,
     build_list: wgpu::ComputePipeline,
     finalize_list: wgpu::ComputePipeline,
     fold: wgpu::ComputePipeline,
-    debug_edges: wgpu::ComputePipeline,
     fill_inf: wgpu::ComputePipeline,
-    layout: wgpu::BindGroupLayout,
-    params_buf: wgpu::Buffer,
-    /// same parameters with `processing = 0`, for bucket-start passes
-    params_build_buf: wgpu::Buffer,
-    fuel_idx_buf: wgpu::Buffer,
-    dem_buf: wgpu::Buffer,
-    fuel_table_buf: wgpu::Buffer,
-    windows_buf: wgpu::Buffer,
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    debug_edges: wgpu::ComputePipeline,
+}
+
+/// GPU-resident simulation state for one scenario.
+pub struct GpuPropagator {
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    pipelines: Pipelines,
+    /// uniform parameter buffers indexed by `[processing][phase]`
+    params_bufs: [[wgpu::Buffer; 2]; 2],
+    /// bind groups indexed by `[processing][phase]`
+    bind_groups: [[wgpu::BindGroup; 2]; 2],
+    inputs_buf: wgpu::Buffer,
     key_buf: wgpu::Buffer,
-    pushed_buf: wgpu::Buffer,
-    tile_min: [wgpu::Buffer; 2],
-    list: [wgpu::Buffer; 2],
-    member: [wgpu::Buffer; 2],
-    /// worklist lengths (atomic append counters)
-    count: [wgpu::Buffer; 2],
-    /// `[x, y, 1]` indirect dispatch arguments derived from the counts
-    indirect: [wgpu::Buffer; 2],
-    work_buf: wgpu::Buffer,
+    tile_min_buf: wgpu::Buffer,
+    ctrl_buf: wgpu::Buffer,
+    /// indirect dispatch arguments, two halves of `[x, y, z]`, copied out of
+    /// `ctrl` (a buffer cannot be bound as storage and used as indirect
+    /// arguments in the same dispatch)
+    indirect_buf: wgpu::Buffer,
     fold_buf: wgpu::Buffer,
-    staging_work: wgpu::Buffer,
+    staging_small: wgpu::Buffer,
     staging_fold: wgpu::Buffer,
     params: Params,
     windows: Vec<Window>,
+    windows_offset: u64,
     rows: usize,
     cols: usize,
     n_tiles: usize,
@@ -177,9 +195,8 @@ pub struct GpuPropagator {
     time: i64,
     bucket_seconds: u32,
     sweeps_per_bucket: u32,
-    /// index of the tile_min buffer holding the current minima
-    cur: usize,
-    max_windows: usize,
+    /// which half of the ping-pong buffers is current
+    phase: usize,
 }
 
 fn ros_code(m: RosModel) -> u32 {
@@ -198,7 +215,9 @@ fn moisture_code(m: MoistureModel) -> u32 {
 }
 
 impl GpuPropagator {
-    /// Open the default high-performance adapter and upload the scenario.
+    /// Open the default high-performance adapter and upload the scenario
+    /// (blocking; native only).
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new(config: GpuConfig) -> Result<GpuPropagator> {
         pollster::block_on(Self::new_async(config))
     }
@@ -215,14 +234,7 @@ impl GpuPropagator {
         let tiles_h = rows.div_ceil(TILE_SIZE);
         let tiles_w = cols.div_ceil(TILE_SIZE);
         let n_tiles = tiles_h * tiles_w;
-        if n_tiles > 65535 {
-            return Err(GpuError::Config(
-                "grid too large: more than 65535 tiles per realization".into(),
-            ));
-        }
-        if config.realizations > 65535 {
-            return Err(GpuError::Config("more than 65535 realizations".into()));
-        }
+        let n_rt = config.realizations * n_tiles;
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
         let adapter = instance
@@ -252,44 +264,45 @@ impl GpuPropagator {
             )));
         }
 
-        // static inputs
+        // static inputs, packed into one u32 buffer
         let fuel_idx_grid = config
             .fuels
             .build_fuel_index_grid(&config.veg)
             .map_err(|e| GpuError::Config(e.to_string()))?;
         let burn = config.fuels.burn();
-        let fuel_idx: Vec<u32> = config
-            .veg
-            .as_slice()
-            .iter()
-            .zip(fuel_idx_grid.as_slice().iter())
-            .map(|(&veg, &idx)| {
-                if veg == NO_FUEL || !burn[idx as usize] {
-                    NO_FUEL_IDX
-                } else {
-                    idx as u32
-                }
-            })
-            .collect();
-        let dem: Vec<f32> = config.dem.as_slice().iter().map(|&v| v as f32).collect();
         let n_fuels = config.fuels.n_fuels();
-        let mut fuel_table: Vec<f32> = Vec::with_capacity(n_fuels * 5 + n_fuels * n_fuels);
-        for i in 0..n_fuels {
-            fuel_table.push(config.fuels.v0()[i] as f32);
-            fuel_table.push(config.fuels.d0()[i] as f32);
-            fuel_table.push(config.fuels.d1()[i] as f32);
-            fuel_table.push(config.fuels.hhv()[i] as f32);
-            fuel_table.push(config.fuels.humidity()[i] as f32);
+        let mut inputs: Vec<u32> = Vec::with_capacity(
+            2 * n_cells + 5 * n_fuels + n_fuels * n_fuels + MAX_WINDOWS * WINDOW_WORDS,
+        );
+        for (&veg, &idx) in config.veg.as_slice().iter().zip(fuel_idx_grid.as_slice()) {
+            inputs.push(if veg == NO_FUEL || !burn[idx as usize] {
+                NO_FUEL_IDX
+            } else {
+                idx as u32
+            });
         }
-        fuel_table.extend(
+        inputs.extend(config.dem.as_slice().iter().map(|&v| (v as f32).to_bits()));
+        for i in 0..n_fuels {
+            for table in [
+                config.fuels.v0(),
+                config.fuels.d0(),
+                config.fuels.d1(),
+                config.fuels.hhv(),
+                config.fuels.humidity(),
+            ] {
+                inputs.push((table[i] as f32).to_bits());
+            }
+        }
+        inputs.extend(
             config
                 .fuels
                 .spread_probabilities()
                 .iter()
-                .map(|&p| p as f32),
+                .map(|&p| (p as f32).to_bits()),
         );
+        let windows_offset = (inputs.len() * 4) as u64;
+        inputs.resize(inputs.len() + MAX_WINDOWS * WINDOW_WORDS, 0);
 
-        let max_windows = 1024usize;
         let params = Params {
             rows: rows as u32,
             cols: cols as u32,
@@ -306,7 +319,7 @@ impl GpuPropagator {
             cellsize: config.cellsize as f32,
             next_end: 0,
             processing: 1,
-            _pad: 0,
+            phase: 0,
         };
 
         let storage = wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST;
@@ -317,74 +330,76 @@ impl GpuPropagator {
                 usage,
             })
         };
-        let params_buf = init(
-            "params",
-            bytemuck::bytes_of(&params),
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        );
-        let params_build_buf = init(
-            "params_build",
-            bytemuck::bytes_of(&Params {
-                processing: 0,
-                ..params
-            }),
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        );
-        let fuel_idx_buf = init("fuel_idx", bytemuck::cast_slice(&fuel_idx), storage);
-        let dem_buf = init("dem", bytemuck::cast_slice(&dem), storage);
-        let fuel_table_buf = init("fuel_table", bytemuck::cast_slice(&fuel_table), storage);
-        let windows_buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("windows"),
-            size: (max_windows * std::mem::size_of::<Window>()) as u64,
-            usage: storage,
-            mapped_at_creation: false,
-        });
-        let filled = |label: &str, len: usize, value: u32| {
-            init(
-                label,
-                bytemuck::cast_slice(&vec![value; len]),
-                storage | wgpu::BufferUsages::COPY_SRC,
-            )
-        };
-        // large state buffers are allocated empty and filled on the GPU
-        let empty = |label: &str, len: usize| {
+        let empty = |label: &str, len: usize, usage: wgpu::BufferUsages| {
             device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(label),
                 size: (len * 4) as u64,
-                usage: storage | wgpu::BufferUsages::COPY_SRC,
+                usage,
                 mapped_at_creation: false,
             })
         };
-        let key_buf = empty("key", config.realizations * n_cells);
-        let pushed_buf = empty("pushed_at", config.realizations * n_cells);
-        let tile_min = [
-            empty("tile_min_a", config.realizations * n_tiles),
-            empty("tile_min_b", config.realizations * n_tiles),
+        let uniform = wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST;
+        let params_for = |processing: u32, phase: u32| Params {
+            processing,
+            phase,
+            ..params
+        };
+        let params_bufs = [
+            [
+                init(
+                    "params[0][0]",
+                    bytemuck::bytes_of(&params_for(0, 0)),
+                    uniform,
+                ),
+                init(
+                    "params[0][1]",
+                    bytemuck::bytes_of(&params_for(0, 1)),
+                    uniform,
+                ),
+            ],
+            [
+                init(
+                    "params[1][0]",
+                    bytemuck::bytes_of(&params_for(1, 0)),
+                    uniform,
+                ),
+                init(
+                    "params[1][1]",
+                    bytemuck::bytes_of(&params_for(1, 1)),
+                    uniform,
+                ),
+            ],
         ];
-        let work_buf = filled("work", 1, 0);
-        let list = [
-            filled("list_a", config.realizations * n_tiles, 0),
-            filled("list_b", config.realizations * n_tiles, 0),
-        ];
-        let member = [
-            filled("member_a", config.realizations * n_tiles, 0),
-            filled("member_b", config.realizations * n_tiles, 0),
-        ];
-        let count = [filled("count_a", 1, 0), filled("count_b", 1, 0)];
-        let indirect_usage = storage | wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_SRC;
-        let indirect = [
-            init(
-                "indirect_a",
-                bytemuck::cast_slice(&[0u32, 1, 1]),
-                indirect_usage,
-            ),
-            init(
-                "indirect_b",
-                bytemuck::cast_slice(&[0u32, 1, 1]),
-                indirect_usage,
-            ),
-        ];
-        let fold_buf = filled("fold", FOLD_FIELDS * n_cells, 0);
+        let inputs_buf = init("inputs", bytemuck::cast_slice(&inputs), storage);
+        // large state buffers are allocated empty and filled on the GPU
+        let key_buf = empty(
+            "key",
+            config.realizations * n_cells,
+            storage | wgpu::BufferUsages::COPY_SRC,
+        );
+        let pushed_buf = empty("pushed_at", config.realizations * n_cells, storage);
+        let tile_min_buf = empty("tile_min", 2 * n_rt, storage);
+        let list_buf = empty("list", 2 * n_rt, storage);
+        let member_buf = init(
+            "member",
+            bytemuck::cast_slice(&vec![0u32; 2 * n_rt]),
+            storage,
+        );
+        let ctrl_buf = init(
+            "ctrl",
+            bytemuck::cast_slice(&[0u32; 2 * CTRL_WORDS]),
+            storage | wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_SRC,
+        );
+        let indirect_buf = empty(
+            "indirect",
+            2 * 3,
+            wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
+        );
+        let fold_buf = init(
+            "fold",
+            bytemuck::cast_slice(&vec![0u32; FOLD_FIELDS * n_cells]),
+            storage | wgpu::BufferUsages::COPY_SRC,
+        );
         let staging = |label: &str, size: u64| {
             device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(label),
@@ -393,7 +408,7 @@ impl GpuPropagator {
                 mapped_at_creation: false,
             })
         };
-        let staging_work = staging("staging_work", 4);
+        let staging_small = staging("staging_small", 256);
         let staging_fold = staging("staging_fold", (FOLD_FIELDS * n_cells * 4) as u64);
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -417,22 +432,13 @@ impl GpuPropagator {
             entries: &[
                 entry(0, wgpu::BufferBindingType::Uniform),
                 entry(1, ro),
-                entry(2, ro),
-                entry(3, ro),
-                entry(4, ro),
+                entry(2, rw),
+                entry(3, rw),
+                entry(4, rw),
                 entry(5, rw),
                 entry(6, rw),
                 entry(7, rw),
                 entry(8, rw),
-                entry(9, rw),
-                entry(10, rw),
-                entry(11, ro),
-                entry(12, rw),
-                entry(13, ro),
-                entry(14, rw),
-                entry(15, rw),
-                entry(16, rw),
-                entry(17, ro),
             ],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -450,44 +456,87 @@ impl GpuPropagator {
                 cache: None,
             })
         };
-        let relax = pipeline("relax_list");
-        let prepare = pipeline("prepare");
-        let build_list = pipeline("build_list");
-        let finalize_list = pipeline("finalize_list");
-        let fold = pipeline("fold_cells");
-        let debug_edges = pipeline("debug_edges");
-        let fill_inf = pipeline("fill_inf");
+        let pipelines = Pipelines {
+            relax: pipeline("relax_list"),
+            prepare: pipeline("prepare"),
+            build_list: pipeline("build_list"),
+            finalize_list: pipeline("finalize_list"),
+            fold: pipeline("fold_cells"),
+            fill_inf: pipeline("fill_inf"),
+            debug_edges: pipeline("debug_edges"),
+        };
+        let bind_group = |params_buf: &wgpu::Buffer| {
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("propagator"),
+                layout: &layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: params_buf.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: inputs_buf.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: key_buf.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: pushed_buf.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 4,
+                        resource: tile_min_buf.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 5,
+                        resource: fold_buf.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 6,
+                        resource: list_buf.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 7,
+                        resource: member_buf.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 8,
+                        resource: ctrl_buf.as_entire_binding(),
+                    },
+                ],
+            })
+        };
+        let bind_groups = [
+            [
+                bind_group(&params_bufs[0][0]),
+                bind_group(&params_bufs[0][1]),
+            ],
+            [
+                bind_group(&params_bufs[1][0]),
+                bind_group(&params_bufs[1][1]),
+            ],
+        ];
 
         let mut sim = GpuPropagator {
             device,
             queue,
-            relax,
-            prepare,
-            build_list,
-            finalize_list,
-            fold,
-            debug_edges,
-            fill_inf,
-            layout,
-            params_buf,
-            params_build_buf,
-            fuel_idx_buf,
-            dem_buf,
-            fuel_table_buf,
-            windows_buf,
+            pipelines,
+            params_bufs,
+            bind_groups,
+            inputs_buf,
             key_buf,
-            pushed_buf,
-            tile_min,
-            list,
-            member,
-            count,
-            indirect,
-            work_buf,
+            tile_min_buf,
+            ctrl_buf,
+            indirect_buf,
             fold_buf,
-            staging_work,
+            staging_small,
             staging_fold,
             params,
             windows: Vec::new(),
+            windows_offset,
             rows,
             cols,
             n_tiles,
@@ -496,24 +545,10 @@ impl GpuPropagator {
             time: 0,
             bucket_seconds: config.bucket_seconds.max(1),
             sweeps_per_bucket: config.sweeps_per_bucket.max(1),
-            cur: 0,
-            max_windows,
+            phase: 0,
         };
         sim.fill_state();
         Ok(sim)
-    }
-
-    /// Set every arrival / pushed-at / tile minimum to INF on the GPU.
-    fn fill_state(&mut self) {
-        let bg = self.bind_group(self.cur, false);
-        let mut encoder = self.device.create_command_encoder(&Default::default());
-        {
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
-            pass.set_pipeline(&self.fill_inf);
-            pass.set_bind_group(0, &bg, &[]);
-            pass.dispatch_workgroups(65535, 1, 1);
-        }
-        self.queue.submit(Some(encoder.finish()));
     }
 
     pub fn time(&self) -> i64 {
@@ -528,104 +563,34 @@ impl GpuPropagator {
         self.realizations
     }
 
-    fn bind_group(&self, cur: usize, build: bool) -> wgpu::BindGroup {
-        fn b(buf: &wgpu::Buffer) -> wgpu::BindingResource<'_> {
-            buf.as_entire_binding()
+    /// Upload the four parameter variants (`processing` x `phase`).
+    fn write_params(&self) {
+        for (processing, bufs) in self.params_bufs.iter().enumerate() {
+            for (phase, buf) in bufs.iter().enumerate() {
+                let p = Params {
+                    processing: processing as u32,
+                    phase: phase as u32,
+                    ..self.params
+                };
+                self.queue.write_buffer(buf, 0, bytemuck::bytes_of(&p));
+            }
         }
-        let params = if build {
-            &self.params_build_buf
-        } else {
-            &self.params_buf
-        };
-        self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("propagator"),
-            layout: &self.layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: b(params),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: b(&self.fuel_idx_buf),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: b(&self.dem_buf),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: b(&self.fuel_table_buf),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 4,
-                    resource: b(&self.windows_buf),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 5,
-                    resource: b(&self.key_buf),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 6,
-                    resource: b(&self.pushed_buf),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 7,
-                    resource: b(&self.tile_min[cur]),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 8,
-                    resource: b(&self.tile_min[1 - cur]),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 9,
-                    resource: b(&self.work_buf),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 10,
-                    resource: b(&self.fold_buf),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 11,
-                    resource: b(&self.list[cur]),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 12,
-                    resource: b(&self.list[1 - cur]),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 13,
-                    resource: b(&self.member[cur]),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 14,
-                    resource: b(&self.member[1 - cur]),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 15,
-                    resource: b(&self.count[1 - cur]),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 16,
-                    resource: b(&self.indirect[1 - cur]),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 17,
-                    resource: b(&self.count[cur]),
-                },
-            ],
-        })
     }
 
-    fn write_params(&self) {
-        self.queue
-            .write_buffer(&self.params_buf, 0, bytemuck::bytes_of(&self.params));
-        let build = Params {
-            processing: 0,
-            ..self.params
-        };
-        self.queue
-            .write_buffer(&self.params_build_buf, 0, bytemuck::bytes_of(&build));
+    fn bind_group(&self, processing: bool) -> &wgpu::BindGroup {
+        &self.bind_groups[processing as usize][self.phase]
+    }
+
+    /// Set every arrival / pushed-at / tile minimum to INF on the GPU.
+    fn fill_state(&mut self) {
+        let mut encoder = self.device.create_command_encoder(&Default::default());
+        {
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
+            pass.set_pipeline(&self.pipelines.fill_inf);
+            pass.set_bind_group(0, self.bind_group(true), &[]);
+            pass.dispatch_workgroups(65535, 1, 1);
+        }
+        self.queue.submit(Some(encoder.finish()));
     }
 
     /// Set the weather for the window starting at `time` (seconds; windows
@@ -649,7 +614,7 @@ impl GpuPropagator {
                 ));
             }
         }
-        if self.windows.len() >= self.max_windows {
+        if self.windows.len() >= MAX_WINDOWS {
             return Err(GpuError::Config("too many weather windows".into()));
         }
         let window = Window {
@@ -659,24 +624,23 @@ impl GpuPropagator {
             moisture: (moisture_pct / 100.0) as f32,
         };
         // a window at the same start time replaces the previous one
-        if let Some(last) = self.windows.last_mut() {
-            if last.t_start == window.t_start {
-                *last = window;
-            } else {
-                self.windows.push(window);
-            }
-        } else {
-            self.windows.push(window);
+        match self.windows.last_mut() {
+            Some(last) if last.t_start == window.t_start => *last = window,
+            _ => self.windows.push(window),
         }
-        self.queue
-            .write_buffer(&self.windows_buf, 0, bytemuck::cast_slice(&self.windows));
+        let words: Vec<u32> = self.windows.iter().flat_map(|w| w.words()).collect();
+        self.queue.write_buffer(
+            &self.inputs_buf,
+            self.windows_offset,
+            bytemuck::cast_slice(&words),
+        );
         self.params.n_windows = self.windows.len() as u32;
         self.write_params();
 
         if !ignitions.is_empty() {
             let n_cells = self.rows * self.cols;
+            let n_rt = self.realizations * self.n_tiles;
             let k = ((time as u32) << 4) | CODE_IGNITION;
-            let tile_cur = &self.tile_min[self.cur];
             for &(row, col) in ignitions {
                 if row >= self.rows || col >= self.cols {
                     return Err(GpuError::Config(format!(
@@ -685,20 +649,19 @@ impl GpuPropagator {
                 }
                 let c = row * self.cols + col;
                 let tile =
-                    (row >> TILE_SHIFT) * (self.cols.div_ceil(TILE_SIZE)) + (col >> TILE_SHIFT);
+                    (row >> TILE_SHIFT) * self.cols.div_ceil(TILE_SIZE) + (col >> TILE_SHIFT);
                 for r in 0..self.realizations {
-                    // forced ignitions overwrite (the heap kernel would pop
-                    // whichever event comes first; at t = now they are the
-                    // earliest possible)
+                    // forced ignitions overwrite: at t = now they are the
+                    // earliest possible event
                     let idx = r * n_cells + c;
                     self.queue.write_buffer(
                         &self.key_buf,
                         (idx * 4) as u64,
                         bytemuck::bytes_of(&k),
                     );
-                    let t_idx = r * self.n_tiles + tile;
+                    let t_idx = self.phase * n_rt + r * self.n_tiles + tile;
                     self.queue.write_buffer(
-                        tile_cur,
+                        &self.tile_min_buf,
                         (t_idx * 4) as u64,
                         bytemuck::bytes_of(&(time as u32)),
                     );
@@ -708,75 +671,103 @@ impl GpuPropagator {
         Ok(())
     }
 
-    fn encode_prepare(&self, encoder: &mut wgpu::CommandEncoder, bg: &wgpu::BindGroup) {
+    fn encode_rt_pass(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        pipeline: &wgpu::ComputePipeline,
+        processing: bool,
+    ) {
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
-        pass.set_pipeline(&self.prepare);
-        pass.set_bind_group(0, bg, &[]);
+        pass.set_pipeline(pipeline);
+        pass.set_bind_group(0, self.bind_group(processing), &[]);
         let n = (self.realizations * self.n_tiles) as u32;
         pass.dispatch_workgroups(n.div_ceil(WORKGROUP), 1, 1);
     }
 
-    fn encode_finalize(&self, encoder: &mut wgpu::CommandEncoder, bg: &wgpu::BindGroup) {
-        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
-        pass.set_pipeline(&self.finalize_list);
-        pass.set_bind_group(0, bg, &[]);
-        pass.dispatch_workgroups(1, 1, 1);
+    /// Derive the next list's indirect dispatch arguments and copy them into
+    /// the indirect buffer's next half.
+    fn encode_finalize(&self, encoder: &mut wgpu::CommandEncoder, processing: bool) {
+        {
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
+            pass.set_pipeline(&self.pipelines.finalize_list);
+            pass.set_bind_group(0, self.bind_group(processing), &[]);
+            pass.dispatch_workgroups(1, 1, 1);
+        }
+        let next = 1 - self.phase;
+        encoder.copy_buffer_to_buffer(
+            &self.ctrl_buf,
+            ((next * CTRL_WORDS + 1) * 4) as u64,
+            &self.indirect_buf,
+            (next * 12) as u64,
+            12,
+        );
     }
 
     /// Queue every tile with unpushed arrivals below `next_end` (bucket
-    /// start), then swap the worklists.
+    /// start), then flip the phase.
     fn encode_build_list(&mut self, encoder: &mut wgpu::CommandEncoder) {
-        let bg = self.bind_group(self.cur, true);
-        self.encode_prepare(encoder, &bg);
-        {
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
-            pass.set_pipeline(&self.build_list);
-            pass.set_bind_group(0, &bg, &[]);
-            let n = (self.realizations * self.n_tiles) as u32;
-            pass.dispatch_workgroups(n.div_ceil(WORKGROUP), 1, 1);
-        }
-        self.encode_finalize(encoder, &bg);
-        self.cur = 1 - self.cur;
+        self.encode_rt_pass(encoder, &self.pipelines.prepare, false);
+        self.encode_rt_pass(encoder, &self.pipelines.build_list, false);
+        self.encode_finalize(encoder, false);
+        self.phase = 1 - self.phase;
     }
 
-    /// One relaxation sweep over the queued tiles, then swap the worklists
-    /// and tile-minimum buffers.
+    /// One relaxation sweep over the queued tiles, then flip the phase.
     fn encode_sweep(&mut self, encoder: &mut wgpu::CommandEncoder) {
-        let bg = self.bind_group(self.cur, false);
-        self.encode_prepare(encoder, &bg);
+        self.encode_rt_pass(encoder, &self.pipelines.prepare, true);
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
-            pass.set_pipeline(&self.relax);
-            pass.set_bind_group(0, &bg, &[]);
-            pass.dispatch_workgroups_indirect(&self.indirect[self.cur], 0);
+            pass.set_pipeline(&self.pipelines.relax);
+            pass.set_bind_group(0, self.bind_group(true), &[]);
+            pass.dispatch_workgroups_indirect(&self.indirect_buf, (self.phase * 12) as u64);
         }
-        self.encode_finalize(encoder, &bg);
-        self.cur = 1 - self.cur;
+        self.encode_finalize(encoder, true);
+        self.phase = 1 - self.phase;
     }
 
-    /// Number of tiles queued for the next sweep (the current worklist).
-    fn read_queued(&self) -> u32 {
-        let mut encoder = self.device.create_command_encoder(&Default::default());
-        encoder.copy_buffer_to_buffer(&self.count[self.cur], 0, &self.staging_work, 0, 4);
-        self.queue.submit(Some(encoder.finish()));
-        let slice = self.staging_work.slice(..);
-        let (tx, rx) = std::sync::mpsc::channel();
+    /// Map a staging buffer for reading once the queue has caught up. On
+    /// native the device is polled to completion; on the web the browser
+    /// resolves the mapping while the future is awaited.
+    async fn map_read(&self, buffer: &wgpu::Buffer, bytes: u64) -> Result<Vec<u8>> {
+        let slice = buffer.slice(..bytes);
+        let (tx, rx) = futures_channel::oneshot::channel();
         slice.map_async(wgpu::MapMode::Read, move |r| {
             let _ = tx.send(r);
         });
         self.device.poll(wgpu::PollType::wait_indefinitely()).ok();
-        rx.recv().unwrap().expect("map indirect buffer");
-        let value = {
-            let data = slice.get_mapped_range().expect("mapped indirect buffer");
-            u32::from_le_bytes([data[0], data[1], data[2], data[3]])
+        rx.await
+            .map_err(|_| GpuError::Device("map callback dropped".into()))?
+            .map_err(|e| GpuError::Device(format!("map buffer: {e:?}")))?;
+        let data = {
+            let mapped = slice
+                .get_mapped_range()
+                .map_err(|e| GpuError::Device(format!("mapped range: {e:?}")))?;
+            mapped.to_vec()
         };
-        self.staging_work.unmap();
-        value
+        buffer.unmap();
+        Ok(data)
+    }
+
+    /// Number of tiles queued for the next sweep (the current worklist).
+    async fn read_queued(&self) -> Result<u32> {
+        let mut encoder = self.device.create_command_encoder(&Default::default());
+        let offset = (self.phase * CTRL_WORDS * 4) as u64;
+        encoder.copy_buffer_to_buffer(&self.ctrl_buf, offset, &self.staging_small, 0, 4);
+        self.queue.submit(Some(encoder.finish()));
+        let data = self.map_read(&self.staging_small, 4).await?;
+        Ok(u32::from_le_bytes([data[0], data[1], data[2], data[3]]))
     }
 
     /// Advance to `end_time` (seconds), bucket by bucket, then sweep until no
-    /// tile with an arrival below `end_time` is left unpushed.
+    /// tile with an arrival below `end_time` is left unpushed (blocking;
+    /// native only).
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn advance_to(&mut self, end_time: i64) -> Result<()> {
+        pollster::block_on(self.advance_to_async(end_time))
+    }
+
+    /// Async form of [`advance_to`](Self::advance_to), usable on the web.
+    pub async fn advance_to_async(&mut self, end_time: i64) -> Result<()> {
         if self.windows.is_empty() {
             return Err(GpuError::Config("no boundary conditions set".into()));
         }
@@ -807,7 +798,7 @@ impl GpuPropagator {
         self.encode_build_list(&mut encoder);
         self.queue.submit(Some(encoder.finish()));
         loop {
-            if self.read_queued() == 0 {
+            if self.read_queued().await? == 0 {
                 break;
             }
             let mut encoder = self.device.create_command_encoder(&Default::default());
@@ -820,35 +811,21 @@ impl GpuPropagator {
 
     /// Debug: per-direction `[p, transition, ros, fli, angle, uniform,
     /// wind_dir, wind_speed]` of one cell under the first window.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn debug_edges(&mut self, row: usize, col: usize) -> Result<Vec<[f32; 8]>> {
         self.params.fold_time = (row * self.cols + col) as u32;
         self.write_params();
-        let bg = self.bind_group(self.cur, false);
         let mut encoder = self.device.create_command_encoder(&Default::default());
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
-            pass.set_pipeline(&self.debug_edges);
-            pass.set_bind_group(0, &bg, &[]);
+            pass.set_pipeline(&self.pipelines.debug_edges);
+            pass.set_bind_group(0, self.bind_group(true), &[]);
             pass.dispatch_workgroups(1, 1, 1);
         }
-        encoder.copy_buffer_to_buffer(&self.fold_buf, 0, &self.staging_fold, 0, 64 * 4);
+        encoder.copy_buffer_to_buffer(&self.fold_buf, 0, &self.staging_small, 0, 64 * 4);
         self.queue.submit(Some(encoder.finish()));
-        let slice = self.staging_fold.slice(..256);
-        let (tx, rx) = std::sync::mpsc::channel();
-        slice.map_async(wgpu::MapMode::Read, move |r| {
-            let _ = tx.send(r);
-        });
-        self.device.poll(wgpu::PollType::wait_indefinitely()).ok();
-        rx.recv()
-            .unwrap()
-            .map_err(|e| GpuError::Device(format!("{e:?}")))?;
-        let data: Vec<f32> = {
-            let mapped = slice
-                .get_mapped_range()
-                .map_err(|e| GpuError::Device(format!("{e:?}")))?;
-            bytemuck::cast_slice(&mapped).to_vec()
-        };
-        self.staging_fold.unmap();
+        let bytes = pollster::block_on(self.map_read(&self.staging_small, 256))?;
+        let data: Vec<f32> = bytemuck::cast_slice(&bytes).to_vec();
         Ok((0..8)
             .map(|d| {
                 let mut a = [0.0f32; 8];
@@ -858,17 +835,23 @@ impl GpuPropagator {
             .collect())
     }
 
-    /// Fold the realizations on the GPU and read the per-cell outputs back.
+    /// Fold the realizations on the GPU and read the per-cell outputs back
+    /// (blocking; native only).
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn get_output(&mut self) -> Result<GpuOutput> {
+        pollster::block_on(self.get_output_async())
+    }
+
+    /// Async form of [`get_output`](Self::get_output), usable on the web.
+    pub async fn get_output_async(&mut self) -> Result<GpuOutput> {
         let n_cells = self.rows * self.cols;
         self.params.fold_time = self.time as u32;
         self.write_params();
-        let bg = self.bind_group(self.cur, false);
         let mut encoder = self.device.create_command_encoder(&Default::default());
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
-            pass.set_pipeline(&self.fold);
-            pass.set_bind_group(0, &bg, &[]);
+            pass.set_pipeline(&self.pipelines.fold);
+            pass.set_bind_group(0, self.bind_group(true), &[]);
             pass.dispatch_workgroups((n_cells as u32).div_ceil(WORKGROUP), 1, 1);
         }
         encoder.copy_buffer_to_buffer(
@@ -879,22 +862,10 @@ impl GpuPropagator {
             (FOLD_FIELDS * n_cells * 4) as u64,
         );
         self.queue.submit(Some(encoder.finish()));
-        let slice = self.staging_fold.slice(..);
-        let (tx, rx) = std::sync::mpsc::channel();
-        slice.map_async(wgpu::MapMode::Read, move |r| {
-            let _ = tx.send(r);
-        });
-        self.device.poll(wgpu::PollType::wait_indefinitely()).ok();
-        rx.recv()
-            .unwrap()
-            .map_err(|e| GpuError::Device(format!("map fold buffer: {e:?}")))?;
-        let data: Vec<f32> = {
-            let mapped = slice
-                .get_mapped_range()
-                .map_err(|e| GpuError::Device(format!("mapped fold buffer: {e:?}")))?;
-            bytemuck::cast_slice(&mapped).to_vec()
-        };
-        self.staging_fold.unmap();
+        let bytes = self
+            .map_read(&self.staging_fold, (FOLD_FIELDS * n_cells * 4) as u64)
+            .await?;
+        let data: Vec<f32> = bytemuck::cast_slice(&bytes).to_vec();
 
         let n = self.realizations as f32;
         let field = |i: usize| &data[i * n_cells..(i + 1) * n_cells];

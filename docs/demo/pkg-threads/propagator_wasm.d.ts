@@ -15,7 +15,7 @@ export class FuelSystemBuilder {
      * `spread_to`/`spread_prob` are parallel arrays giving the base spread
      * probability toward each target fuel id.
      */
-    add_fuel(id: number, name: string, v0: number, d0: number, d1: number, hhv: number, humidity: number | null | undefined, spotting: boolean, prob_ign_by_embers: number, burn: boolean, spread_to: Int32Array, spread_prob: Float64Array): void;
+    add_fuel(id: number, name: string, v0: number, d0: number, d1: number, hhv: number, humidity: number | null | undefined, spotting: boolean, prob_ign_by_embers: number, burn: boolean, spread_to: Int32Array | number[], spread_prob: Float64Array | number[]): void;
     constructor();
 }
 
@@ -55,7 +55,7 @@ export class Propagator {
      * grid must fully contain the old one and growth to the north/west must
      * be a multiple of [`tile_size`] cells.
      */
-    expand(rows: number, cols: number, veg: Int32Array, dem: Float64Array, origin_row: bigint, origin_col: bigint): void;
+    expand(rows: number, cols: number, veg: Int32Array | number[], dem: Float64Array | number[], origin_row: bigint, origin_col: bigint): void;
     /**
      * Fire probability per cell in `[0, 1]`, row-major, `rows * cols` long.
      */
@@ -73,7 +73,7 @@ export class Propagator {
      * hits instead, so the caller can grow the domain with
      * [`Propagator::expand`] and continue.
      */
-    constructor(rows: number, cols: number, veg: Int32Array, dem: Float64Array, fuels: FuelSystemBuilder, realizations: number, seed: number, do_spotting: boolean, cellsize: number, ros_model: string, moisture_model: string, halt_on_boundary?: boolean | null, threads?: number | null);
+    constructor(rows: number, cols: number, veg: Int32Array | number[], dem: Float64Array | number[], fuels: FuelSystemBuilder, realizations: number, seed: number, do_spotting: boolean, cellsize: number, ros_model: string, moisture_model: string, halt_on_boundary?: boolean | null, threads?: number | null);
     /**
      * Next event time (scheduler or front), or `-1` when the run is idle.
      */
@@ -112,7 +112,7 @@ export class Propagator {
      * Pass empty arrays for whichever action kind is absent; a call with no
      * cells at all is a no-op.
      */
-    set_action_fields(time: bigint, moisture_cells: Int32Array, moisture_values: Float32Array, veg_cells: Int32Array, veg_fuel: number): void;
+    set_action_fields(time: bigint, moisture_cells: Int32Array | number[], moisture_values: Float32Array | number[], veg_cells: Int32Array | number[], veg_fuel: number): void;
     /**
      * Enqueue boundary conditions at `time` (external units: percent
      * moisture, degrees wind direction from north, km/h wind speed).
@@ -120,7 +120,7 @@ export class Propagator {
      * `ignitions` is a flat list of `[row0, col0, row1, col1, …]`; pass an
      * empty array to leave the ignition set unchanged.
      */
-    set_boundary_conditions(time: bigint, moisture: number, wind_dir: number, wind_speed: number, ignitions: Int32Array): void;
+    set_boundary_conditions(time: bigint, moisture: number, wind_dir: number, wind_speed: number, ignitions: Int32Array | number[]): void;
     /**
      * Turn boundary halting on or off mid-run.
      *
@@ -179,7 +179,7 @@ export class Propagator {
  * Filtering, topology, smoothing, omitted-threshold, and empty-geometry
  * semantics are defined by `propagator-geo`.
  */
-export function extract_isochrone(values: Float32Array, rows: number, cols: number, transform: Float64Array, thresholds?: Float64Array | null, med_filt_val?: number | null, min_length?: number | null, smooth_sigma?: number | null, simp_fact?: number | null): any;
+export function extract_isochrone(values: Float32Array | number[], rows: number, cols: number, transform: Float64Array | number[], thresholds?: Float64Array | number[] | null, med_filt_val?: number | null, min_length?: number | null, smooth_sigma?: number | null, simp_fact?: number | null): any;
 
 /**
  * `true` when this bundle was built with the `threads` feature, i.e. it
@@ -216,10 +216,12 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
     readonly __wbg_fuelsystembuilder_free: (a: number, b: number) => void;
     readonly __wbg_propagator_free: (a: number, b: number) => void;
+    readonly __wbg_wbg_rayon_poolbuilder_free: (a: number, b: number) => void;
     readonly extract_isochrone: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number) => [number, number, number];
     readonly fuelsystembuilder_add_fuel: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number) => [number, number];
     readonly fuelsystembuilder_new: () => number;
     readonly has_threads: () => number;
+    readonly initThreadPool: (a: number) => any;
     readonly output_variable_count: () => number;
     readonly propagator_boundary_pressure: (a: number) => number;
     readonly propagator_boundary_proximity: (a: number, b: number) => number;
@@ -241,8 +243,6 @@ export interface InitOutput {
     readonly propagator_step: (a: number, b: bigint) => [number, number, number];
     readonly propagator_time: (a: number) => bigint;
     readonly tile_size: () => number;
-    readonly __wbg_wbg_rayon_poolbuilder_free: (a: number, b: number) => void;
-    readonly initThreadPool: (a: number) => any;
     readonly wbg_rayon_poolbuilder_build: (a: number) => void;
     readonly wbg_rayon_poolbuilder_mainJS: (a: number) => any;
     readonly wbg_rayon_poolbuilder_numThreads: (a: number) => number;
@@ -251,10 +251,10 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+    readonly __wbindgen_free: (a: number, b: number, c: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __externref_table_dealloc: (a: number) => void;
-    readonly __wbindgen_free: (a: number, b: number, c: number) => void;
     readonly __wbindgen_thread_destroy: (a?: number, b?: number, c?: number) => void;
     readonly __wbindgen_start: (a: number) => void;
 }

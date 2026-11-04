@@ -588,6 +588,116 @@ impl Propagator {
     }
 }
 
+/// WebGPU execution backend (feature `gpu`): the same scenario inputs as
+/// [`Propagator`], run by `propagator-gpu`. Methods that touch the GPU are
+/// async (they await buffer mappings). Scope: contact spread with scalar
+/// weather and point ignitions; no spotting, actions or growth.
+#[cfg(feature = "gpu")]
+#[wasm_bindgen]
+pub struct GpuPropagator {
+    inner: propagator_gpu::GpuPropagator,
+    rows: usize,
+    cols: usize,
+}
+
+#[cfg(feature = "gpu")]
+#[wasm_bindgen]
+impl GpuPropagator {
+    /// Open the GPU and upload the scenario (async; rejects when WebGPU is
+    /// unavailable).
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create(
+        rows: usize,
+        cols: usize,
+        veg: Vec<i32>,
+        dem: Vec<f64>,
+        fuels: &FuelSystemBuilder,
+        realizations: usize,
+        seed: u32,
+        cellsize: f64,
+        ros_model: &str,
+        moisture_model: &str,
+    ) -> Result<GpuPropagator, JsValue> {
+        if veg.len() != rows * cols || dem.len() != rows * cols {
+            return Err(JsValue::from_str("veg/dem length must equal rows*cols"));
+        }
+        let fuel_system = FuelSystem::from_defs(&fuels.defs).map_err(to_js)?;
+        let mut config = propagator_gpu::GpuConfig::new(
+            Grid2::from_vec(rows, cols, veg),
+            Grid2::from_vec(rows, cols, dem),
+            fuel_system,
+        );
+        config.realizations = realizations.max(1);
+        config.seed = seed;
+        config.cellsize = cellsize;
+        config.ros_model = ros_from_str(ros_model)?;
+        config.moisture_model = moisture_from_str(moisture_model)?;
+        let inner = propagator_gpu::GpuPropagator::new_async(config)
+            .await
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(GpuPropagator { inner, rows, cols })
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn time(&self) -> i64 {
+        self.inner.time()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn rows(&self) -> usize {
+        self.rows
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn cols(&self) -> usize {
+        self.cols
+    }
+
+    /// Weather window starting at `time` plus point ignitions (flat
+    /// `[row, col, ...]`), as [`Propagator::set_boundary_conditions`].
+    pub fn set_boundary_conditions(
+        &mut self,
+        time: i64,
+        moisture: f64,
+        wind_dir: f64,
+        wind_speed: f64,
+        ignitions: Vec<i32>,
+    ) -> Result<(), JsValue> {
+        if ignitions.len() % 2 != 0 {
+            return Err(JsValue::from_str("ignitions must be a flat list of [row, col] pairs"));
+        }
+        let points: Vec<(usize, usize)> = ignitions
+            .chunks_exact(2)
+            .map(|rc| (rc[0] as usize, rc[1] as usize))
+            .collect();
+        self.inner
+            .set_boundary_conditions(time, wind_dir, wind_speed, moisture, &points)
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    /// Advance by `seconds` of simulation time (async).
+    pub async fn step(&mut self, seconds: i64) -> Result<(), JsValue> {
+        let end = self.inner.time() + seconds;
+        self.inner
+            .advance_to_async(end)
+            .await
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    /// `[fire probability (rows*cols) ..., area_mean_ha]` folded on the GPU
+    /// (async): one readback feeds both the map and the readout.
+    pub async fn snapshot(&mut self) -> Result<Vec<f32>, JsValue> {
+        let out = self
+            .inner
+            .get_output_async()
+            .await
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let mut packed = out.fire_probability.as_slice().to_vec();
+        packed.push((out.area_mean / 10_000.0) as f32);
+        Ok(packed)
+    }
+}
+
 /// Number of per-cell variables packed by [`Propagator::output_snapshot`].
 #[wasm_bindgen]
 pub fn output_variable_count() -> usize {
