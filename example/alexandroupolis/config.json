@@ -1,0 +1,43 @@
+{
+    "name": "Alexandroupolis / Evros 2023 (demo reconstruction)",
+    "init_date": "202308190500",
+    "ignitions": [
+        "POINT: [40.932;26.122]"
+    ],
+    "realizations": 20,
+    "time_limit": 1465200,
+    "do_spotting": true,
+    "time_resolution": 3600,
+    "boundary_conditions": [
+        {
+            "time": 0,
+            "w_dir": 30,
+            "w_speed": 30,
+            "moisture": 6
+        },
+        {
+            "time": 14400,
+            "w_dir": 45,
+            "w_speed": 45,
+            "moisture": 5
+        },
+        {
+            "time": 28800,
+            "w_dir": 55,
+            "w_speed": 55,
+            "moisture": 4
+        },
+        {
+            "time": 43200,
+            "w_dir": 65,
+            "w_speed": 40,
+            "moisture": 6
+        },
+        {
+            "time": 64800,
+            "w_dir": 35,
+            "w_speed": 25,
+            "moisture": 8
+        }
+    ]
+}

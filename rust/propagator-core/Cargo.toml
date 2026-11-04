@@ -1,0 +1,13 @@
+[package]
+name = "propagator-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Stochastic cellular wildfire spread simulator (Rust core, ported from the Python/numba implementation)"
+
+[dependencies]
+# intentionally dependency-free: std-only core
+
+[profile.release]
+lto = true
+codegen-units = 1

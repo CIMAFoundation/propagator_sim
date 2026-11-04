@@ -34,7 +34,28 @@ pip install -e '.[cli,io]'
 If you only need the simulation engine (without CLI/I/O helpers) drop the
 extras from the install command.
 
-## First Simulation
+To use the interactive browser interface, install the `web` extra instead:
+
+```bash
+pip install -e '.[web]'
+```
+
+`uv sync --dev --all-extras` already includes it.
+
+## Optional Local Web Demo
+
+For debugging and demonstrations, run:
+
+```bash
+uv run propagator-web
+```
+
+Open <http://127.0.0.1:8765>, choose the simulation center and ignition,
+select the numba or optional Rust core, configure weather and duration, and
+select **Run simulation**. The first run in an area downloads terrain and
+land-cover data. See the [Local Web Demo](web.md) guide for the full workflow.
+
+## First CLI Simulation
 
 The repository ships with small GeoTIFF datasets and configuration files under
 `example/`. Run a simulation in GeoTIFF mode with:

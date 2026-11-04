@@ -20,10 +20,16 @@ extra:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Interactive Demo: demo.md
   - Programmatic Workflow: programmatic.md
   - CLI Usage: cli.md
+  - Local Web Demo: web.md
   - Simulation Outputs: outputs.md
   - Fire Spotting: spotting.md
+  - Checkpoints & Domain Growth: checkpoints.md
+  - Rust vs numba Core: rust-vs-numba.md
+  - Core Internals: core-internals.md
+  - Migration Guide: migration.md
   - API Reference:
       - Overview: reference/index.md
       - Core: reference/propagator.md

@@ -19,7 +19,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
       - name: Sync deps
-        run: uv sync --frozen
+        run: uv sync --frozen --all-extras
       - name: Run tests
         run: uv run pytest -q
       - name: Build sdist/wheel

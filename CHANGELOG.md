@@ -5,6 +5,166 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- Rust core: the heap kernel now evaluates the spread models once per edge
+  per generation of the inputs through a shared, block-sparse `EdgeCache`
+  (ignition probability, transition time, carried ROS/FLI for the 8
+  directions), instead of once per event per realization. Entries are
+  filled lazily (probability first, fire behaviour only for accepted
+  draws), so the kernel never evaluates more of the models than before;
+  with a single realization the cache is bypassed. Weather and vegetation
+  changes invalidate the whole cache; decaying action moisture only
+  invalidates the cells it touches (plus their neighbours), so runs with
+  firefighting actions keep the speedup. Seeded runs are bitwise
+  identical; 1.5–2x faster from about 4 realizations up, within noise of
+  the old kernel below that. The cache costs 168 KiB per reached 32x32
+  tile, shared by all realizations, reported by `edge_cache_bytes()` on the
+  Rust adapter and wasm bindings and included in the web memory guardrail
+  for `core: "rust"`.
+
+### Added
+
+- Core parity: `boundary_proximity(margin)` — which edges (N/S/W/E) have
+  pending front events within `margin` cells — is now available on the numba
+  core and through the Rust adapter (`propagator.rust_core.Propagator`), not
+  only inside the Rust crate. Unlike `boundary_pressure()` it is predictive
+  and does not require propagation to have halted on the boundary first, so a
+  driver can grow the domain before the front reaches the edge.
+- The `standard` rate-of-spread model (the combined `w_h_effect` wind+slope
+  scaling) is now accepted by the configuration/type surface of the numba
+  path. It was already implemented by `get_p_time_fn` and selectable in the
+  Rust core, but the `RateOfSpreadModel` literal rejected it.
+
+- Explicit initial window for `PropagatorDataFromCogs`: besides the
+  default `mid_lon`/`mid_lat` + `grid_dim` square, the loader now
+  accepts `initial_bounds` (a `(minx, miny, maxx, maxy)` box in any
+  `initial_bounds_epsg`, reprojected and snapped outward to whole
+  pixels on the selected COG's grid) or an explicit
+  `initial_pixel_origin` + `initial_pixel_shape` window already given
+  in the COG's own pixel coordinates, used verbatim. An optional
+  `snap_shape_to` rounds an `initial_bounds`-derived shape up to a
+  tile-size multiple for callers that find that convenient (not
+  required for correctness). This lets callers that already work with
+  an explicit bounding box (e.g. a REST API) or pre-computed pixel
+  window (e.g. a browser/WASM client) drive `PropagatorDataFromCogs`
+  directly, instead of pre-clipping COGs to static rasters that cannot
+  be grown.
+- `SimulationRunner` now validates `grow_margin % TILE_SIZE == 0` in
+  `__post_init__`, instead of relying on the CLI to catch it, so any
+  library caller gets a clear `ValueError` up front rather than a
+  confusing failure out of the Rust/numba core's `expand()`.
+- `TILE_SIZE`/`TILE_SHIFT`/`TILE_MASK` moved to
+  `propagator.core.constants` (previously only defined in
+  `propagator.core.numba.tiles`, which still re-exports them
+  unchanged) and are now also re-exported from `propagator.core` and
+  `propagator.rust_core`, so downstream code can validate
+  `grow_margin % TILE_SIZE` without importing the CLI or the numba
+  submodule.
+- State persistence and rollback: `Propagator.checkpoint()` snapshots the
+  full dynamic state (front heaps, tiled state, weather, vegetation and the
+  pending boundary-condition queue) into an immutable
+  `PropagatorCheckpoint`; `Propagator.restore()` rolls back in place, and
+  `PropagatorCheckpoint.save()`/`load()` persist to compressed `.npz`.
+  Checkpoint size scales with the burned area, not the grid.
+- World cell coordinate system: `Propagator(origin=(row, col))` anchors the
+  grid in absolute cell coordinates; `world_bounds()` is available on both
+  `Propagator` and `PropagatorCheckpoint`.
+- Domain growth: `Propagator.from_checkpoint(cp, veg=..., dem=...,
+  origin=...)` resumes a checkpoint on a larger grid. North/west growth
+  must be a multiple of the tile size (32 cells) so the block-sparse tiles
+  transfer without being rewritten; weather fields are padded by edge
+  replication and pending scheduler events are re-anchored automatically.
+- In-place domain growth: `Propagator.expand(veg, dem, origin)` grows the
+  live simulator without copying front heaps or tile pools — the cheap
+  path for wrappers that enlarge the domain as the fire approaches a
+  boundary. Same containment/alignment rules as `from_checkpoint`.
+- Deterministic seeding: `Propagator(seed=...)` and `reseed()` seed the
+  JIT kernels' per-thread RNGs; runs with the same seed, machine and
+  numba thread count are bitwise reproducible, and `reseed()` after
+  `restore()` makes rollback continuations deterministic.
+- Tile freezing: with `freeze_dir` set, `freeze_inactive_tiles()` pages
+  burned-out interior tiles to a fixed-record file on disk and releases
+  their memory, keeping the working set proportional to the active front
+  while preserving full per-cell interior tracking. A tile freezes only
+  when propagation can provably never touch it again (reachability
+  analysis of the unburnt-fuel graph from pending front events; strict
+  all-burnt criterion when spotting is enabled), so dynamics and the RNG
+  stream are unchanged — seeded runs are bitwise identical with or
+  without freezing. Outputs and dense getters merge frozen tiles in
+  transparently; new ignitions thaw the reachable component they seed.
+- Frozen-tile output cache: each frozen tile's contribution to the
+  output aggregates is folded at freeze time into an in-memory cache
+  (one block per spatial tile position, aggregated across
+  realizations), so `get_output()` costs no tile I/O in steady state
+  regardless of how much interior is frozen. Thaws dirty only their
+  position (rebuilt lazily from the store); restores invalidate the
+  cache. Mean output fields may differ from an uncached computation in
+  the last floating-point bits; counts, probabilities, minima and
+  maxima are exact.
+- Incremental checkpointing (format v2): `checkpoint()` references
+  frozen tiles in the append-only store instead of thawing them, so
+  snapshotting a run with a large frozen interior costs neither RAM nor
+  tile I/O, and restores roll the store index back. `save()` streams the
+  referenced records into a sidecar `.tiles` file next to the `.npz`
+  (keep them together); on resume, records import into the new session's
+  store (`freeze_dir`) or materialize into memory without one. Version 1
+  checkpoint files still load.
+- COG mode with automatic domain growth (`--mode cog`): the CLI streams
+  windowed DEM/fuel inputs from cloud-optimized GeoTIFFs (`s3://`,
+  `https://` or local, listed per UTM zone and paired by `utm_<zone>`
+  filename hints), loading only a `--grid_dim` window around the
+  ignition; when the fire reaches the window boundary the domain grows
+  in place by `--grow_margin` cells per side, fetching the wider window
+  on demand. New `PropagatorDataFromCogs` loader
+  (`propagator.io.loader.cog`), plus `--seed` and `--freeze_dir` CLI
+  options, and a Pedrogao Grande demo under `example/pedrogao/`.
+- Boundary suspension: with `out_of_bounds_mode="raise"` the kernel now
+  suspends a realization *before* igniting a boundary-ring cell, leaving
+  its event heap intact, so a checkpoint taken after
+  `PropagatorOutOfBoundsError` can be resumed on a grown domain without
+  losing any spread (previously the boundary cell burned and its
+  out-of-grid spreads were silently dropped).
+
+### Changed
+
+- Peak memory reduced ~5x at scale (4.7 GB -> 0.94 GB at 1000x1000 with
+  100 realizations): the front event heap starts small and grows on
+  demand, and all per-cell state (arrival time, rate of spread, fireline
+  intensity, burn state and spotting masks) lives in on-demand 32x32
+  block-sparse tiles, so memory scales with the burned area instead of
+  grid size times realizations. `get_output()` aggregates all output maps
+  in a single fold pass (~20 ms vs 1.4 s).
+- **Breaking:** the dense per-realization state fields (`fire`,
+  `arrival_time`, `ros`, `fireline_int`, `spotting_generation`,
+  `spotting_receiving`) were removed from `Propagator`; use the
+  `get_fire()`, `get_arrival_time()`, `get_ros()`, `get_fireline_int()`,
+  `get_spotting_generation()` and `get_spotting_receiving()` accessors
+  for dense `(realizations, rows, cols)` views.
+- **Breaking:** the `UpdateBatch`-based spread path (`next_updates_fn`,
+  `single_cell_updates`) was removed; propagation runs entirely in the
+  `advance_front_until` front-tracking kernel.
+- Propagation kernel performance (~1.6x event throughput): fuel properties
+  are read directly from `FuelSystem` arrays through a precomputed
+  vegetation-to-fuel index grid instead of per-cell `Fuel` jitclass
+  allocations and typed-Dict lookups; spread updates are pushed directly
+  onto the event heap instead of building intermediate per-cell lists.
+- **Breaking:** simulation state arrays now use
+  `(realizations, rows, cols)` layout so each realization's grid is
+  contiguous in memory. `PropagatorOutput` 2D maps are unaffected.
+- **Breaking:** the lower-level kernel functions take an additional
+  `fuel_idx` argument (see `propagator.core.numba.build_fuel_index_grid`).
+
+### Fixed
+
+- Infinite suspend/regrow loop in the propagation driver on domains
+  smaller than the per-pop tile reserve (grids up to roughly 180x180
+  cells): the kernel demanded more tile headroom than the domain could
+  ever contain. Worst-case tile demand is now bounded by the number of
+  tiles that can still be allocated.
+
 ## [0.1.0] - 2026-06-12
 
 ### Added

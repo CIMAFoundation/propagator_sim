@@ -1,0 +1,43 @@
+{
+    "name": "Pedrogao Grande 2017 (demo reconstruction)",
+    "init_date": "201706171440",
+    "ignitions": [
+        "POINT: [39.955;-8.147]"
+    ],
+    "realizations": 20,
+    "time_limit": 86400,
+    "do_spotting": true,
+    "time_resolution": 3600,
+    "boundary_conditions": [
+        {
+            "time": 0,
+            "w_dir": 200,
+            "w_speed": 25,
+            "moisture": 7
+        },
+        {
+            "time": 14400,
+            "w_dir": 225,
+            "w_speed": 45,
+            "moisture": 5
+        },
+        {
+            "time": 25200,
+            "w_dir": 250,
+            "w_speed": 50,
+            "moisture": 5
+        },
+        {
+            "time": 43200,
+            "w_dir": 270,
+            "w_speed": 20,
+            "moisture": 9
+        },
+        {
+            "time": 64800,
+            "w_dir": 300,
+            "w_speed": 15,
+            "moisture": 12
+        }
+    ]
+}

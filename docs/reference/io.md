@@ -16,6 +16,24 @@ public classes and protocols that are exported via `propagator.io.__all__`.
 
 ::: propagator.io.loader.tiles
 
+## Boundary Conditions and Firefighting Actions
+
+`TimedInput` turns time-stamped weather, ignition, and action definitions into
+the core engine's `BoundaryConditions`. The Web UI, CLI, numba core, and Rust
+adapter share these action classes and rasterized inputs.
+
+::: propagator.io.boundary_conditions.TimedInput
+
+::: propagator.io.actions.Action
+
+::: propagator.io.actions.CanadairAction
+
+::: propagator.io.actions.HelicopterAction
+
+::: propagator.io.actions.WaterlineAction
+
+::: propagator.io.actions.HeavyAction
+
 ## Writers
 
 ::: propagator.io.writer.protocol

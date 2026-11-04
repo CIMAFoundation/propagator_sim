@@ -5,6 +5,7 @@ import pytest
 
 from propagator.core import BoundaryConditions, Propagator  # type: ignore
 from propagator.core.models import PropagatorStats, UpdateBatch  # type: ignore
+from propagator.core.numba import FLAG_SPOT_GEN, FLAG_SPOT_RECV  # type: ignore
 from propagator.core.scheduler import SchedulerEvent  # type: ignore
 
 
@@ -24,82 +25,113 @@ def make_propagator(realizations: int = 2) -> Propagator:
     return propagator
 
 
-def test_spotting_state_allocated_only_when_enabled():
+def test_spotting_probabilities_default_to_zero():
     base_veg = np.array([[1, 2], [3, 4]], dtype=np.int32)
     base_dem = np.zeros_like(base_veg, dtype=np.float32)
 
-    no_spotting = Propagator(
-        veg=base_veg,
-        dem=base_dem,
-        realizations=2,
-        do_spotting=False,
-    )
-    assert no_spotting.spotting_generation is None
-    assert no_spotting.spotting_receiving is None
-    np.testing.assert_allclose(
-        no_spotting.compute_spotting_generation_probability(),
-        np.zeros(base_veg.shape, dtype=np.float32),
-    )
-    np.testing.assert_allclose(
-        no_spotting.compute_spotting_receiving_probability(),
-        np.zeros(base_veg.shape, dtype=np.float32),
+    for do_spotting in (False, True):
+        propagator = Propagator(
+            veg=base_veg,
+            dem=base_dem,
+            realizations=2,
+            do_spotting=do_spotting,
+        )
+        np.testing.assert_allclose(
+            propagator.compute_spotting_generation_probability(),
+            np.zeros(base_veg.shape, dtype=np.float32),
+        )
+        np.testing.assert_allclose(
+            propagator.compute_spotting_receiving_probability(),
+            np.zeros(base_veg.shape, dtype=np.float32),
+        )
+        assert (
+            propagator.get_spotting_generation().shape == (2,) + base_veg.shape
+        )
+        assert not propagator.get_spotting_receiving().any()
+
+
+def test_disabling_spotting_does_not_mutate_shared_fuels():
+    from propagator.core import FUEL_SYSTEM_LEGACY
+
+    veg = np.full((2, 2), 5, dtype=np.int32)
+    dem = np.zeros((2, 2), dtype=np.float32)
+    spotting_before = FUEL_SYSTEM_LEGACY.spotting.copy()
+
+    without_spotting = Propagator(
+        veg=veg, dem=dem, realizations=1, do_spotting=False
     )
 
+    np.testing.assert_array_equal(FUEL_SYSTEM_LEGACY.spotting, spotting_before)
+    assert without_spotting.fuels is not FUEL_SYSTEM_LEGACY
     with_spotting = Propagator(
-        veg=base_veg,
-        dem=base_dem,
-        realizations=2,
-        do_spotting=True,
+        veg=veg, dem=dem, realizations=1, do_spotting=True
     )
-    assert with_spotting.spotting_generation is not None
-    assert with_spotting.spotting_receiving is not None
+    assert np.any(with_spotting.fuels.spotting)
+
+
+def ignite_cell(
+    propagator: Propagator,
+    realization: int,
+    row: int,
+    col: int,
+    time: int,
+    ros: float,
+    fli: float,
+) -> None:
+    """Burn a single cell directly through the sparse-state test seam."""
+    propagator.time = time
+    tile, local_row, local_col = propagator._state_tile_slot(
+        realization, row, col
+    )
+    propagator._tile_flags[realization, tile, local_row, local_col] |= 1
+    propagator._tile_arrival[realization, tile, local_row, local_col] = time
+    propagator._tile_ros[realization, tile, local_row, local_col] = ros
+    propagator._tile_fli[realization, tile, local_row, local_col] = fli
+
+
+def mark_spotting(
+    propagator: Propagator,
+    realization: int,
+    row: int,
+    col: int,
+    *,
+    gen: bool = False,
+    recv: bool = False,
+) -> None:
+    """Set spotting flags on a cell's tile slot (test seam)."""
+    tile, local_row, local_col = propagator._state_tile_slot(
+        realization, row, col
+    )
+    if gen:
+        propagator._tile_flags[realization, tile, local_row, local_col] |= (
+            FLAG_SPOT_GEN
+        )
+    if recv:
+        propagator._tile_flags[realization, tile, local_row, local_col] |= (
+            FLAG_SPOT_RECV
+        )
 
 
 def test_compute_fire_probability_and_means():
     propagator = make_propagator(realizations=2)
 
-    propagator.fire = np.array(
-        [
-            [[1, 0], [0, 1]],
-            [[1, 1], [0, 0]],
-        ],
-        dtype=np.int8,
-    )
-    propagator.ros = np.array(
-        [
-            [[0.8, 0.0], [0.0, 1.2]],
-            [[0.4, 0.6], [0.0, 0.0]],
-        ],
-        dtype=np.float32,
-    )
-    propagator.fireline_int = np.array(
-        [
-            [[10.0, 0.0], [0.0, 20.0]],
-            [[5.0, 15.0], [0.0, 0.0]],
-        ],
-        dtype=np.float32,
-    )
-    propagator.arrival_time = np.array(
-        [
-            [[10, 0], [0, 20]],
-            [[15, 25], [0, 0]],
-        ],
-        dtype=np.int32,
-    )
-    propagator.spotting_generation = np.array(
-        [
-            [[1, 0], [0, 0]],
-            [[1, 1], [0, 0]],
-        ],
-        dtype=np.uint32,
-    )
-    propagator.spotting_receiving = np.array(
-        [
-            [[0, 0], [1, 1]],
-            [[0, 1], [0, 0]],
-        ],
-        dtype=np.uint32,
-    )
+    # burn state per realization:
+    # r0: (0,0) t=10 ros=0.8 fli=10, (1,0) t=15 ros=0.4 fli=5
+    # r1: (0,1) t=20 ros=1.2 fli=20, (1,0) t=25 ros=0.6 fli=15
+    ignite_cell(propagator, 0, 0, 0, time=10, ros=0.8, fli=10.0)
+    ignite_cell(propagator, 0, 1, 0, time=15, ros=0.4, fli=5.0)
+    ignite_cell(propagator, 1, 0, 1, time=20, ros=1.2, fli=20.0)
+    ignite_cell(propagator, 1, 1, 0, time=25, ros=0.6, fli=15.0)
+
+    # spotting flags:
+    # gen: r0 at (0,0) and (1,0); r1 at (1,0)
+    # recv: r0 and r1 at (0,1); r1 at (1,0)
+    mark_spotting(propagator, 0, 0, 0, gen=True)
+    mark_spotting(propagator, 0, 1, 0, gen=True)
+    mark_spotting(propagator, 1, 1, 0, gen=True)
+    mark_spotting(propagator, 0, 0, 1, recv=True)
+    mark_spotting(propagator, 1, 0, 1, recv=True)
+    mark_spotting(propagator, 1, 1, 0, recv=True)
 
     prob = propagator.compute_fire_probability()
     np.testing.assert_allclose(
@@ -215,19 +247,15 @@ def test_compute_fire_probability_and_means():
 
 def test_get_output_includes_spotting_probabilities():
     propagator = make_propagator(realizations=2)
+    # burn (0,0) in r0 at t=5 and (1,0) in r1 at t=9
+    ignite_cell(propagator, 0, 0, 0, time=5, ros=0.0, fli=0.0)
+    ignite_cell(propagator, 1, 1, 0, time=9, ros=0.0, fli=0.0)
     propagator.time = 60
-    propagator.fire = np.array(
-        [[[1, 0], [0, 0]], [[0, 1], [0, 0]]], dtype=np.int8
-    )
-    propagator.spotting_generation = np.array(
-        [[[1, 0], [0, 1]], [[0, 0], [0, 0]]], dtype=np.uint32
-    )
-    propagator.spotting_receiving = np.array(
-        [[[0, 1], [0, 0]], [[1, 0], [0, 0]]], dtype=np.uint32
-    )
-    propagator.arrival_time = np.array(
-        [[[5, 0], [0, 0]], [[0, 9], [0, 0]]], dtype=np.int32
-    )
+    # gen: r0 at (0,0), r1 at (0,1); recv: r1 at (0,0), r0 at (1,0)
+    mark_spotting(propagator, 0, 0, 0, gen=True)
+    mark_spotting(propagator, 1, 0, 1, gen=True)
+    mark_spotting(propagator, 1, 0, 0, recv=True)
+    mark_spotting(propagator, 0, 1, 0, recv=True)
 
     output = propagator.get_output()
 
@@ -279,6 +307,63 @@ def test_compute_stats_counts_active_and_thresholds():
     assert stats.area_50 == 3 * cell_area
     assert stats.area_75 == 2 * cell_area
     assert stats.area_90 == 1 * cell_area
+
+
+def make_wide_propagator(realizations: int = 2) -> Propagator:
+    veg = np.full((128, 128), 4, dtype=np.int32)
+    dem = np.zeros_like(veg, dtype=np.float32)
+    propagator = Propagator(
+        veg=veg,
+        dem=dem,
+        realizations=realizations,
+        do_spotting=False,
+        out_of_bounds_mode="ignore",
+    )
+    base = np.full_like(veg, 0.1, dtype=np.float32)
+    propagator.moisture = base.copy()
+    propagator.wind_dir = np.zeros_like(base)
+    propagator.wind_speed = np.full_like(base, 10.0)
+    return propagator
+
+
+def test_boundary_proximity_reports_only_nearby_edges():
+    propagator = make_wide_propagator(realizations=2)
+
+    # a pending event well inside the domain: no edge is close
+    propagator._front_push(0, 10, 64, 64, 0.0, 0.0)
+    assert propagator.boundary_proximity(4) == (False, False, False, False)
+
+    # ... one 3 cells from the west edge: only west is reported
+    propagator._front_push(0, 20, 64, 3, 0.0, 0.0)
+    assert propagator.boundary_proximity(4) == (False, False, True, False)
+
+    # every realization's heap is scanned, and margins accumulate per edge
+    propagator._front_push(1, 20, 125, 64, 0.0, 0.0)
+    assert propagator.boundary_proximity(4) == (False, True, True, False)
+
+    # a margin below 1 is treated as 1: a cell in the boundary ring counts
+    propagator._front_push(1, 30, 0, 64, 0.0, 0.0)
+    assert propagator.boundary_proximity(0) == (True, False, False, False)
+
+
+def test_boundary_proximity_predicts_before_the_front_halts():
+    propagator = make_wide_propagator(realizations=1)
+    # ignite 3 cells from the west edge: the front is close to it from the
+    # start, before propagation ever halts on the boundary
+    propagator.set_boundary_conditions(
+        BoundaryConditions(
+            time=0,
+            moisture=np.full((128, 128), 10.0, dtype=np.float32),
+            wind_dir=np.zeros((128, 128), dtype=np.float32),
+            wind_speed=np.full((128, 128), 10.0, dtype=np.float32),
+            ignitions=[(64, 3)],
+        )
+    )
+    propagator.step(seconds=1)
+
+    assert propagator.boundary_proximity(4) == (False, False, True, False)
+    # nothing halted, so boundary_pressure stays silent
+    assert propagator.boundary_pressure() == (False, False, False, False)
 
 
 def test_set_boundary_conditions_enqueue_event():
@@ -371,27 +456,74 @@ def test_decay_actions_moisture_exponential():
     assert propagator.actions_moisture is None
 
 
-def test_apply_updates_updates_state():
-    propagator = make_propagator(realizations=1)
+def _make_two_fuel_propagator(non_vegetated_at, ignite_at, realizations=5):
+    """Build a deterministic burnable/non-combustible spread scenario."""
+    from propagator.core.numba.models import FuelSystem
 
-    updates = UpdateBatch(
-        rows=np.array([0], dtype=np.int32),
-        cols=np.array([1], dtype=np.int32),
-        realizations=np.array([0], dtype=np.int32),
-        rates_of_spread=np.array([2.5], dtype=np.float32),
-        fireline_intensities=np.array([7.5], dtype=np.float32),
+    veg = np.full((9, 9), 5, dtype=np.int32)
+    veg[non_vegetated_at] = 3
+    dem = np.zeros_like(veg, dtype=np.float32)
+    fuels = FuelSystem(2)
+    fuels.add_fuel(5, "conifers", 1.0, 1.0, 20000.0, 0.0, -9999.0)
+    fuels.add_fuel(
+        3,
+        "non-vegetated",
+        1.0,
+        1.0,
+        20000.0,
+        0.0,
+        -9999.0,
+        False,
+        0.0,
+        False,
+    )
+    fuels.add_transition_probability(5, 3, 1.0)
+    fuels.add_transition_probability(3, 5, 1.0)
+
+    propagator = Propagator(
+        veg=veg,
+        dem=dem,
+        realizations=realizations,
+        do_spotting=False,
+        fuels=fuels,
+    )
+    propagator.moisture = np.zeros(veg.shape, dtype=np.float32)
+    propagator.wind_dir = np.zeros(veg.shape, dtype=np.float32)
+    propagator.wind_speed = np.zeros(veg.shape, dtype=np.float32)
+    propagator.set_boundary_conditions(
+        BoundaryConditions(time=0, ignitions=[ignite_at])
+    )
+    return propagator
+
+
+def test_unburnable_fuel_does_not_ignite_from_a_burning_neighbour():
+    propagator = _make_two_fuel_propagator(
+        non_vegetated_at=(4, 5), ignite_at=(4, 4)
     )
 
-    future_time = 5
-    propagator._apply_updates(updates, new_time=future_time)
+    steps = 0
+    while propagator.next_time() is not None and steps < 20:
+        propagator.step()
+        steps += 1
 
-    assert propagator.fire[0, 1, 0] == 1
-    assert propagator.arrival_time[0, 1, 0] == future_time
-    assert propagator.ros[0, 1, 0] == pytest.approx(2.5)
-    assert propagator.fireline_int[0, 1, 0] == pytest.approx(7.5)
+    fire = propagator.get_fire()
+    assert np.all(fire[:, 4, 4])
+    assert not np.any(fire[:, 4, 5])
 
-    time = propagator.time
-    assert time == future_time
+
+def test_unburnable_fuel_does_not_propagate_outward():
+    propagator = _make_two_fuel_propagator(
+        non_vegetated_at=(4, 4), ignite_at=(4, 4)
+    )
+
+    steps = 0
+    while propagator.next_time() is not None and steps < 20:
+        propagator.step()
+        steps += 1
+
+    fire = propagator.get_fire()
+    assert np.all(fire[:, 4, 4])
+    assert not np.any(fire[:, 4, 5])
 
 
 def test_step_applies_event():

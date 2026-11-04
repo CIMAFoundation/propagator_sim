@@ -51,10 +51,10 @@ Time-dependent moisture considerations
     - current value when working on a cell/realization is `actions_moisture * decay_factor**(t_now - t0)`
     - when adding moisture at `t_now`, add `delta / scale` to the stored array
 
-Session notes and implementation direction
-- Current hot path: `Propagator.step()` pops a single event time, applies BC, and calls `next_updates_fn` to generate new updates.
+Session notes and implementation direction (historical: pre-refactor design)
+- Previous hot path: `Propagator.step()` popped a single event time, applied BC, and called `next_updates_fn` to generate new updates.
 - The existing `Scheduler` is Python-side and groups `UpdateBatchWithTime` by time; this adds overhead at high event counts.
-- `next_updates_fn` is numba-jitted but works on batches; it returns arrays that then get split/queued in Python.
+- `next_updates_fn` was numba-jitted but worked on batches; it returned arrays that then got split/queued in Python. It has since been superseded by the front-tracking kernel below (`advance_front_until`) and no longer exists in the codebase.
 - For performance, the propagation loop should avoid `UpdateBatch*` in the core loop and run as a numba front-tracking kernel.
 - Proposed kernel structure:
   - Per-realization min-heap (arrays of times/rows/cols/ros/fli, plus size).

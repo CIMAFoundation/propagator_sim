@@ -1,0 +1,13 @@
+[package]
+name = "propagator-geo"
+version = "0.1.0"
+edition = "2021"
+license = "EUPL-1.2"
+description = "Dependency-free geospatial raster processing for PROPAGATOR"
+readme = "README.md"
+
+[dependencies]
+
+[profile.release]
+lto = true
+codegen-units = 1

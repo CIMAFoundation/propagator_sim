@@ -35,10 +35,10 @@ sim = Propagator(
 ## Model
 
 When a spotting-prone cell burns, it emits a Poisson-distributed number of
-embers (mean `LAMBDA_SPOTTING = {{spotting.LAMBDA}}`). Each ember is thrown at a
-uniformly random azimuth `θ`, lands some distance away, and — if it clears the
-landing-cell checks — ignites a new fire after a delay. The landing distance is
-the heart of the model and is documented in full below.
+embers (mean `LAMBDA_SPOTTING = {{spotting.LAMBDA}}`). Each ember is thrown at a uniformly random
+azimuth `θ`, lands some distance away, and — if it clears the landing-cell
+checks — ignites a new fire after a delay. The landing distance is the heart of
+the model and is documented in full below.
 
 ### Landing distance
 
@@ -58,11 +58,14 @@ with `θ` the ember's trajectory angle (uniform in `[0, 2π)`), `U` the source
 cell's wind speed, and `I` the source cell's fireline intensity (kW/m, carried
 on the propagation front from when the source cell ignited). If `U ≤ 0` or
 `I ≤ 0` the ember travels no distance (no transport medium / no fire to loft
-it). The model lives in `fire_spotting` / `compute_spotting` in
-`propagator.core.numba.propagation`.
+it). The same formulation and the same RNG draw order are used by
+both the numba core (`fire_spotting` / `compute_spotting` in
+`propagator.core.numba.propagation`) and the Rust core
+(`rust/propagator-core/src/kernel.rs`), so the two remain statistically
+equivalent.
 
-Reference values (the values below are injected from the code at docs-build
-time, so they always match the running constants):
+Reference values (both cores; the values below are injected from the code at
+docs-build time, so they always match the running constants):
 
 <!-- markdownlint-disable MD060 -->
 | Constant | Value | Meaning |
@@ -192,9 +195,9 @@ magnitude. Downwind embers (`cos ≈ 1`) are carried at nearly full wind speed;
 off-axis embers move downrange more slowly and take longer to land. The
 projection is floored at `SPOTTING_MIN_ALIGNMENT = {{spotting.MIN_ALIGNMENT}}` to
 remove the `cos → 0` singularity for near-crosswind embers and to prevent
-implausibly long flight times; because the `directional` factor and the
-`2·cellsize` filter already suppress off-axis throws, this floor affects only a
-small tail of embers.
+implausibly long flight
+times; because the `directional` factor and the `2·cellsize` filter already
+suppress off-axis throws, this floor affects only a small tail of embers.
 
 ## Calibration and tuning
 

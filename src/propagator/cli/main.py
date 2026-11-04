@@ -19,17 +19,23 @@ from propagator.cli.console import (
     status_propagator_msg,
 )
 from propagator.core import Propagator, PropagatorOutOfBoundsError
-from propagator.core.numba import FUEL_SYSTEM_LEGACY, fuelsystem_from_dict
+from propagator.core.constants import FUEL_SYSTEM_LEGACY_DICT, TILE_SIZE
+from propagator.core.numba import (
+    FUEL_SYSTEM_LEGACY,
+    fuelsystem_from_dict,
+)
 from propagator.core.numba.models import FuelSystem
+from propagator.core.runner import SimulationRunner
 from propagator.io.configuration import PropagatorConfigurationLegacy
+from propagator.io.loader.cog import PropagatorDataFromCogs
 from propagator.io.loader.geotiff import PropagatorDataFromGeotiffs
 from propagator.io.loader.protocol import PropagatorInputDataProtocol
 from propagator.io.loader.tiles import PropagatorDataFromTiles
 from propagator.io.writer import (
     GeoTiffWriter,
-    IsochronesGeoJSONWriter,
     MetadataJSONWriter,
 )
+from propagator.io.writer.isochrones_geojson import build_isochrones_writer
 from propagator.io.writer.protocol import OutputWriter
 
 
@@ -41,10 +47,12 @@ class PropagatorCLILegacy(BaseSettings):
     fuel_config: Optional[Path] = Field(
         None, description="Path to fuel configuration file (YAML)"
     )
-    mode: Literal["tiles", "geotiff"] = Field(
+    mode: Literal["tiles", "geotiff", "cog"] = Field(
         "tiles",
         description="Mode of static data load: 'tiles' for automatic, "
-        "'geotiff' for giving DEM and FUEL in input.",
+        "'geotiff' for giving DEM and FUEL in input, 'cog' for windowed "
+        "reads from cloud-optimized GeoTIFFs with automatic domain "
+        "growth when the fire reaches the boundary.",
     )
     dem: Optional[Path] = Field(
         None,
@@ -62,6 +70,38 @@ class PropagatorCLILegacy(BaseSettings):
         None,
         description="Tileset to be used in 'tiles' mode (default: 'default')",
     )
+    cog_dem: Optional[str] = Field(
+        None,
+        description="Comma-separated DEM COG URLs (s3://, https:// or "
+        "paths), one per UTM zone; required in 'cog' mode",
+    )
+    cog_fuel: Optional[str] = Field(
+        None,
+        description="Comma-separated fuel COG URLs matching --cog-dem "
+        "one to one; required in 'cog' mode",
+    )
+    grid_dim: int = Field(
+        3072,
+        gt=0,
+        description="Initial window size in cells around the ignition "
+        "('cog' mode)",
+    )
+    grow_margin: int = Field(
+        512,
+        gt=0,
+        description="Cells added on every side when the fire reaches the "
+        f"domain boundary ('cog' mode); must be a multiple of {TILE_SIZE}",
+    )
+    freeze_dir: Optional[Path] = Field(
+        None,
+        description="Directory for freezing burned-out tiles to disk "
+        "(keeps memory proportional to the active front)",
+    )
+    seed: Optional[int] = Field(
+        None,
+        description="Seed for the simulation RNGs (reproducible for a "
+        "fixed machine and numba thread count)",
+    )
     output: Path = Field(
         ...,
         description="Path to output folder where results will be saved",
@@ -70,6 +110,19 @@ class PropagatorCLILegacy(BaseSettings):
         [0.5, 0.75, 0.9],
         description="Isochrones thresholds to be saved. \
             Default: [0.5,0.75,0.9]",
+    )
+    isochrones_mode: Literal["none", "single", "multiple", "jsonl"] = Field(
+        "none",
+        description="Isochrones output mode: 'none' (off, default), "
+        "'single' (one consolidated file, rewritten each step), 'multiple' "
+        "(one file per timestep, that step only), or 'jsonl' (one GeoJSON "
+        "FeatureCollection per line, appended).",
+    )
+    isochrones_format: Literal["geojson", "gpkg"] = Field(
+        "geojson",
+        description="Isochrones file format for 'single'/'multiple' modes: "
+        "'geojson' (default) or 'gpkg' (GeoPackage). 'jsonl' is always "
+        "GeoJSON lines.",
     )
 
     record: CliImplicitFlag[bool] = Field(
@@ -80,6 +133,12 @@ class PropagatorCLILegacy(BaseSettings):
     ignore_out_of_bounds: CliImplicitFlag[bool] = Field(
         False,
         description="Continue simulation when reaching bounds.",
+    )
+
+    core: Literal["numba", "rust"] = Field(
+        "numba",
+        description="Simulation core: 'numba' (default) or 'rust' (native "
+        "extension, requires the propagator_rust wheel).",
     )
 
     # Quiet mode to suppress console output, set to true when --quiet is passed
@@ -157,7 +216,24 @@ class PropagatorCLILegacy(BaseSettings):
                     f"TILESPATH path {self.tilespath} does not exist"
                 )
 
+        elif self.mode == "cog":
+            if self.cog_dem is None or self.cog_fuel is None:
+                raise ValueError(
+                    "COG_DEM and COG_FUEL URL lists must be provided in "
+                    "'cog' mode"
+                )
+            if self.grow_margin % TILE_SIZE:
+                raise ValueError(
+                    f"GROW_MARGIN must be a multiple of {TILE_SIZE} cells"
+                )
+
         return self
+
+    def cog_url_lists(self) -> tuple[list[str], list[str]]:
+        assert self.cog_dem is not None and self.cog_fuel is not None
+        dem_urls = [u.strip() for u in self.cog_dem.split(",") if u.strip()]
+        fuel_urls = [u.strip() for u in self.cog_fuel.split(",") if u.strip()]
+        return dem_urls, fuel_urls
 
     def build_configuration(self) -> PropagatorConfigurationLegacy:
         """Create configuration object from provided JSON file."""
@@ -166,15 +242,23 @@ class PropagatorCLILegacy(BaseSettings):
         return PropagatorConfigurationLegacy(**json_cfg)
 
 
-def fuels_from_yaml(path: str | Path) -> FuelSystem:
+def _fuels_node_from_yaml(path: str | Path) -> Mapping:
     path = Path(path)
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     fuels_node = data.get("fuels")
     if not isinstance(fuels_node, Mapping):
         raise ValueError("YAML must contain 'fuels' (mapping)")
+    return fuels_node
+
+
+def fuels_from_yaml(path: str | Path) -> FuelSystem:
     # coerce IDs to int and build Fuel objects
-    fs = fuelsystem_from_dict(fuels_node)  # type: ignore
-    return fs
+    return fuelsystem_from_dict(_fuels_node_from_yaml(path))  # type: ignore
+
+
+def fuel_dict_from_yaml(path: str | Path) -> dict:
+    """Raw fuel definitions (config units) for the Rust core."""
+    return {int(k): v for k, v in _fuels_node_from_yaml(path).items()}
 
 
 # --- main function -----------------------------------------------------------
@@ -211,22 +295,26 @@ def main() -> None:
 
     if cli.fuel_config is not None:
         fuel_system = fuels_from_yaml(cli.fuel_config)
+        fuel_dict = fuel_dict_from_yaml(cli.fuel_config)
         if cli.verbose:
             info_msg(f"Fuel system loaded from {cli.fuel_config}")
     else:
         fuel_system = FUEL_SYSTEM_LEGACY
+        fuel_dict = FUEL_SYSTEM_LEGACY_DICT
         if cli.verbose:
             info_msg("Using legacy fuel system")
 
     loader: PropagatorInputDataProtocol | None = None
+    cog_loader: PropagatorDataFromCogs | None = None
 
-    if cli.mode == "tiles":
+    if cli.mode in ("tiles", "cog"):
         # first extract middle point from configuration
         mid_point = cfg.get_ignitions_middle_point()
         if mid_point is None:
             raise ValueError("Ignitions must be defined in the configuration.")
-
         mid_lat, mid_lon = mid_point[1], mid_point[0]
+
+    if cli.mode == "tiles":
         loader = PropagatorDataFromTiles(
             base_path=str(cli.tilespath),
             tileset=cli.tileset if cli.tileset is not None else "default",
@@ -240,6 +328,16 @@ def main() -> None:
             dem_file=str(cli.dem),
             veg_file=str(cli.fuel),
         )
+    elif cli.mode == "cog":
+        dem_urls, fuel_urls = cli.cog_url_lists()
+        cog_loader = PropagatorDataFromCogs(
+            dem_urls=dem_urls,
+            fuel_urls=fuel_urls,
+            mid_lon=mid_lon,
+            mid_lat=mid_lat,
+            grid_dim=cli.grid_dim,
+        )
+        loader = cog_loader
     else:
         raise ValueError(f"Unknown mode: {cli.mode}")
 
@@ -270,43 +368,80 @@ def main() -> None:
             }
         )
 
-    raster_writer = GeoTiffWriter(
-        start_date=cfg.init_date,
-        raster_variables_mapping=raster_variables_mapping,
-        output_folder=cli.output,
-        geo_info=geo_info,
-        dst_crs=dst_crs,
-    )
-
-    metadata_writer = MetadataJSONWriter(
-        start_date=cfg.init_date, output_folder=cli.output, prefix="metadata"
-    )
-
-    isochrones_writer = IsochronesGeoJSONWriter(
+    # The isochrones writer is persistent across domain growth (it may
+    # accumulate state); only its geo_info is refreshed when the grid grows.
+    isochrones_writer = build_isochrones_writer(
+        cli.isochrones_mode,
         start_date=cfg.init_date,
         output_folder=cli.output,
         prefix="isochrones",
-        thresholds=cli.isochrones,
         geo_info=geo_info,
         dst_crs=dst_crs,
+        fmt=cli.isochrones_format,
+        thresholds=cli.isochrones,
     )
 
-    writer = OutputWriter(
-        raster_writer=raster_writer,
-        metadata_writer=metadata_writer,
-        isochrones_writer=isochrones_writer,
-    )
+    def build_writer(current_geo_info) -> OutputWriter:
+        """(Re)build the shape-dependent writers; called again after every
+        domain growth. The isochrones writer is reused (its geo_info is
+        refreshed in grow_domain)."""
+        if isochrones_writer is not None:
+            isochrones_writer.geo_info = current_geo_info
+        return OutputWriter(
+            raster_writer=GeoTiffWriter(
+                start_date=cfg.init_date,
+                raster_variables_mapping=raster_variables_mapping,
+                output_folder=cli.output,
+                geo_info=current_geo_info,
+                dst_crs=dst_crs,
+            ),
+            metadata_writer=MetadataJSONWriter(
+                start_date=cfg.init_date,
+                output_folder=cli.output,
+                prefix="metadata",
+            ),
+            isochrones_writer=isochrones_writer,
+        )
 
-    simulator = Propagator(
-        dem=dem,
-        veg=veg,
-        realizations=cfg.realizations,
-        fuels=fuel_system,
-        do_spotting=cfg.do_spotting,
-        out_of_bounds_mode="ignore" if cli.ignore_out_of_bounds else "raise",
-        p_time_fn=cfg.p_time_fn if cfg.p_time_fn is not None else None,
-        p_moist_fn=cfg.p_moist_fn if cfg.p_moist_fn is not None else None,
-    )
+    writer = build_writer(geo_info)
+
+    origin = cog_loader.initial_origin if cog_loader is not None else (0, 0)
+    oob_mode = "ignore" if cli.ignore_out_of_bounds else "raise"
+
+    if cli.core == "rust":
+        from propagator.rust_core import Propagator as RustPropagator
+
+        simulator = RustPropagator(
+            dem=dem,
+            veg=veg,
+            realizations=cfg.realizations,
+            fuels_dict=fuel_dict,
+            do_spotting=cfg.do_spotting,
+            origin=origin,
+            seed=cli.seed,
+            freeze_dir=cli.freeze_dir,
+            out_of_bounds_mode=oob_mode,
+            ros_model=cfg.ros_model,
+            moisture_model=cfg.prob_moist_model,
+            cellsize=cfg.cellsize,
+        )
+        if cli.verbose:
+            info_msg("Using Rust core (propagator_rust)")
+    else:
+        simulator = Propagator(
+            dem=dem,
+            veg=veg,
+            realizations=cfg.realizations,
+            fuels=fuel_system,
+            cellsize=cfg.cellsize,
+            do_spotting=cfg.do_spotting,
+            origin=origin,
+            seed=cli.seed,
+            freeze_dir=cli.freeze_dir,
+            out_of_bounds_mode=oob_mode,
+            p_time_fn=cfg.p_time_fn if cfg.p_time_fn is not None else None,
+            p_moist_fn=cfg.p_moist_fn if cfg.p_moist_fn is not None else None,
+        )
 
     non_vegetated = fuel_system.get_non_vegetated()
     boundary_conditions_list = cfg.get_boundary_conditions(
@@ -318,28 +453,39 @@ def main() -> None:
     if cli.verbose:
         print_boundary_conditions_table(cfg.boundary_conditions)
 
+    def _on_domain_grow(new_geo_info) -> None:
+        nonlocal writer
+        writer = build_writer(new_geo_info)
+
+    runner = SimulationRunner(
+        simulator=simulator,
+        cog_loader=cog_loader,
+        grow_margin=cli.grow_margin,
+        freeze_dir=cli.freeze_dir,
+        on_domain_grow=_on_domain_grow,
+        verbose=cli.verbose,
+    )
+
     while True:
         next_time = simulator.next_time()
         if next_time is None:
             break
 
+        target_time = simulator.time + cfg.time_resolution
         try:
-            simulator.step(seconds=cfg.time_resolution)
+            output = runner.advance_to(target_time)
         except PropagatorOutOfBoundsError as e:
             warn(f"Simulation stopped due to PropagatorOutOfBoundsError: {e}")
             break
 
-        finally:
-            output = simulator.get_output()
+        status_propagator_msg(
+            cfg.init_date,
+            output.time,
+            output.stats,
+            verbose=cli.verbose,
+        )
 
-            status_propagator_msg(
-                cfg.init_date,
-                output.time,
-                output.stats,
-                verbose=cli.verbose,
-            )
-
-            writer.write_output(output)
+        writer.write_output(output)
 
         if simulator.time > cfg.time_limit:
             break

@@ -26,6 +26,24 @@ pip install -e '.[cli,io]'
 This installs the PROPAGATOR package in editable mode together with the optional
 extras required for raster handling, the CLI, and documentation tooling.
 
+### Optional Local Web Demo
+
+For debugging or demonstrations, launch the optional map-based interface:
+
+```bash
+uv sync --extra web
+uv run propagator-web
+```
+
+Open <http://127.0.0.1:8765>, choose the area and ignition on the map, select
+the numba or optional Rust core, configure the scenario, and run it. You can
+draw and schedule Canadair, helicopter, waterline, and heavy-vehicle actions.
+Results update frame by frame with probability heatmaps, isochrones, area
+statistics, and a growth chart.
+
+See [`docs/web.md`](docs/web.md) for the full guide. The server binds to
+`127.0.0.1` and is intended for local use only.
+
 ## Running Simulations
 
 Launch the CLI over the bundled GeoTIFF sample:
@@ -94,6 +112,8 @@ The MkDocs site covers:
   setup, quick run instructions, and programmatic usage tips.
 - **CLI Usage** (`docs/cli.md`): operating modes, flag reference, output
   products, and troubleshooting.
+- **Local Web Demo** (`docs/web.md`): optional map-based debugging and
+  demonstration interface with firefighting actions and animated results.
 - **Programmatic Workflow** (`docs/programmatic.md`): loader/writer pipeline
   example with `propagator.io`.
 - **API Reference** (`docs/reference/`): mkdocstrings pages for the core,

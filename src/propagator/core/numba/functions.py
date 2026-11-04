@@ -44,7 +44,7 @@ Q = 2442.0
 # Moisture of extinction
 MOISTURE_OF_EXTINCTION = 0.3
 
-RateOfSpreadModel = Literal["wang", "rothermel"]
+RateOfSpreadModel = Literal["wang", "rothermel", "standard"]
 MoistureModel = Literal["trucchia", "baghino"]
 
 

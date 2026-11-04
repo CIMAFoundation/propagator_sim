@@ -1,0 +1,17 @@
+{
+  "name": "propagator-wasm",
+  "type": "module",
+  "description": "WebAssembly bindings for the Rust PROPAGATOR core",
+  "version": "0.1.0",
+  "license": "EUPL-1.2",
+  "files": [
+    "propagator_wasm_bg.wasm",
+    "propagator_wasm.js",
+    "propagator_wasm.d.ts"
+  ],
+  "main": "propagator_wasm.js",
+  "types": "propagator_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

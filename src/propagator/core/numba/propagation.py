@@ -12,14 +12,14 @@ from numba import jit  # type: ignore
 from numpy.random import lognormal, poisson, random, uniform
 
 from propagator.core.constants import NO_FUEL
-from propagator.core.models import UpdateBatchTuple
 
 from .functions import (
     fireline_intensity,
     get_probability_to_neighbour,
     lhv_fuel,
 )
-from .models import Fuel, FuelSystem
+from .models import FuelSystem
+from .tiles import FLAG_FIRE, read_flags
 
 # P_c = P_c0 (1 + P_cd), where P_c0 constant spread_probability of
 # ignition by spotting and P_cd is a correction factor that
@@ -60,6 +60,9 @@ SPOTTING_MIN_ALIGNMENT = 0.2
 SPOTTING_TIME_TO_PROPAGATION_MEDIAN = 600.0
 SPOTTING_TIME_TO_PROPAGATION_LOG_SIGMA = 0.4
 
+# Hard cap on embers per emission so the per-cell number of front events is
+# bounded (P[Poisson(2) > 32] ~ 1e-27, so the cap never binds in practice).
+MAX_SPOTTING_EMBERS = 32
 
 NEIGHBOURS = np.array(
     [
@@ -73,6 +76,7 @@ NEIGHBOURS = np.array(
         (1, 1),
     ]
 )
+N_NEIGHBOURS = NEIGHBOURS.shape[0]
 # calculate the distance to the neighbours in a lattice from NEIGHBOURS
 NEIGHBOURS_DISTANCE = np.sqrt(NEIGHBOURS[:, 0] ** 2 + NEIGHBOURS[:, 1] ** 2)
 # calculate the angle to the neighbours in a lattice from NEIGHBOURS using meteorological convention
@@ -150,7 +154,9 @@ def compute_spotting(
     col: int,
     cellsize: float,
     veg: npt.NDArray[np.integer],
-    fire: npt.NDArray[np.int8],
+    fuel_idx: npt.NDArray[np.int64],
+    tile_idx_r: npt.NDArray[np.int32],
+    tile_flags_r: npt.NDArray[np.uint8],
     wind_dir: float,
     wind_speed: float,
     fireline_intensity_value: float,
@@ -169,8 +175,12 @@ def compute_spotting(
         The size of each cell (m)
     veg : npt.NDArray[np.integer]
         The vegetation type array
-    fire : npt.NDArray[np.int8]
-        The fire state array
+    fuel_idx : npt.NDArray[np.int64]
+        The dense fuel index array (vegetation codes mapped to FuelSystem indices)
+    tile_idx_r : npt.NDArray[np.int32]
+        The realization's tile-index grid
+    tile_flags_r : npt.NDArray[np.uint8]
+        The realization's tiled flags pool
     wind_dir : float
         The wind direction (clockwise radians, 0 is north -> south)
     wind_speed : float
@@ -192,7 +202,7 @@ def compute_spotting(
     # let numba assign the type
     spotting_updates = []  # type: ignore
 
-    num_embers = poisson(LAMBDA_SPOTTING)
+    num_embers = min(poisson(LAMBDA_SPOTTING), MAX_SPOTTING_EMBERS)
 
     if num_embers == 0:
         return spotting_updates
@@ -227,17 +237,20 @@ def compute_spotting(
         col_to = col + int(delta_c / cellsize)
 
         # check if the landing location is within the grid, otherwise discard
-        if col_to < 0 or col_to > fire.shape[1] - 1:
+        if col_to < 0 or col_to > veg.shape[1] - 1:
             continue
 
-        if row_to < 0 or row_to > fire.shape[0] - 1:
+        if row_to < 0 or row_to > veg.shape[0] - 1:
             continue
 
         # prevent ignition of already burning cells
-        if fire[row_to, col_to] != 0:
+        if read_flags(tile_idx_r, tile_flags_r, row_to, col_to) & FLAG_FIRE:
             continue
         veg_to = veg[row_to, col_to]
         if veg_to == NO_FUEL:
+            continue
+        idx_to = fuel_idx[row_to, col_to]
+        if not fuels.burn[idx_to]:
             continue
 
         # we want to put another probabilistic filter in order
@@ -246,9 +259,7 @@ def compute_spotting(
         # P_c = P_c0 (1 + P_cd), where P_c0 constant probability of ignition
         # by spotting and P_cd is a correction factor that
         # depends on vegetation type and density > set on the fuels system
-        fuel_to = fuels.get_fuel(veg_to)  # type: ignore
-
-        P_c = P_C0 * (1 + fuel_to.prob_ign_by_embers)
+        P_c = P_C0 * (1 + fuels.prob_ign_by_embers[idx_to])
         if uniform() > P_c:
             continue
 
@@ -279,8 +290,9 @@ def compute_spotting(
 
 @jit(cache=False, nopython=True, fastmath=True)
 def calculate_fire_behavior(
-    fuel_from: Fuel,
-    fuel_to: Fuel,
+    fuels: FuelSystem,
+    idx_from: int,
+    idx_to: int,
     dh: float,
     dist: float,
     angle: float,
@@ -293,10 +305,12 @@ def calculate_fire_behavior(
 
     Parameters
     ----------
-    fuel_from : Fuel
-        The fuel object for the source cell.
-    fuel_to : Fuel
-        The fuel object for the target cell.
+    fuels : FuelSystem
+        The fuel system object.
+    idx_from : int
+        The dense fuel index of the source cell.
+    idx_to : int
+        The dense fuel index of the target cell.
     dh : float
         The elevation difference between the source and target cells (m).
     dist : float
@@ -321,7 +335,7 @@ def calculate_fire_behavior(
     """
 
     transition_time, ros_value = p_time_fn(
-        fuel_from.v0,
+        fuels.v0[idx_from],
         dh,
         angle,
         dist,
@@ -335,13 +349,13 @@ def calculate_fire_behavior(
         transition_time = 1
 
     # evaluate LHV of dead fuel
-    lhv_dead_fuel_value = lhv_fuel(fuel_to.hhv, moisture)
+    lhv_dead_fuel_value = lhv_fuel(fuels.hhv[idx_to], moisture)
     # evaluate LHV of the canopy
-    lhv_canopy_value = lhv_fuel(fuel_to.hhv, fuel_to.humidity)
+    lhv_canopy_value = lhv_fuel(fuels.hhv[idx_to], fuels.humidity[idx_to])
     # evaluate fireline intensity
     fireline_intensity_value = fireline_intensity(
-        fuel_to.d0,
-        fuel_to.d1,
+        fuels.d0[idx_to],
+        fuels.d1[idx_to],
         ros_value,
         lhv_dead_fuel_value,
         lhv_canopy_value,
@@ -349,261 +363,120 @@ def calculate_fire_behavior(
     return transition_time, ros_value, fireline_intensity_value
 
 
-@jit(cache=False, parallel=False, nopython=True, fastmath=True)
-def single_cell_updates(
+@jit(cache=False, nopython=True, fastmath=True)
+def try_spread_to_neighbour(
+    neighbour_index: int,
     row: int,
     col: int,
     cellsize: float,
     veg: npt.NDArray[np.integer],
+    fuel_idx: npt.NDArray[np.int64],
     dem: npt.NDArray[np.floating],
-    fire: npt.NDArray[np.int8],
+    tile_idx_r: npt.NDArray[np.int32],
+    tile_flags_r: npt.NDArray[np.uint8],
     moisture: npt.NDArray[np.floating],
-    wind_dir: npt.NDArray[np.floating],
-    wind_speed: npt.NDArray[np.floating],
+    w_dir_r: float,
+    w_speed_r: float,
     fuels: FuelSystem,
     p_time_fn: Any,
     p_moist_fn: Any,
-    fireline_intensity_value: float,
-) -> list[tuple[int, int, int, float, float, bool]]:
+) -> tuple[bool, int, int, int, float, float]:
     """
-    Apply fire spread to a single cell and get the next spread updates.
+    Attempt a probabilistic fire spread from a cell to one of its neighbours.
 
     Parameters
     ----------
+    neighbour_index : int
+        Index into the NEIGHBOURS lattice offsets (0..7).
     row : int
-        The row index of the current cell
+        The row index of the source cell
     col : int
-        The column index of the current cell
+        The column index of the source cell
     cellsize: float
         The size of each cell (in meters)
     veg : npt.NDArray[np.integer]
         The 2D vegetation array
+    fuel_idx : npt.NDArray[np.int64]
+        The dense fuel index array (vegetation codes mapped to FuelSystem indices)
     dem : npt.NDArray[np.floating]
         The 2D digital elevation model array
-    fire: npt.NDArray[np.int8]
-        The 2D current fire state
+    tile_idx_r : npt.NDArray[np.int32]
+        The realization's tile-index grid
+    tile_flags_r : npt.NDArray[np.uint8]
+        The realization's tiled flags pool
     moisture: npt.NDArray[np.floating]
         The 2D moisture array (units: fraction [0, 1])
-    wind_dir: npt.NDArray[np.floating]
-        The 2D wind direction array (units: radians between [-π, π], 0 is east->west)
-    wind_speed: npt.NDArray[np.floating]
-        The 2D wind speed array (units: km/h)
+    w_dir_r: float
+        The wind direction at the source cell (radians)
+    w_speed_r: float
+        The wind speed at the source cell (km/h)
     fuels: FuelSystem
         The fuel system
     p_time_fn: Any
-        The function to compute the spread time (must be jit-compiled). Units are compliant with other functions.
-            signature: (v0: float, dh: float, angle_to: float, dist: float, moist: float, w_dir: float, w_speed: float) -> tuple[float, float]
+        The function to compute the spread time (must be jit-compiled).
     p_moist_fn: Any
-        The function to compute the moisture probability (must be jit-compiled). Units are compliant with other functions.
-            signature: (moist: float) -> float
-    fireline_intensity_value: float
-        The fireline intensity of this (source/emitting) cell (kW/m), used to
-        scale the ember spotting distance.
+        The function to compute the moisture probability (must be jit-compiled).
 
     Returns
     -------
-    list[tuple[int, int, int, float, float, bool]]
-        A list of fire spread updates (transition_times, rows, cols,
-        rates_of_spread, fireline_intensities, is_spotting)
+    tuple[bool, int, int, int, float, float]
+        (ignites, row_to, col_to, transition_time, rate_of_spread,
+        fireline_intensity)
     """
+    row_to = row + NEIGHBOURS[neighbour_index, 0]
+    col_to = col + NEIGHBOURS[neighbour_index, 1]
 
-    # let numba assign the type
-    fire_spread_updates = []  # type: ignore
+    # check if the neighbour is within the grid, otherwise discard
+    if row_to < 0 or row_to >= veg.shape[0]:
+        return False, row_to, col_to, 0, 0.0, 0.0
+    if col_to < 0 or col_to >= veg.shape[1]:
+        return False, row_to, col_to, 0, 0.0, 0.0
 
-    dem_from = dem[row, col]
-    veg_from = veg[row, col]
+    veg_to = veg[row_to, col_to]
 
-    if veg_from == NO_FUEL:
-        return fire_spread_updates
-
-    w_dir_r = wind_dir[row, col]
-    w_speed_r = wind_speed[row, col]
-
-    fuel_from = fuels.get_fuel(veg_from)  # type: ignore
-
-    for neighbour, dist_to_lattice, angle_to in zip(
-        NEIGHBOURS, NEIGHBOURS_DISTANCE, NEIGHBOURS_ANGLE
+    # keep only pixels where fire can spread
+    if veg_to == NO_FUEL or (
+        read_flags(tile_idx_r, tile_flags_r, row_to, col_to) & FLAG_FIRE
     ):
-        row_to = row + neighbour[0]
-        col_to = col + neighbour[1]
+        return False, row_to, col_to, 0, 0.0, 0.0
 
-        # check if the neighbour is within the grid, otherwise discard
-        if row_to < 0 or row_to >= fire.shape[0]:
-            continue
-        if col_to < 0 or col_to >= fire.shape[1]:
-            continue
+    idx_to = fuel_idx[row_to, col_to]
+    if not fuels.burn[idx_to]:
+        return False, row_to, col_to, 0, 0.0, 0.0
 
-        veg_to = veg[row_to, col_to]
-        dist_to = dist_to_lattice * cellsize
+    dist_to = NEIGHBOURS_DISTANCE[neighbour_index] * cellsize
+    angle_to = NEIGHBOURS_ANGLE[neighbour_index]
 
-        # keep only pixels where fire can spread
-        if fire[row_to, col_to] or veg_to == NO_FUEL:
-            continue
+    dh = dem[row_to, col_to] - dem[row, col]
+    moisture_r = moisture[row_to, col_to]
+    idx_from = fuel_idx[row, col]
+    transition_probability = fuels.spread_probability[idx_from, idx_to]
 
-        dh = dem[row_to, col_to] - dem_from
-        moisture_r = moisture[row_to, col_to]
-        transition_probability = fuels.get_transition_probability(
-            veg_from,
-            veg_to,  # type: ignore
-        )
-
-        p_prob = get_probability_to_neighbour(
-            angle_to,
-            dist_to,
-            w_dir_r,
-            w_speed_r,
-            moisture_r,  # type: ignore
-            dh,
-            transition_probability,
-            p_moist_fn,
-        )
-
-        do_propagate = p_prob > random()
-        if not do_propagate:
-            continue
-
-        fuel_to = fuels.get_fuel(veg_to)  # type: ignore
-
-        transition_time, ros, fireline_intensity = calculate_fire_behavior(
-            fuel_from,
-            fuel_to,
-            dh,
-            dist_to,
-            angle_to,
-            moisture_r,  # type: ignore
-            w_dir_r,
-            w_speed_r,
-            p_time_fn,
-        )
-        fire_spread_updates.append(
-            (transition_time, row_to, col_to, ros, fireline_intensity, False)
-        )
-
-    if fuel_from.spotting:
-        spotting_updates = compute_spotting(
-            row,
-            col,
-            cellsize,
-            veg,
-            fire,
-            wind_dir[row, col],
-            wind_speed[row, col],
-            fireline_intensity_value,
-            fuels,
-        )
-        fire_spread_updates.extend(spotting_updates)
-
-    return fire_spread_updates
-
-
-@jit(cache=False, parallel=False, nopython=True, fastmath=True)
-def next_updates_fn(
-    rows: npt.NDArray[np.integer],
-    cols: npt.NDArray[np.integer],
-    realizations: npt.NDArray[np.integer],
-    cellsize: float,
-    time: int,
-    veg: npt.NDArray[np.integer],
-    dem: npt.NDArray[np.floating],
-    fire: npt.NDArray[np.int8],
-    moisture: npt.NDArray[np.floating],
-    wind_dir: npt.NDArray[np.floating],
-    wind_speed: npt.NDArray[np.floating],
-    fuels: FuelSystem,
-    p_time_fn: Any,
-    p_moist_fn: Any,
-) -> UpdateBatchTuple:
-    """
-    Compute the next updates for the fire spread simulation.
-
-    Parameters
-    ----------
-    rows: npt.NDArray[np.integer]
-        The row indices of the fire spread updates.
-    cols: npt.NDArray[np.integer]
-        The column indices of the fire spread updates.
-    realizations: npt.NDArray[np.integer]
-        The realization indices of the fire spread updates.
-    cellsize: float
-        The size of each cell (in meters)
-    time: int
-        The current time step.
-    veg : npt.NDArray[np.integer]
-        The 2D vegetation array
-    dem : npt.NDArray[np.floating]
-        The 2D digital elevation model array
-    fire: npt.NDArray[np.int8]
-        The 3D current fire state
-    moisture: npt.NDArray[np.floating]
-        The 2D moisture array (units: fraction [0, 1])
-    wind_dir: npt.NDArray[np.floating]
-        The 2D wind direction array (units: radians between [-π, π], 0 is east->west)
-    wind_speed: npt.NDArray[np.floating]
-        The 2D wind speed array (units: km/h)
-    fuels: FuelSystem
-        The fuel system
-    p_time_fn: Any
-        The function to compute the spread time (must be jit-compiled). Units are compliant with other functions.
-            signature: (v0: float, dh: float, angle_to: float, dist: float, moist: float, w_dir: float, w_speed: float) -> tuple[float, float]
-    p_moist_fn: Any
-        The function to compute the moisture probability (must be jit-compiled). Units are compliant with other functions.
-            signature: (moist: float) -> float
-
-    Returns
-    -------
-    UpdateBatchTuple
-        A tuple containing the arrays for the next updates.
-        (next_times, next_rows, next_cols, next_realizations, next_ros, next_fireline_intensities)
-    """
-    next_rows = []
-    next_cols = []
-    next_realizations = []
-    next_times = []
-    next_ros = []
-    next_fireline_intensities = []
-
-    for index in range(len(rows)):
-        row: int = rows[index]
-        col: int = cols[index]
-        realization: int = realizations[index]
-
-        fire_spread_update = single_cell_updates(
-            row,
-            col,
-            cellsize,
-            veg,
-            dem,
-            fire[:, :, realization],
-            moisture,
-            wind_dir,
-            wind_speed,  # type: ignore
-            fuels,
-            p_time_fn,
-            p_moist_fn,
-            0.0,  # legacy batch path: source fireline intensity unavailable here
-        )
-
-        for fire_spread in fire_spread_update:
-            (
-                transition_time,
-                row_to,
-                col_to,
-                ros,
-                fireline_intensity,
-                _is_spotting,
-            ) = fire_spread
-            next_times.append(time + transition_time)
-            next_rows.append(row_to)
-            next_cols.append(col_to)
-            next_realizations.append(realization)
-            next_ros.append(ros)
-            next_fireline_intensities.append(fireline_intensity)
-
-    return (
-        np.array(next_times),
-        np.array(next_rows),
-        np.array(next_cols),
-        np.array(next_realizations),
-        np.array(next_ros),
-        np.array(next_fireline_intensities),
+    p_prob = get_probability_to_neighbour(
+        angle_to,
+        dist_to,
+        w_dir_r,
+        w_speed_r,
+        moisture_r,  # type: ignore
+        dh,
+        transition_probability,
+        p_moist_fn,
     )
+
+    do_propagate = p_prob > random()
+    if not do_propagate:
+        return False, row_to, col_to, 0, 0.0, 0.0
+
+    transition_time, ros, fli = calculate_fire_behavior(
+        fuels,
+        idx_from,
+        idx_to,
+        dh,
+        dist_to,
+        angle_to,
+        moisture_r,  # type: ignore
+        w_dir_r,
+        w_speed_r,
+        p_time_fn,
+    )
+    return True, row_to, col_to, transition_time, ros, fli

@@ -1,0 +1,17 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "propagator-rust"
+version = "0.1.0"
+description = "Python bindings for the Rust PROPAGATOR core"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+
+[tool.maturin]
+module-name = "propagator_rust"
+manifest-path = "Cargo.toml"
