@@ -142,6 +142,7 @@ pub struct GpuPropagator {
     relax: wgpu::ComputePipeline,
     prepare: wgpu::ComputePipeline,
     build_list: wgpu::ComputePipeline,
+    finalize_list: wgpu::ComputePipeline,
     fold: wgpu::ComputePipeline,
     debug_edges: wgpu::ComputePipeline,
     fill_inf: wgpu::ComputePipeline,
@@ -158,7 +159,9 @@ pub struct GpuPropagator {
     tile_min: [wgpu::Buffer; 2],
     list: [wgpu::Buffer; 2],
     member: [wgpu::Buffer; 2],
-    /// `[count, 1, 1]`: indirect dispatch arguments of the worklist
+    /// worklist lengths (atomic append counters)
+    count: [wgpu::Buffer; 2],
+    /// `[x, y, 1]` indirect dispatch arguments derived from the counts
     indirect: [wgpu::Buffer; 2],
     work_buf: wgpu::Buffer,
     fold_buf: wgpu::Buffer,
@@ -367,6 +370,7 @@ impl GpuPropagator {
             filled("member_a", config.realizations * n_tiles, 0),
             filled("member_b", config.realizations * n_tiles, 0),
         ];
+        let count = [filled("count_a", 1, 0), filled("count_b", 1, 0)];
         let indirect_usage = storage | wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_SRC;
         let indirect = [
             init(
@@ -427,6 +431,8 @@ impl GpuPropagator {
                 entry(13, ro),
                 entry(14, rw),
                 entry(15, rw),
+                entry(16, rw),
+                entry(17, ro),
             ],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -447,6 +453,7 @@ impl GpuPropagator {
         let relax = pipeline("relax_list");
         let prepare = pipeline("prepare");
         let build_list = pipeline("build_list");
+        let finalize_list = pipeline("finalize_list");
         let fold = pipeline("fold_cells");
         let debug_edges = pipeline("debug_edges");
         let fill_inf = pipeline("fill_inf");
@@ -457,6 +464,7 @@ impl GpuPropagator {
             relax,
             prepare,
             build_list,
+            finalize_list,
             fold,
             debug_edges,
             fill_inf,
@@ -472,6 +480,7 @@ impl GpuPropagator {
             tile_min,
             list,
             member,
+            count,
             indirect,
             work_buf,
             fold_buf,
@@ -594,7 +603,15 @@ impl GpuPropagator {
                 },
                 wgpu::BindGroupEntry {
                     binding: 15,
+                    resource: b(&self.count[1 - cur]),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 16,
                     resource: b(&self.indirect[1 - cur]),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 17,
+                    resource: b(&self.count[cur]),
                 },
             ],
         })
@@ -699,6 +716,13 @@ impl GpuPropagator {
         pass.dispatch_workgroups(n.div_ceil(WORKGROUP), 1, 1);
     }
 
+    fn encode_finalize(&self, encoder: &mut wgpu::CommandEncoder, bg: &wgpu::BindGroup) {
+        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
+        pass.set_pipeline(&self.finalize_list);
+        pass.set_bind_group(0, bg, &[]);
+        pass.dispatch_workgroups(1, 1, 1);
+    }
+
     /// Queue every tile with unpushed arrivals below `next_end` (bucket
     /// start), then swap the worklists.
     fn encode_build_list(&mut self, encoder: &mut wgpu::CommandEncoder) {
@@ -711,6 +735,7 @@ impl GpuPropagator {
             let n = (self.realizations * self.n_tiles) as u32;
             pass.dispatch_workgroups(n.div_ceil(WORKGROUP), 1, 1);
         }
+        self.encode_finalize(encoder, &bg);
         self.cur = 1 - self.cur;
     }
 
@@ -725,13 +750,14 @@ impl GpuPropagator {
             pass.set_bind_group(0, &bg, &[]);
             pass.dispatch_workgroups_indirect(&self.indirect[self.cur], 0);
         }
+        self.encode_finalize(encoder, &bg);
         self.cur = 1 - self.cur;
     }
 
     /// Number of tiles queued for the next sweep (the current worklist).
     fn read_queued(&self) -> u32 {
         let mut encoder = self.device.create_command_encoder(&Default::default());
-        encoder.copy_buffer_to_buffer(&self.indirect[self.cur], 0, &self.staging_work, 0, 4);
+        encoder.copy_buffer_to_buffer(&self.count[self.cur], 0, &self.staging_work, 0, 4);
         self.queue.submit(Some(encoder.finish()));
         let slice = self.staging_work.slice(..);
         let (tx, rx) = std::sync::mpsc::channel();

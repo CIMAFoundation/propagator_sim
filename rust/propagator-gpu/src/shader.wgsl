@@ -89,6 +89,10 @@ struct Window {
 @group(0) @binding(13) var<storage, read> member_cur: array<u32>;
 @group(0) @binding(14) var<storage, read_write> member_next: array<atomic<u32>>;
 @group(0) @binding(15) var<storage, read_write> count_next: array<atomic<u32>>;
+// indirect dispatch arguments [x, y, z] for the sweep over `list_cur`
+// (x <= 65535 per dimension, so the list is laid out as x + 65535 * y)
+@group(0) @binding(16) var<storage, read_write> indirect_next: array<u32>;
+@group(0) @binding(17) var<storage, read> count_cur: array<u32>;
 
 const NEIGHBOUR_DR = array<i32, 8>(-1, -1, -1, 0, 0, 1, 1, 1);
 const NEIGHBOUR_DC = array<i32, 8>(-1, 0, 1, -1, 1, -1, 0, 1);
@@ -316,7 +320,11 @@ fn build_list(@builtin(global_invocation_id) gid: vec3<u32>) {
 @compute @workgroup_size(256)
 fn relax_list(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
     let n_tiles = params.tiles_w * params.tiles_h;
-    let rt = list_cur[wg.x];
+    let item = wg.x + 65535u * wg.y;
+    if item >= count_cur[0] {
+        return;
+    }
+    let rt = list_cur[item];
     let r = rt / n_tiles;
     let t = rt % n_tiles;
     let n_cells = params.rows * params.cols;
@@ -373,6 +381,16 @@ fn relax_list(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id
             queue_next(rt);
         }
     }
+}
+
+// After a list has been built: turn its count into 2-D indirect dispatch
+// arguments (a dimension is limited to 65535 workgroups).
+@compute @workgroup_size(1)
+fn finalize_list() {
+    let c = atomicLoad(&count_next[0]);
+    indirect_next[0] = min(c, 65535u);
+    indirect_next[1] = (c + 65534u) / 65535u;
+    indirect_next[2] = 1u;
 }
 
 // Fill the state buffers with INF (unburnt / never pushed); `fold_time` is
