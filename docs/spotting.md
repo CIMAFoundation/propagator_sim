@@ -55,9 +55,10 @@ landing_time = distance / ( U · max(alignment, MIN_ALIGNMENT) )    # seconds
 ```
 
 with `θ` the ember's trajectory angle (uniform in `[0, 2π)`), `U` the source
-cell's wind speed, and `I` the source cell's fireline intensity (kW/m). If
-`U ≤ 0` or `I ≤ 0` the ember travels no distance (no transport medium / no
-fire to loft it). The same formulation and the same RNG draw order are used by
+cell's wind speed, and `I` the source cell's fireline intensity (kW/m, carried
+on the propagation front from when the source cell ignited). If `U ≤ 0` or
+`I ≤ 0` the ember travels no distance (no transport medium / no fire to loft
+it). The same formulation and the same RNG draw order are used by
 both the numba core (`fire_spotting` / `compute_spotting` in
 `propagator.core.numba.propagation`) and the Rust core
 (`rust/propagator-core/src/kernel.rs`), so the two remain statistically

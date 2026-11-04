@@ -73,6 +73,7 @@ docs = [
     "matplotlib>=3.10.7",
 ]
 
+
 [dependency-groups]
 dev = [
     "ipykernel>=7.1.0",

@@ -73,12 +73,18 @@ The command will create the `results/quickstart` directory if it does not
 already exist. Time-related settings in the configuration file (for example
 `time_limit` and `time_resolution`) are expressed in seconds.
 
+The configuration must include boundary conditions with an entry at time `0`
+and at least one ignition in that initial state. If ignitions are provided at
+the top level, the CLI merges them into the first boundary-condition block.
+
 ### Optional inputs
 - Provide a custom fuel model with `--fuel-config example/fuel_config.yaml`.
 - Switch to tiles mode by supplying `--mode tiles --tilespath <tiles_dir>
   [--tileset <name>]` when using staged tiled rasters instead of GeoTIFFs.
 - Add `--verbose` to print progress tables and boundary-condition details.
 - Add `--record` to save terminal logs alongside the simulation outputs.
+- Add `--ignore-out-of-bounds` to keep running after the fire reaches the
+  domain edge.
 
 ## Inspect the Outputs
 
@@ -86,6 +92,11 @@ After the run completes, the output directory contains GeoTIFF rasters
 (`fire_probability`, `fireline_intensity_*`, `ros_*`), GeoJSON isochrones, and
 metadata JSON summarising the run. Visualise the rasters with any GIS tool or
 load them back into Python using `rasterio` or `geopandas`.
+
+Each artefact name includes the simulation time, for example
+`fire_probability_3600.tiff` or `metadata_3600.json`. When `--record` is
+enabled, the terminal export is written as `run.html` and `run.log` in the
+output directory.
 
 ## Programmatic Usage
 

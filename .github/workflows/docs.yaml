@@ -26,13 +26,17 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          # numba (a core dependency, pulled in by the docs figure hook) does
+          # not support 3.14 yet; pin to a supported version.
+          python-version: '3.13'
           cache: 'pip'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install mkdocs mkdocs-material mkdocstrings[python] mike
+          # Install the package (for the docs hook to import) plus the docs
+          # toolchain; scipy and numba come in via the core dependencies.
+          pip install -e '.[docs]'
 
       - name: Build docs (sanity check)
         run: mkdocs build --strict
