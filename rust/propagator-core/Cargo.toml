@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 description = "Stochastic cellular wildfire spread simulator (Rust core, ported from the Python/numba implementation)"
+readme = "README.md"
+repository = "https://github.com/CIMAFoundation/propagator_sim"
 
 [dependencies]
 # intentionally dependency-free: std-only core

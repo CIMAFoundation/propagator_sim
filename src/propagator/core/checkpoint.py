@@ -30,8 +30,10 @@ from propagator.core.tile_store import (
 )
 
 # version 2 adds incremental frozen-tile references (sidecar .tiles file
-# on disk); version 1 files load fine with an empty frozen index
-CHECKPOINT_VERSION = 2
+# on disk); version 1 files load fine with an empty frozen index.
+# version 3 adds front_src (where each front event came from, for
+# Propagator.extinguish); older files load with every source unknown
+CHECKPOINT_VERSION = 3
 
 # Array fields serialized directly as npz entries (None allowed for the
 # optional weather/actions fields).
@@ -47,6 +49,7 @@ _ARRAY_FIELDS = (
     "front_cols",
     "front_ros",
     "front_fli",
+    "front_src",
     "front_sizes",
     "tile_idx",
     "tile_counts",
@@ -111,6 +114,10 @@ class PropagatorCheckpoint:
     # with a huge frozen interior stays cheap.
     frozen_index: TileIndex = field(default_factory=dict)
     frozen_source: TileStore | Path | None = None
+
+    # source of each front event (NEIGHBOURS index or SRC_EXTERNAL),
+    # trimmed like the other front arrays; None in version < 3 files
+    front_src: npt.NDArray[np.uint8] | None = None
 
     @property
     def shape(self) -> tuple[int, int]:

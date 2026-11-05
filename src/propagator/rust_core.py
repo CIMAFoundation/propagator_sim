@@ -211,6 +211,15 @@ class Propagator:
         """
         return {k: int(v) for k, v in self._sim.freeze_diagnostic().items()}
 
+    def extinguish(self, success) -> int:
+        """Try to put the fire out where ``success`` is positive: a grid
+        with the shape of ``veg`` giving the probability of success per
+        cell (a bool mask means certain success). Each realization draws
+        its own outcome. Returns the front events cancelled. Same semantics
+        as the numba core's ``Propagator.extinguish``."""
+        success = np.ascontiguousarray(success, dtype=np.float32)
+        return int(self._sim.extinguish(success))
+
     def edge_cache_bytes(self) -> int:
         """Bytes held by the shared per-cell edge cache (spread quantities
         reused across realizations; grows with the reached area)."""

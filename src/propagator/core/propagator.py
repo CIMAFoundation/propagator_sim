@@ -39,6 +39,7 @@ from propagator.core.numba import (
     FRONT_RESERVE,
     FROZEN_TILE,
     FUEL_SYSTEM_LEGACY,
+    SRC_EXTERNAL,
     TILE_MASK,
     TILE_RESERVE,
     TILE_SHIFT,
@@ -47,13 +48,16 @@ from propagator.core.numba import (
     accumulate_flame_block,
     advance_front_until,
     build_fuel_index_grid,
+    draw_extinguish,
     flood_reachable,
     fold_state_tiles,
     get_p_moisture_fn,
     get_p_time_fn,
+    heap_retain,
     materialize_tiles,
     seed_rngs,
 )
+from propagator.core.numba.propagation import NEIGHBOURS
 from propagator.core.scheduler import Scheduler, SchedulerEvent
 from propagator.core.tile_store import TileStore, iter_records, parse_record
 
@@ -239,6 +243,8 @@ class Propagator:
     _front_cols: npt.NDArray[np.int32] = field(init=False)
     _front_ros: npt.NDArray[np.float32] = field(init=False)
     _front_fli: npt.NDArray[np.float32] = field(init=False)
+    # where each event came from: NEIGHBOURS index, or SRC_EXTERNAL
+    _front_src: npt.NDArray[np.uint8] = field(init=False)
     _front_sizes: npt.NDArray[np.int32] = field(init=False)
     _front_overflow: npt.NDArray[np.int8] = field(init=False)
     _front_capacity: int = field(init=False, default=0)
@@ -302,6 +308,11 @@ class Propagator:
         )
         self._front_fli = np.zeros(
             (self.realizations, self._front_capacity), dtype=np.float32
+        )
+        self._front_src = np.full(
+            (self.realizations, self._front_capacity),
+            SRC_EXTERNAL,
+            dtype=np.uint8,
         )
         self._front_sizes = np.zeros((self.realizations,), dtype=np.int32)
         self._front_overflow = np.zeros((self.realizations,), dtype=np.int8)
@@ -701,6 +712,121 @@ class Propagator:
 
         self.scheduler.add_event(boundary_condition.time, event)
 
+    def extinguish(self, success: npt.ArrayLike) -> int:
+        """Try to put the fire out over an area, in every realization, now.
+
+        ``success`` gives, per cell, the probability (0–1) that the attempt
+        succeeds there; NaN and values <= 0 mean "not attempted", values
+        >= 1 always succeed, and a bool mask means certain success. Each
+        realization draws its own outcome per cell, so the ensemble spreads
+        the risk of failure. Where it succeeds the intervention acts on the
+        pending front, not on the fuel:
+
+        - every pending front event *into* the cell is cancelled (the cell
+          does not ignite now), and so is every contact-spread event *from*
+          it (an already burning cell stops spreading);
+        - pending ignition boundary conditions on the cell are dropped;
+        - burnt cells stay burnt and the vegetation is untouched, so a cell
+          that is still unburnt can be reached again by fire that ignites
+          *after* this call;
+        - embers already in flight (spotting events) still land.
+
+        Outcomes come from the kernels' RNG, one draw per cell with
+        0 < p < 1, realization by realization in row-major order: runs
+        seeded with :meth:`reseed` stay reproducible, and certain outcomes
+        (p = 0 or 1) draw nothing.
+
+        Parameters
+        ----------
+        success : numpy.ndarray
+            Grid with the shape of ``veg``: probability of success per cell,
+            or a bool mask.
+
+        Returns
+        -------
+        int
+            Number of front events cancelled.
+        """
+        success = np.asarray(success, dtype=np.float32)
+        if success.shape != self.veg.shape:
+            raise ValueError(
+                f"extinguish grid shape {success.shape} does not match the "
+                f"grid {self.veg.shape}"
+            )
+        rows, cols = success.shape
+        flat_p = success.ravel()
+        attempted = np.flatnonzero(flat_p > 0)  # NaN compares false
+        if attempted.size == 0:
+            return 0
+        outcomes = draw_extinguish(
+            np.ascontiguousarray(flat_p[attempted]), int(self.realizations)
+        )
+        cleared = [attempted[outcomes[r]] for r in range(self.realizations)]
+        offsets = np.asarray(NEIGHBOURS, dtype=np.int64)
+
+        def hit(
+            cells: npt.NDArray, r: npt.NDArray, c: npt.NDArray
+        ) -> npt.NDArray:
+            inside = (r >= 0) & (c >= 0) & (r < rows) & (c < cols)
+            out = np.zeros(r.shape, dtype=bool)
+            out[inside] = np.isin(r[inside] * cols + c[inside], cells)
+            return out
+
+        dropped = 0
+        for real in range(self.realizations):
+            size = int(self._front_sizes[real])
+            cells = cleared[real]
+            if size == 0 or cells.size == 0:
+                continue
+            r = self._front_rows[real, :size].astype(np.int64)
+            c = self._front_cols[real, :size].astype(np.int64)
+            src = self._front_src[real, :size]
+            keep = ~hit(cells, r, c)
+            spread = np.flatnonzero(src != SRC_EXTERNAL)
+            if spread.size:
+                k = src[spread].astype(np.int64)
+                from_hit = hit(
+                    cells, r[spread] - offsets[k, 0], c[spread] - offsets[k, 1]
+                )
+                keep[spread[from_hit]] = False
+            new_size = heap_retain(
+                self._front_times[real],
+                self._front_rows[real],
+                self._front_cols[real],
+                self._front_ros[real],
+                self._front_fli[real],
+                self._front_src[real],
+                size,
+                keep,
+            )
+            dropped += size - int(new_size)
+            self._front_sizes[real] = new_size
+        # a halt on the boundary may have been caused by a dropped event
+        self._front_out_of_bounds[:] = 0
+
+        for _, event in self.scheduler.events():
+            u = event.updates
+            if len(u.rows) == 0:
+                continue
+            ur = np.asarray(u.rows, dtype=np.int64)
+            uc = np.asarray(u.cols, dtype=np.int64)
+            gone = np.zeros(len(ur), dtype=bool)
+            for real in np.unique(u.realizations):
+                sel = np.asarray(u.realizations) == real
+                if 0 <= int(real) < self.realizations:
+                    gone[sel] = hit(cleared[int(real)], ur[sel], uc[sel])
+            if not gone.any():
+                continue
+            kept = ~gone
+            event.updates = UpdateBatch(
+                rows=u.rows[kept],
+                cols=u.cols[kept],
+                realizations=u.realizations[kept],
+                rates_of_spread=u.rates_of_spread[kept],
+                fireline_intensities=u.fireline_intensities[kept],
+            )
+        return dropped
+
     def _schedule_ignitions(
         self, time: int, updates: UpdateBatch | None
     ) -> None:
@@ -737,6 +863,7 @@ class Propagator:
         self._front_cols[realization, size] = col
         self._front_ros[realization, size] = ros
         self._front_fli[realization, size] = fli
+        self._front_src[realization, size] = SRC_EXTERNAL
 
         idx = size
         while idx > 0:
@@ -752,6 +879,7 @@ class Propagator:
                 self._front_cols,
                 self._front_ros,
                 self._front_fli,
+                self._front_src,
             ):
                 arr[realization, parent], arr[realization, idx] = (
                     arr[realization, idx],
@@ -769,6 +897,7 @@ class Propagator:
             "_front_cols",
             "_front_ros",
             "_front_fli",
+            "_front_src",
         ):
             old = getattr(self, name)
             new = np.zeros((self.realizations, new_capacity), dtype=old.dtype)
@@ -1043,6 +1172,7 @@ class Propagator:
                 self._front_cols,
                 self._front_ros,
                 self._front_fli,
+                self._front_src,
                 self._front_sizes,
                 self._front_overflow,
                 self.cellsize,
@@ -1772,6 +1902,7 @@ class Propagator:
             front_cols=self._front_cols[:, :front_size].copy(),
             front_ros=self._front_ros[:, :front_size].copy(),
             front_fli=self._front_fli[:, :front_size].copy(),
+            front_src=self._front_src[:, :front_size].copy(),
             front_sizes=self._front_sizes.copy(),
             tile_idx=self._tile_idx.copy(),
             tile_counts=self._tile_counts.copy(),
@@ -1930,6 +2061,14 @@ class Propagator:
             array = np.zeros((self.realizations, capacity), source.dtype)
             array[:, :stored_events] = source + shift if shift else source
             setattr(self, name, array)
+        # sources: checkpoints from before version 3 do not record them;
+        # their events count as external (extinguish only cancels spread
+        # *into* masked cells for those)
+        self._front_src = np.full(
+            (self.realizations, capacity), SRC_EXTERNAL, dtype=np.uint8
+        )
+        if checkpoint.front_src is not None:
+            self._front_src[:, :stored_events] = checkpoint.front_src
         self._front_sizes = checkpoint.front_sizes.astype(np.int32).copy()
         self._front_overflow = np.zeros((self.realizations,), dtype=np.int8)
 

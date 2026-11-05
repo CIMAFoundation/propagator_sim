@@ -33,6 +33,7 @@ const HIGH_BIT: u32 = 1 << LAST;
 
 /// Fuel cells (in-domain, `veg != NO_FUEL`) of every tile position.
 /// Realization-independent; padding cells past the domain edge are 0.
+#[derive(Clone)]
 pub(crate) struct FuelMasks {
     tiles_h: usize,
     tiles_w: usize,

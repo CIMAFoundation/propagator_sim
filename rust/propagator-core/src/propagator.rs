@@ -90,6 +90,7 @@ impl PropagatorConfig {
 }
 
 /// Stochastic cellular wildfire spread simulator (see spec §1).
+#[derive(Clone)]
 pub struct Propagator {
     veg: Grid2<i32>,
     dem: Grid2<f64>,
@@ -369,6 +370,100 @@ impl Propagator {
 
         self.scheduler.add_event(bc.time, event);
         Ok(())
+    }
+
+    /// Try to put the fire out over an area, in every realization, at the
+    /// current time. `success` gives, per cell, the probability (0–1) that
+    /// the attempt succeeds there; NaN and values ≤ 0 mean "not attempted",
+    /// values ≥ 1 always succeed. Each realization draws its own outcome
+    /// per cell, so the ensemble spreads the risk of failure. Where it
+    /// succeeds the intervention acts on the pending front, not on the fuel:
+    ///
+    /// - every pending front event *into* the cell is cancelled (the cell
+    ///   does not ignite now), and so is every contact-spread event *from*
+    ///   it (an already burning cell stops spreading);
+    /// - pending ignition boundary conditions on the cell are dropped;
+    /// - burnt cells stay burnt and the vegetation is untouched, so a cell
+    ///   that is still unburnt can be reached again by fire that ignites
+    ///   *after* this call;
+    /// - embers already in flight (spotting events) still land.
+    ///
+    /// Outcomes come from each realization's RNG, one draw per cell with
+    /// 0 < p < 1, in row-major order: seeded runs stay reproducible, and
+    /// certain outcomes (p = 0 or 1, e.g. a plain mask) draw nothing.
+    ///
+    /// Returns the number of front events cancelled.
+    pub fn extinguish(&mut self, success: &Grid2<f32>) -> Result<usize> {
+        if success.shape() != self.veg.shape() {
+            return Err(PropagatorError::InvalidBoundaryConditions(
+                "extinguish grid shape mismatch".into(),
+            ));
+        }
+        let (rows, cols) = success.shape();
+        // attempted cells, row-major: (flat index, probability)
+        let attempted: Vec<(usize, f32)> = success
+            .as_slice()
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| **p > 0.0) // NaN compares false
+            .map(|(i, p)| (i, *p))
+            .collect();
+        if attempted.is_empty() {
+            return Ok(0);
+        }
+        let mut cleared: Vec<std::collections::HashSet<usize>> =
+            Vec::with_capacity(self.reals.len());
+        for real in &mut self.reals {
+            let mut set = std::collections::HashSet::with_capacity(attempted.len());
+            for &(i, p) in &attempted {
+                if p >= 1.0 || real.rng.uniform() < p as f64 {
+                    set.insert(i);
+                }
+            }
+            cleared.push(set);
+        }
+        let flat = |row: i64, col: i64| -> Option<usize> {
+            (row >= 0 && col >= 0 && (row as usize) < rows && (col as usize) < cols)
+                .then(|| row as usize * cols + col as usize)
+        };
+        let mut dropped = 0;
+        for (real, set) in self.reals.iter_mut().zip(&cleared) {
+            if set.is_empty() {
+                continue;
+            }
+            let hit = |row: i64, col: i64| flat(row, col).is_some_and(|i| set.contains(&i));
+            dropped += real.heap.retain(|row, col, src| {
+                let (row, col) = (row as i64, col as i64);
+                if hit(row, col) {
+                    return false;
+                }
+                match crate::kernel::NEIGHBOURS.get(src as usize) {
+                    Some(&(dr, dc)) => !hit(row - dr, col - dc),
+                    None => true,
+                }
+            });
+            // a halt on the boundary may have been caused by a dropped event
+            real.halted_on_boundary = false;
+        }
+        for (_, event) in self.scheduler.events_mut() {
+            let u = &event.updates;
+            if u.is_empty() {
+                continue;
+            }
+            let mut kept = UpdateBatch::default();
+            for i in 0..u.len() {
+                let gone = flat(u.rows[i] as i64, u.cols[i] as i64).is_some_and(|cell| {
+                    cleared
+                        .get(u.realizations[i] as usize)
+                        .is_some_and(|set| set.contains(&cell))
+                });
+                if !gone {
+                    kept.push(u.rows[i], u.cols[i], u.realizations[i], u.ros[i], u.fli[i]);
+                }
+            }
+            event.updates = kept;
+        }
+        Ok(dropped)
     }
 
     fn ignitions_to_updates(&self, ignitions: &Ignitions) -> Result<UpdateBatch> {
