@@ -655,3 +655,198 @@ fn growth_must_be_tile_aligned_and_containing() {
         Err(PropagatorError::InvalidGrowth(_))
     ));
 }
+
+/// Grass with two fuel islands, each enclosed by a one-cell non-fuel
+/// ring inside a single tile: (37..59)^2 in tile (1, 1) and (71..89)^2
+/// in tile (2, 2).
+fn islands_grid() -> (Grid2<i32>, Grid2<f64>) {
+    let (mut veg, dem) = flat_grass();
+    for (lo, hi) in [(36usize, 59usize), (70, 89)] {
+        for i in lo..=hi {
+            for (row, col) in [(lo, i), (hi, i), (i, lo), (i, hi)] {
+                veg[(row, col)] = NO_FUEL;
+            }
+        }
+    }
+    (veg, dem)
+}
+
+#[test]
+fn ignition_inside_frozen_island_burns_identically() {
+    const REALS: usize = 10;
+    const IGNITION_HOUR: i64 = 40;
+    let freeze_dir = std::env::temp_dir().join(format!(
+        "prop-core-island-test-{}",
+        std::process::id()
+    ));
+
+    let run = |freeze: bool| {
+        let (veg, dem) = islands_grid();
+        let mut config = PropagatorConfig::new(veg, dem);
+        config.realizations = REALS;
+        config.seed = Some(97);
+        config.oob_mode = OobMode::Ignore;
+        if freeze {
+            config.freeze_dir = Some(freeze_dir.clone());
+        }
+        let mut sim = Propagator::new(config).unwrap();
+        // the fire burns around both islands but cannot cross the rings
+        sim.set_boundary_conditions(basic_conditions((110, 20))).unwrap();
+        // one batch: island 1 in every realization, island 2 in a few
+        // realizations (twice in realization 4)
+        let mut points: Vec<(usize, usize, usize)> =
+            (0..REALS).map(|r| (48, 48, r)).collect();
+        points.extend([(80, 80, 1), (80, 80, 4), (75, 84, 4), (80, 80, 7)]);
+        sim.set_boundary_conditions(BoundaryConditions {
+            time: IGNITION_HOUR * 3600 + 1800,
+            ignitions: Some(Ignitions::PointsWithRealization(points)),
+            ..Default::default()
+        })
+        .unwrap();
+
+        let mut frozen_before_ignition = 0;
+        let mut thawed_by_ignition = 0;
+        for hour in 1..=2 * IGNITION_HOUR {
+            let before = sim.frozen_tiles();
+            sim.step_window(3600).unwrap();
+            if hour == IGNITION_HOUR + 1 {
+                thawed_by_ignition = before - sim.frozen_tiles();
+            }
+            if freeze {
+                sim.freeze_inactive_tiles().unwrap();
+            }
+            if hour == IGNITION_HOUR {
+                frozen_before_ignition = sim.frozen_tiles();
+                // the islands are still unburnt
+                let output = sim.get_output().unwrap();
+                assert_eq!(output.fire_probability[(48, 48)], 0.0);
+                assert_eq!(output.fire_probability[(80, 80)], 0.0);
+            }
+        }
+        let fires = sim.get_fire().unwrap();
+        (
+            sim.get_output().unwrap(),
+            fires,
+            frozen_before_ignition,
+            thawed_by_ignition,
+        )
+    };
+
+    let (plain, plain_fires, _, _) = run(false);
+    let (frozen, frozen_fires, frozen_count, thawed) = run(true);
+    // the burnt-out area froze, the island tiles included: the ignition
+    // window thawed at least one tile per ignited island
+    assert!(frozen_count > 0);
+    assert!(thawed >= REALS + 3, "only {thawed} tiles thawed");
+
+    // island 1 burns everywhere, island 2 only where it was ignited
+    // bitwise identical to the run without freezing
+    for r in 0..REALS {
+        assert_eq!(plain_fires[r].as_slice(), frozen_fires[r].as_slice());
+    }
+    let burnt_in = |r: usize, lo: usize, hi: usize| {
+        let mut count = 0;
+        for row in lo + 1..hi {
+            for col in lo + 1..hi {
+                count += (frozen_fires[r][(row, col)] != 0) as usize;
+            }
+        }
+        count
+    };
+    assert_eq!(frozen.fire_probability[(48, 48)], 1.0);
+    // the islands spread beyond their ignition cells (spread is
+    // stochastic, so count over realizations)
+    let island1: usize = (0..REALS).map(|r| burnt_in(r, 36, 59)).sum();
+    assert!(island1 > 10 * REALS, "island 1 burnt only {island1} cells");
+    let mut island2 = 0;
+    for r in 0..REALS {
+        let ignited = [1, 4, 7].contains(&r);
+        assert_eq!(frozen_fires[r][(80, 80)] != 0, ignited, "realization {r}");
+        if ignited {
+            island2 += burnt_in(r, 70, 89);
+        } else {
+            assert_eq!(burnt_in(r, 70, 89), 0, "realization {r}");
+        }
+    }
+    assert!(island2 > 3 + 3, "island 2 burnt only {island2} cells");
+    // the second ignition of realization 4 burnt too
+    assert!(frozen_fires[4][(75, 84)] != 0);
+
+    // the aggregated outputs are bitwise identical too
+    assert_eq!(
+        plain.fire_probability.as_slice(),
+        frozen.fire_probability.as_slice()
+    );
+    assert_eq!(plain.ros_max.as_slice(), frozen.ros_max.as_slice());
+    assert_eq!(plain.fli_max.as_slice(), frozen.fli_max.as_slice());
+    assert_eq!(
+        plain.min_arrival_time.as_slice(),
+        frozen.min_arrival_time.as_slice()
+    );
+    // means are NaN where nothing burnt (the rings): compare bit patterns
+    let bits = |grid: &Grid2<f32>| -> Vec<u32> {
+        grid.as_slice().iter().map(|v| v.to_bits()).collect()
+    };
+    assert_eq!(bits(&plain.mean_arrival_time), bits(&frozen.mean_arrival_time));
+    assert_eq!(bits(&plain.ros_mean), bits(&frozen.ros_mean));
+
+    std::fs::remove_dir_all(&freeze_dir).ok();
+}
+
+#[test]
+fn freeze_diagnostic_counts_without_freezing() {
+    // spotting enabled: the strict criterion is a subset of reachability
+    let veg = Grid2::filled(ROWS, COLS, 5);
+    let dem = Grid2::filled(ROWS, COLS, 0.0);
+    let mut config = PropagatorConfig::new(veg, dem);
+    config.realizations = 8;
+    config.seed = Some(5);
+    config.oob_mode = OobMode::Ignore;
+    config.do_spotting = true;
+    let mut sim = Propagator::new(config).unwrap();
+    sim.set_boundary_conditions(basic_conditions((64, 64))).unwrap();
+    sim.step_window(4 * 3600).unwrap();
+    let before = sim.get_output().unwrap();
+    let diagnostic = sim.freeze_diagnostic();
+    assert!(diagnostic.allocated > 0);
+    assert!(diagnostic.strict_freezable <= diagnostic.reachability_freezable);
+    assert!(diagnostic.reachability_freezable <= diagnostic.allocated);
+    assert_eq!(
+        diagnostic.blocked_by_strict,
+        diagnostic.reachability_freezable - diagnostic.strict_freezable
+    );
+    assert_eq!(sim.frozen_tiles(), 0);
+    let after = sim.get_output().unwrap();
+    assert_eq!(
+        before.fire_probability.as_slice(),
+        after.fire_probability.as_slice()
+    );
+
+    // without spotting the reachability count is what a freeze freezes
+    let freeze_dir = std::env::temp_dir().join(format!(
+        "prop-core-diag-test-{}",
+        std::process::id()
+    ));
+    let (veg, dem) = flat_grass();
+    let mut config = PropagatorConfig::new(veg, dem);
+    config.realizations = 8;
+    config.seed = Some(6);
+    config.oob_mode = OobMode::Ignore;
+    config.freeze_dir = Some(freeze_dir.clone());
+    let mut sim = Propagator::new(config).unwrap();
+    sim.set_boundary_conditions(basic_conditions((64, 64))).unwrap();
+    let mut diagnostic = sim.freeze_diagnostic();
+    for _ in 0..48 {
+        sim.step_window(3600).unwrap();
+        diagnostic = sim.freeze_diagnostic();
+        if diagnostic.reachability_freezable > 0 {
+            break;
+        }
+    }
+    assert!(diagnostic.reachability_freezable > 0);
+    assert_eq!(
+        sim.freeze_inactive_tiles().unwrap(),
+        diagnostic.reachability_freezable
+    );
+    std::fs::remove_dir_all(&freeze_dir).ok();
+}

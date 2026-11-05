@@ -256,3 +256,119 @@ def test_freeze_requires_freeze_dir(tmp_path):
     propagator = make_propagator(tmp_path, freeze=False)
     with pytest.raises(RuntimeError, match="freeze_dir"):
         propagator.freeze_inactive_tiles()
+
+
+def _rust_island_run(tmp_path, freeze: bool):
+    """Rust core: grass with a non-fuel ring enclosing a fuel island, a
+    fire burning around it, then a batch of ignitions inside the island
+    (all realizations, plus a second cell in realization 1)."""
+    pytest.importorskip("propagator_rust")
+    from propagator.core.constants import (  # type: ignore
+        FUEL_SYSTEM_LEGACY_DICT,
+    )
+    from propagator.rust_core import Propagator as RustPropagator
+
+    size, realizations = 128, 6
+    veg = np.full((size, size), 5, dtype=np.int32)
+    lo, hi = 36, 59
+    veg[lo, lo : hi + 1] = 0
+    veg[hi, lo : hi + 1] = 0
+    veg[lo : hi + 1, lo] = 0
+    veg[lo : hi + 1, hi] = 0
+    simulator = RustPropagator(
+        veg=veg,
+        dem=np.zeros((size, size), dtype=np.float32),
+        realizations=realizations,
+        fuels_dict=FUEL_SYSTEM_LEGACY_DICT,
+        do_spotting=False,
+        seed=3,
+        freeze_dir=tmp_path / "rust_store" if freeze else None,
+        out_of_bounds_mode="ignore",
+    )
+    simulator.set_boundary_conditions(
+        BoundaryConditions(
+            time=0,
+            moisture=5.0,
+            wind_dir=0.0,
+            wind_speed=10.0,
+            ignitions=[(110, 20)],
+        )
+    )
+    ignition_time = 40 * 3600 + 1800
+    simulator.set_boundary_conditions(
+        BoundaryConditions(
+            time=ignition_time,
+            ignitions=[(48, 48, r) for r in range(realizations)]
+            + [(40, 55, 1)],
+        )
+    )
+    frozen = 0
+    for hour in range(1, 81):
+        simulator.step(seconds=3600)
+        if freeze:
+            frozen += simulator.freeze_inactive_tiles()
+        if hour == 40:
+            # the island has not burnt yet
+            assert simulator.get_output().fire_probability[48, 48] == 0
+    return simulator.get_output(), frozen
+
+
+def test_rust_ignition_inside_frozen_island_matches_plain_run(tmp_path):
+    plain, _ = _rust_island_run(tmp_path, freeze=False)
+    frozen, frozen_count = _rust_island_run(tmp_path, freeze=True)
+    assert frozen_count > 0
+    assert frozen.fire_probability[48, 48] == 1.0
+    assert frozen.fire_probability[40, 55] > 0
+    for name in (
+        "fire_probability",
+        "min_arrival_time",
+        "mean_arrival_time",
+        "ros_max",
+        "ros_mean",
+        "fli_max",
+    ):
+        np.testing.assert_array_equal(
+            getattr(frozen, name), getattr(plain, name), err_msg=name
+        )
+
+
+def test_rust_freeze_diagnostic_reports_counts():
+    pytest.importorskip("propagator_rust")
+    from propagator.core.constants import (  # type: ignore
+        FUEL_SYSTEM_LEGACY_DICT,
+    )
+    from propagator.rust_core import Propagator as RustPropagator
+
+    size = 128
+    simulator = RustPropagator(
+        veg=np.full((size, size), 5, dtype=np.int32),
+        dem=np.zeros((size, size), dtype=np.float32),
+        realizations=4,
+        fuels_dict=FUEL_SYSTEM_LEGACY_DICT,
+        do_spotting=True,
+        seed=1,
+        out_of_bounds_mode="ignore",
+    )
+    simulator.set_boundary_conditions(
+        BoundaryConditions(
+            time=0,
+            moisture=5.0,
+            wind_dir=0.0,
+            wind_speed=10.0,
+            ignitions=[(64, 64)],
+        )
+    )
+    simulator.step(seconds=4 * 3600)
+    counts = simulator.freeze_diagnostic()
+    assert set(counts) == {
+        "allocated",
+        "strict_freezable",
+        "reachability_freezable",
+        "blocked_by_strict",
+    }
+    assert counts["allocated"] > 0
+    assert counts["strict_freezable"] <= counts["reachability_freezable"]
+    assert (
+        counts["blocked_by_strict"]
+        == counts["reachability_freezable"] - counts["strict_freezable"]
+    )
