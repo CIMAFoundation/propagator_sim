@@ -23,8 +23,8 @@ use crate::scheduler::{
 };
 use crate::tile_store::{record_to_tile, TileKey, TileStore};
 use crate::tiles::{
-    flood_reachable, local_index, Tile, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV,
-    FROZEN_TILE, TILE_SHIFT, TILE_SIZE,
+    flood_reachable, local_index, FrozenSummary, RowMask, Tile, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV,
+    TILE_SHIFT, TILE_SIZE,
 };
 
 /// Behaviour when fire reaches the boundary ring.
@@ -966,7 +966,7 @@ impl Propagator {
                     .collect()
             };
 
-            let mut slots_to_remove: Vec<i32> = Vec::new();
+            let mut to_freeze: Vec<(usize, usize, i32, FrozenSummary)> = Vec::new();
             for (&(tile_row, tile_col, slot), &can_freeze) in
                 allocated.iter().zip(freezable.iter())
             {
@@ -974,18 +974,19 @@ impl Propagator {
                     continue;
                 }
                 let key = self.tile_world_key(r, tile_row, tile_col);
-                {
+                let summary = {
                     let tile = self.reals[r].tiles.tile(slot);
                     store.freeze(key, tile)?;
-                }
+                    FrozenSummary::from_open(&open_mask(
+                        tile, tile_row, tile_col, &ignitable, grid_w,
+                    ))
+                };
                 let tile = self.reals[r].tiles.tile(slot).clone();
                 self.fold_cache_add(&key, &tile);
-                slots_to_remove.push(slot);
+                to_freeze.push((tile_row, tile_col, slot, summary));
             }
-            frozen_total += slots_to_remove.len();
-            self.reals[r]
-                .tiles
-                .remove_slots(&slots_to_remove, FROZEN_TILE);
+            frozen_total += to_freeze.len();
+            self.reals[r].tiles.freeze_tiles(to_freeze);
         }
         if frozen_total > 0 {
             self.release_dead_edge_tiles();
@@ -1079,16 +1080,18 @@ impl Propagator {
     /// propagate through them. The ignition tiles themselves are always
     /// thawed.
     fn thaw_for_ignition(&mut self, realization: usize, cells: &[(usize, usize)]) -> Result<()> {
-        let Some(store) = self.store.clone() else {
+        if self.store.is_none() || self.reals[realization].tiles.frozen_count() == 0 {
             return Ok(());
-        };
-        let frozen_keys = store.keys_for_realization(realization as u32);
-        if frozen_keys.is_empty() {
+        }
+        let frozen: Vec<(usize, usize)> =
+            self.reals[realization].tiles.frozen_positions().collect();
+        if frozen.is_empty() {
             return Ok(());
         }
 
         let (ignitable, grid_h, grid_w) = self.ignitable_grid();
-        // burnt-state union of live and frozen tiles
+        // burnt-state union of live and frozen tiles; frozen tiles come
+        // from their in-RAM summaries, never from disk
         let mut open = ignitable;
         {
             let tiles = &self.reals[realization].tiles;
@@ -1096,11 +1099,12 @@ impl Propagator {
                 let tile = tiles.tile(slot);
                 close_burnt_cells(&mut open, tile, tile_row, tile_col, grid_w);
             }
-        }
-        for key in &frozen_keys {
-            let tile = store.read(key)?;
-            let (tile_row, tile_col) = self.tile_local_pos(key);
-            close_burnt_cells(&mut open, &tile, tile_row, tile_col, grid_w);
+            for &(tile_row, tile_col) in &frozen {
+                // a missing summary keeps every fuel cell open (safe)
+                if let Some(summary) = tiles.frozen_summary(tile_row, tile_col) {
+                    close_unsummarized_cells(&mut open, &summary.open(), tile_row, tile_col, grid_w);
+                }
+            }
         }
 
         let mut reachable = vec![false; grid_h * grid_w];
@@ -1110,8 +1114,9 @@ impl Propagator {
             .iter()
             .map(|&(row, col)| (row >> TILE_SHIFT, col >> TILE_SHIFT))
             .collect();
-        for key in &frozen_keys {
-            let (tile_row, tile_col) = self.tile_local_pos(key);
+        for (tile_row, tile_col) in frozen {
+            // solid tiles have no open cell, so only their own ignitions
+            // thaw them; only thawed tiles are read back from disk
             if target_tiles.contains(&(tile_row, tile_col))
                 || tile_any(&reachable, tile_row, tile_col, grid_w)
             {
@@ -1584,6 +1589,47 @@ fn tile_any(mask: &[bool], tile_row: usize, tile_col: usize, grid_w: usize) -> b
         }
     }
     false
+}
+
+/// Open cells (in-domain fuel, unburnt) of a live tile.
+fn open_mask(
+    tile: &Tile,
+    tile_row: usize,
+    tile_col: usize,
+    ignitable: &[bool],
+    grid_w: usize,
+) -> RowMask {
+    let row0 = tile_row << TILE_SHIFT;
+    let col0 = tile_col << TILE_SHIFT;
+    let mut mask: RowMask = [0; TILE_SIZE];
+    for (local_row, bits) in mask.iter_mut().enumerate() {
+        for local_col in 0..TILE_SIZE {
+            let burnt = tile.flags[local_row * TILE_SIZE + local_col] & FLAG_FIRE != 0;
+            if !burnt && ignitable[(row0 + local_row) * grid_w + (col0 + local_col)] {
+                *bits |= 1 << local_col;
+            }
+        }
+    }
+    mask
+}
+
+/// Clear `open` inside the tile wherever `mask` has no open cell.
+fn close_unsummarized_cells(
+    open: &mut [bool],
+    mask: &RowMask,
+    tile_row: usize,
+    tile_col: usize,
+    grid_w: usize,
+) {
+    let row0 = tile_row << TILE_SHIFT;
+    let col0 = tile_col << TILE_SHIFT;
+    for (local_row, bits) in mask.iter().enumerate() {
+        for local_col in 0..TILE_SIZE {
+            if bits >> local_col & 1 == 0 {
+                open[(row0 + local_row) * grid_w + (col0 + local_col)] = false;
+            }
+        }
+    }
 }
 
 /// Clear `open` where the tile's cells are burnt.
