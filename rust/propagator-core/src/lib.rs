@@ -59,7 +59,8 @@ pub use fuels::{
 pub use grid::Grid2;
 pub use models::{MoistureModel, RosModel};
 pub use propagator::{
-    FreezeDiagnostic, OobMode, Propagator, PropagatorConfig, CELLSIZE_DEFAULT,
+    FreezeDiagnostic, FreezeStats, FuzzyFreeze, OobMode, Propagator, PropagatorConfig,
+    CELLSIZE_DEFAULT,
     REALIZATIONS_DEFAULT,
 };
 pub use scheduler::{

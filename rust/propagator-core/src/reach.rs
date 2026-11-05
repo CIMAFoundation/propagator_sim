@@ -23,7 +23,7 @@
 use crate::fuels::NO_FUEL;
 use crate::grid::Grid2;
 use crate::tiles::{
-    FrozenSummary, RowMask, Tile, TileGrid, FLAG_FIRE, FROZEN_TILE, TILE_MASK, TILE_SHIFT,
+    FrozenSummary, RowMask, Tile, TileGrid, COLD_TILE, FLAG_FIRE, FROZEN_TILE, TILE_MASK, TILE_SHIFT,
     TILE_SIZE,
 };
 
@@ -226,7 +226,7 @@ impl<'a> Reach<'a> {
                 let fuel_mask = fuel.get(tile_row, tile_col);
                 let mask = if slot >= 0 {
                     live_open(tiles.tile(slot), fuel_mask)
-                } else if slot == FROZEN_TILE {
+                } else if slot == FROZEN_TILE || slot == COLD_TILE {
                     match tiles.frozen_summary(tile_row, tile_col) {
                         Some(FrozenSummary::Solid) => EMPTY,
                         Some(FrozenSummary::Open(mask)) => **mask,
@@ -521,7 +521,7 @@ mod tests {
                 let slot = scenario.tiles.slot_of(tile_row, tile_col);
                 let mask = if slot >= 0 {
                     live_open(scenario.tiles.tile(slot), fuel.get(tile_row, tile_col))
-                } else if slot == FROZEN_TILE {
+                } else if slot == FROZEN_TILE || slot == COLD_TILE {
                     scenario.tiles.frozen_summary(tile_row, tile_col).unwrap().open()
                 } else {
                     *fuel.get(tile_row, tile_col)
