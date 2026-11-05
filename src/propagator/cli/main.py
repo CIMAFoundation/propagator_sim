@@ -62,6 +62,16 @@ class PropagatorCLILegacy(BaseSettings):
         None,
         description="Path to FUEL file (GeoTIFF), required in 'geotiff' mode",
     )
+    fsg: Optional[Path] = Field(
+        None,
+        description="Path to fuel strata gap file (GeoTIFF, m) for the "
+        "crown fire module ('geotiff' mode)",
+    )
+    cbd: Optional[Path] = Field(
+        None,
+        description="Path to canopy bulk density file (GeoTIFF, kg/m3) for "
+        "the crown fire module ('geotiff' mode)",
+    )
     tilespath: Optional[Path] = Field(
         None,
         description="Base Path to TILES file (GeoTIFF), required in 'tiles' mode",
@@ -203,6 +213,9 @@ class PropagatorCLILegacy(BaseSettings):
             self.fuel = Path(self.fuel)
             if not self.dem.is_file():
                 raise ValueError(f"DEM file {self.dem} not found.")
+            for canopy in (self.fsg, self.cbd):
+                if canopy is not None and not Path(canopy).is_file():
+                    raise ValueError(f"Canopy file {canopy} not found.")
             if not self.fuel.is_file():
                 raise ValueError(f"FUEL file {self.fuel} not found.")
 
@@ -327,6 +340,8 @@ def main() -> None:
         loader = PropagatorDataFromGeotiffs(
             dem_file=str(cli.dem),
             veg_file=str(cli.fuel),
+            fsg_file=str(cli.fsg) if cli.fsg is not None else None,
+            cbd_file=str(cli.cbd) if cli.cbd is not None else None,
         )
     elif cli.mode == "cog":
         dem_urls, fuel_urls = cli.cog_url_lists()
@@ -347,6 +362,17 @@ def main() -> None:
     geo_info = loader.get_geo_info()
     dst_crs = CRS.from_epsg(4326)
 
+    # crown fire module: canopy rasters (geotiff mode only)
+    fsg = cbd = None
+    if isinstance(loader, PropagatorDataFromGeotiffs):
+        fsg = loader.get_fsg()
+        cbd = loader.get_cbd()
+    if cfg.do_crowning and (fsg is None or cbd is None):
+        raise ValueError(
+            "do_crowning requires the canopy rasters --fsg and --cbd "
+            "('geotiff' mode)."
+        )
+
     raster_variables_mapping = {
         "fire_probability": lambda output: output.fire_probability,
         "mean_arrival_time": lambda output: output.mean_arrival_time,
@@ -360,6 +386,17 @@ def main() -> None:
         "ros_mean": lambda output: output.ros_mean,
         "ros_max": lambda output: output.ros_max,
     }
+    if cfg.do_crowning:
+        raster_variables_mapping.update(
+            {
+                "crowning_probability": (
+                    lambda output: output.crowning_probability
+                ),
+                "active_crowning_probability": (
+                    lambda output: output.active_crowning_probability
+                ),
+            }
+        )
     if cfg.do_spotting:
         raster_variables_mapping.update(
             {
@@ -428,6 +465,11 @@ def main() -> None:
             ros_model=cfg.ros_model,
             moisture_model=cfg.prob_moist_model,
             cellsize=cfg.cellsize,
+            do_crowning=cfg.do_crowning,
+            fsg=fsg,
+            cbd=cbd,
+            crowning_initiation_model=cfg.crowning_initiation_model,
+            active_crowning_model=cfg.active_crowning_model,
         )
         if cli.verbose:
             info_msg("Using Rust core (propagator_rust)")
@@ -445,6 +487,11 @@ def main() -> None:
             out_of_bounds_mode=oob_mode,
             p_time_fn=cfg.p_time_fn if cfg.p_time_fn is not None else None,
             p_moist_fn=cfg.p_moist_fn if cfg.p_moist_fn is not None else None,
+            do_crowning=cfg.do_crowning,
+            fsg=fsg,
+            cbd=cbd,
+            p_crowning_init_fn=cfg.p_crowning_init_fn,
+            active_crowning_fn=cfg.active_crowning_fn,
         )
 
     non_vegetated = fuel_system.get_non_vegetated()

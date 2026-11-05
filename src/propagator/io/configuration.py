@@ -16,6 +16,8 @@ from shapely import Geometry
 
 from propagator.core.constants import (
     CELLSIZE,
+    CROWNING_ACTIVE_DEFAULT,
+    CROWNING_INITIATION_DEFAULT,
     MOISTURE_MODEL_DEFAULT,
     REALIZATIONS,
     ROS_DEFAULT,
@@ -24,8 +26,12 @@ from propagator.core.models import BoundaryConditions
 
 # ---- project utils ----------------------------------------------------------
 from propagator.core.numba import (
+    ActiveCrowningModel,
+    CrowningInitiationModel,
     MoistureModel,
     RateOfSpreadModel,
+    get_active_crowning_fn,
+    get_p_crowning_initiation_fn,
     get_p_moisture_fn,
     get_p_time_fn,
 )
@@ -80,10 +86,24 @@ class PropagatorConfigurationLegacy(BaseModel):
     realizations: int = Field(
         REALIZATIONS, ge=1, description="Number of realizations"
     )
+    do_crowning: bool = Field(
+        False,
+        description="Crown fire module option (needs canopy inputs)",
+    )
+    crowning_initiation_model: CrowningInitiationModel = Field(
+        CROWNING_INITIATION_DEFAULT,
+        description="Crown fire initiation model name",
+    )
+    active_crowning_model: ActiveCrowningModel = Field(
+        CROWNING_ACTIVE_DEFAULT,
+        description="Active crown fire criterion name",
+    )
 
     # --- models ---
     p_time_fn: Optional[object] = Field(default=None, exclude=True)
     p_moist_fn: Optional[object] = Field(default=None, exclude=True)
+    p_crowning_init_fn: Optional[object] = Field(default=None, exclude=True)
+    active_crowning_fn: Optional[object] = Field(default=None, exclude=True)
 
     # --- boundary conditions ---
     boundary_conditions: List[TimedInput] = Field(
@@ -147,6 +167,12 @@ class PropagatorConfigurationLegacy(BaseModel):
         # set the functions
         self.p_time_fn = get_p_time_fn(self.ros_model)
         self.p_moist_fn = get_p_moisture_fn(self.prob_moist_model)
+        self.p_crowning_init_fn = get_p_crowning_initiation_fn(
+            self.crowning_initiation_model
+        )
+        self.active_crowning_fn = get_active_crowning_fn(
+            self.active_crowning_model
+        )
         if self.p_time_fn is None:
             raise ValueError(f"Unknown ROS model: {self.ros_model}")
         if self.p_moist_fn is None:

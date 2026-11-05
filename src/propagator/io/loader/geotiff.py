@@ -37,6 +37,17 @@ def check_input_files_consistency(dem_file, veg_file):
         )
 
 
+def load_canopy_file(filename, reference_file) -> np.ndarray:
+    """Read a canopy raster (crown fire module) aligned with the DEM.
+
+    Nodata cells become NaN, which the core reads as "no canopy".
+    """
+    with rio.open(filename) as canopy_file:
+        check_input_files_consistency(reference_file, canopy_file)
+        values = canopy_file.read(1, masked=True).astype("float32")
+    return values.filled(np.nan)
+
+
 def load_data_from_files(veg_filename, dem_filename):
     with (
         rio.open(veg_filename) as veg_file,
@@ -59,11 +70,33 @@ def load_data_from_files(veg_filename, dem_filename):
 class PropagatorDataFromGeotiffs(PropagatorInputDataProtocol):
     dem_file: str
     veg_file: str
+    # optional canopy rasters for the crown fire module
+    fsg_file: str | None = None  # fuel strata gap [m]
+    cbd_file: str | None = None  # canopy bulk density [kg/m3]
 
     def __attrs_post_init__(self):
         self._cache: tuple[np.ndarray, np.ndarray, GeographicInfo] = (
             load_data_from_files(self.veg_file, self.dem_file)
         )
+        self._canopy: dict[str, np.ndarray] = {}
+        if self.fsg_file is not None or self.cbd_file is not None:
+            with rio.open(self.dem_file) as dem_file:
+                for name, filename in (
+                    ("fsg", self.fsg_file),
+                    ("cbd", self.cbd_file),
+                ):
+                    if filename is not None:
+                        self._canopy[name] = load_canopy_file(
+                            filename, dem_file
+                        )
+
+    def get_fsg(self) -> np.ndarray | None:
+        """Fuel strata gap (m), or None if no raster was given."""
+        return self._canopy.get("fsg")
+
+    def get_cbd(self) -> np.ndarray | None:
+        """Canopy bulk density (kg/m3), or None if no raster was given."""
+        return self._canopy.get("cbd")
 
     def get_dem(self) -> np.ndarray:
         dem, _, _ = self._cache
