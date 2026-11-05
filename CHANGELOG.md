@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Crown fire module (ported from the `feat/crownfire` branch by
+  Perello-nico), on both the numba and the Rust core. It is off by
+  default: `do_crowning=False` leaves outputs unchanged, bit for bit. With
+  `do_crowning=True` and the canopy inputs `fsg` (fuel strata gap, m) and
+  `cbd` (canopy bulk density, kg/m³), each cell that a spreading surface
+  front ignites, whose fuel has `crowning: true` (legacy table: conifers),
+  may crown. Initiation is stochastic, using the Cruz et al. (2004,
+  default) or Perrakis et al. (2023) logistic probability. The crown fire
+  is active when the Alexander & Cruz active crown rate of spread reaches
+  Van Wagner's 3/CBD, passive otherwise. New outputs:
+  `crowning_probability` and `active_crowning_probability`, also written
+  as CLI rasters, plus `get_fire_status()` for per-realization status
+  (0–3). Configuration fields: `do_crowning`, `crowning_initiation_model`
+  and `active_crowning_model`. CLI options `--fsg` and `--cbd` (geotiff
+  mode). Crown status is stored in the tile flags, so it carries over
+  through freezing, checkpoints and domain growth. Numba checkpoint
+  format bumped to version 3 and Rust to version 2 (they also store the
+  canopy). Examples are in `example/crowning/`, with the Spotorno 1 m
+  rasters. See `docs/crown_fire.md`.
+
 - Flame height outputs `flame_height_mean` and `flame_height_max` (m), on
   both the Rust and the numba core and as CLI rasters. Each realization's
   fireline intensity is turned into a flame height with Byram's relation

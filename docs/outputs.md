@@ -26,6 +26,8 @@ aggregated across the stochastic realizations of the run.
 | `radiant_reach_max` | m | Maximum radiant reach across realizations (0 where never burnt). |
 | `spotting_generation_probability` | [0, 1] | Fraction of realizations in which the cell launched at least one ember (all zeros when spotting is disabled). See [Fire Spotting](spotting.md). |
 | `spotting_receiving_probability` | [0, 1] | Fraction of realizations in which the cell was hit by an ember (all zeros when spotting is disabled). |
+| `crowning_probability` | [0, 1] | Fraction of realizations in which the cell burned as a crown fire, passive or active (all zeros when crowning is disabled). See [Crown Fire](crown_fire.md). |
+| `active_crowning_probability` | [0, 1] | Fraction of realizations in which the cell burned as an active crown fire. |
 | `stats` | — | Aggregate statistics: number of active cells and burned-area mean and 50/75/90th percentiles. |
 
 ## Arrival Times

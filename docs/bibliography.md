@@ -30,6 +30,20 @@ and applications to prescribed fire planning.
   8(2):73–77, 1998.
   [doi:10.1071/WF9980073](https://doi.org/10.1071/WF9980073)
 
+## Crown Fire
+
+- M. G. Cruz, M. E. Alexander, and R. H. Wakimoto. “Modeling the likelihood
+  of crown fire occurrence in conifer forest stands.” *Forest Science*
+  50(5):640–658, 2004.
+- D. D. B. Perrakis et al. “Improved logistic models of crown fire
+  probability in Canadian conifer forests.” *International Journal of
+  Wildland Fire*, 2023.
+- M. E. Alexander and M. G. Cruz. “Evaluating a model for predicting active
+  crown fire rate of spread using wildfire observations.” *Canadian Journal
+  of Forest Research* 36(11):3015–3028, 2006.
+- C. E. Van Wagner. “Conditions for the start and spread of crown fire.”
+  *Canadian Journal of Forest Research* 7(1):23–34, 1977.
+
 ## Operational Deployments
 
 - A. Trucchia, M. D’Andrea, F. Baghino, N. Perello, N. Rebora, and P. Fiorucci.

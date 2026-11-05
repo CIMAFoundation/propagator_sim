@@ -26,6 +26,7 @@ nav:
   - Local Web Demo: web.md
   - Simulation Outputs: outputs.md
   - Fire Spotting: spotting.md
+  - Crown Fire: crown_fire.md
   - Checkpoints & Domain Growth: checkpoints.md
   - Rust vs numba Core: rust-vs-numba.md
   - Core Internals: core-internals.md

@@ -1,0 +1,22 @@
+{
+    "init_date": "202207011200",
+    "ignitions": [
+        "POINT: [44.23754;8.42303]"
+    ],
+    "realizations": 10,
+    "cellsize": 1,
+    "time_limit": 7200,
+    "time_resolution": 1800,
+    "do_spotting": false,
+    "do_crowning": true,
+    "crowning_initiation_model": "cruz",
+    "active_crowning_model": "alexander",
+    "boundary_conditions": [
+        {
+            "time": 0,
+            "w_dir": 180,
+            "w_speed": 13,
+            "moisture": 6
+        }
+    ]
+}
