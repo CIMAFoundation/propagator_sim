@@ -15,16 +15,16 @@ use crate::error::{PropagatorError, Result};
 use crate::fold::{fold_realization, PropagatorOutput, PropagatorStats, StateFold};
 use crate::fuels::{legacy_fuel_system, FuelSystem, NO_FUEL};
 use crate::grid::Grid2;
-use crate::kernel::{advance_all, Realization, SharedInputs};
-use crate::models::{MoistureModel, RosModel};
+use crate::kernel::{advance_all, CrowningInputs, Realization, SharedInputs};
+use crate::models::{ActiveCrowningModel, CrowningInitiationModel, MoistureModel, RosModel};
 use crate::rng::Rng;
 use crate::scheduler::{
     BoundaryConditions, Ignitions, Scheduler, SchedulerEvent, UpdateBatch,
 };
 use crate::tile_store::{record_to_tile, TileKey, TileStore};
 use crate::tiles::{
-    flood_reachable, local_index, Tile, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV,
-    FROZEN_TILE, TILE_SHIFT, TILE_SIZE,
+    flood_reachable, local_index, Tile, FLAG_CROWN, FLAG_CROWN_ACTIVE, FLAG_FIRE,
+    FLAG_SPOT_GEN, FLAG_SPOT_RECV, FROZEN_TILE, TILE_SHIFT, TILE_SIZE,
 };
 
 /// Behaviour when fire reaches the boundary ring.
@@ -64,6 +64,14 @@ pub struct PropagatorConfig {
     pub oob_mode: OobMode,
     /// `None` = available parallelism
     pub n_threads: Option<usize>,
+    /// crown fire module (off by default); requires `fsg` and `cbd`
+    pub do_crowning: bool,
+    /// fuel strata gap, m; non-finite or negative means no canopy
+    pub fsg: Option<Grid2<f32>>,
+    /// canopy bulk density, kg/m^3; non-finite or <= 0 means no canopy
+    pub cbd: Option<Grid2<f32>>,
+    pub crowning_initiation_model: CrowningInitiationModel,
+    pub active_crowning_model: ActiveCrowningModel,
 }
 
 impl PropagatorConfig {
@@ -84,6 +92,11 @@ impl PropagatorConfig {
             moisture_model: MoistureModel::default(),
             oob_mode: OobMode::default(),
             n_threads: None,
+            do_crowning: false,
+            fsg: None,
+            cbd: None,
+            crowning_initiation_model: CrowningInitiationModel::default(),
+            active_crowning_model: ActiveCrowningModel::default(),
         }
     }
 }
@@ -102,6 +115,12 @@ pub struct Propagator {
     moisture_model: MoistureModel,
     oob_mode: OobMode,
     n_threads: usize,
+    do_crowning: bool,
+    /// sanitized canopy inputs (0 where there is no canopy)
+    fsg: Option<Grid2<f32>>,
+    cbd: Option<Grid2<f32>>,
+    crowning_initiation_model: CrowningInitiationModel,
+    active_crowning_model: ActiveCrowningModel,
 
     time: i64,
     moisture: Option<Grid2<f32>>,
@@ -144,6 +163,12 @@ impl Propagator {
         }
         let fuel_idx = fuels.build_fuel_index_grid(&config.veg)?;
         let (rows, cols) = config.veg.shape();
+        let (fsg, cbd) = sanitize_canopy(
+            config.do_crowning,
+            config.fsg,
+            config.cbd,
+            (rows, cols),
+        )?;
         let reals = (0..config.realizations)
             .map(|r| {
                 let rng = match config.seed {
@@ -175,6 +200,11 @@ impl Propagator {
             moisture_model: config.moisture_model,
             oob_mode: config.oob_mode,
             n_threads,
+            do_crowning: config.do_crowning,
+            fsg,
+            cbd,
+            crowning_initiation_model: config.crowning_initiation_model,
+            active_crowning_model: config.active_crowning_model,
             time: 0,
             moisture: None,
             wind_dir: None,
@@ -532,6 +562,15 @@ impl Propagator {
             moisture_model: self.moisture_model,
             do_spotting: self.do_spotting,
             edges: &self.edges,
+            crowning: match (&self.fsg, &self.cbd) {
+                (Some(fsg), Some(cbd)) if self.do_crowning => Some(CrowningInputs {
+                    fsg,
+                    cbd,
+                    initiation_model: self.crowning_initiation_model,
+                    active_model: self.active_crowning_model,
+                }),
+                _ => None,
+            },
         };
         advance_all(
             &mut self.reals,
@@ -755,6 +794,8 @@ impl Propagator {
             radiant_reach_max: fold.radiant_max,
             radiant_reach_mean: masked_mean(&fold.radiant_sum, &fold.count),
             fli_max: fold.fli_max,
+            crowning_probability: probability(&fold.crown_count),
+            active_crowning_probability: probability(&fold.crown_active_count),
             fire_probability,
             stats,
         })
@@ -844,6 +885,17 @@ impl Propagator {
     pub fn get_fire(&self) -> Result<Vec<Grid2<u8>>> {
         self.materialize(0u8, |tile, local| {
             (tile.flags[local] & FLAG_FIRE != 0) as u8
+        })
+    }
+
+    /// Dense per-realization fire status: 0 unburnt, 1 surface fire,
+    /// 2 passive crown fire, 3 active crown fire.
+    pub fn get_fire_status(&self) -> Result<Vec<Grid2<u8>>> {
+        self.materialize(0u8, |tile, local| {
+            let flags = tile.flags[local];
+            (flags & FLAG_FIRE != 0) as u8
+                + (flags & FLAG_CROWN != 0) as u8
+                + (flags & FLAG_CROWN_ACTIVE != 0) as u8
         })
     }
 
@@ -1219,6 +1271,9 @@ impl Propagator {
             wind_dir: self.wind_dir.clone(),
             wind_speed: self.wind_speed.clone(),
             actions_moisture: self.actions_moisture.clone(),
+            do_crowning: self.do_crowning,
+            fsg: self.fsg.clone(),
+            cbd: self.cbd.clone(),
             heaps: self.reals.iter().map(|real| real.heap.clone()).collect(),
             tiles: self.reals.iter().map(|real| real.tiles.clone()).collect(),
             scheduler_events: self.scheduler.snapshot(),
@@ -1255,6 +1310,7 @@ impl Propagator {
         checkpoint: &PropagatorCheckpoint,
         options: ResumeOptions,
     ) -> Result<Propagator> {
+        let grown = options.domain.is_some();
         let (veg, dem, origin, row_shift, col_shift) = match options.domain {
             None => (
                 checkpoint.veg.clone(),
@@ -1279,8 +1335,32 @@ impl Propagator {
             }
         };
 
+        let new_shape = veg.shape();
+        let (fsg, cbd) = match options.canopy {
+            Some((fsg, cbd)) => (Some(fsg), Some(cbd)),
+            None if grown => (
+                checkpoint
+                    .fsg
+                    .as_ref()
+                    .map(|g| g.pad_const(new_shape, row_shift, col_shift, 0.0)),
+                checkpoint
+                    .cbd
+                    .as_ref()
+                    .map(|g| g.pad_const(new_shape, row_shift, col_shift, 0.0)),
+            ),
+            None => (checkpoint.fsg.clone(), checkpoint.cbd.clone()),
+        };
         let mut config = PropagatorConfig::new(veg, dem);
         config.fuels = options.fuels;
+        config.do_crowning = checkpoint.do_crowning;
+        config.fsg = fsg;
+        config.cbd = cbd;
+        if let Some(model) = options.crowning_initiation_model {
+            config.crowning_initiation_model = model;
+        }
+        if let Some(model) = options.active_crowning_model {
+            config.active_crowning_model = model;
+        }
         config.cellsize = checkpoint.cellsize;
         config.do_spotting = checkpoint.do_spotting;
         config.realizations = checkpoint.realizations;
@@ -1326,6 +1406,12 @@ impl Propagator {
         self.fuel_idx = self.fuels.build_fuel_index_grid(&self.veg)?;
         self.origin = origin;
         self.edges.reset(new_shape.0, new_shape.1);
+        // canopy outside the old domain is unknown: no crowning there
+        for field in [&mut self.fsg, &mut self.cbd] {
+            if let Some(grid) = field.take() {
+                *field = Some(grid.pad_const(new_shape, row_shift, col_shift, 0.0));
+            }
+        }
 
         let tile_row0 = row_shift >> TILE_SHIFT;
         let tile_col0 = col_shift >> TILE_SHIFT;
@@ -1374,6 +1460,11 @@ impl Propagator {
         if checkpoint.do_spotting != self.do_spotting {
             return Err(PropagatorError::CheckpointMismatch(
                 "do_spotting mismatch".into(),
+            ));
+        }
+        if checkpoint.do_crowning != self.do_crowning {
+            return Err(PropagatorError::CheckpointMismatch(
+                "do_crowning mismatch".into(),
             ));
         }
         if checkpoint.cellsize != self.cellsize {
@@ -1480,6 +1571,51 @@ impl Propagator {
 
 /// Validate a domain-growth request and return the (row, col) shift of
 /// the old grid inside the new one.
+/// Validate the crown fire module inputs and replace cells without a usable
+/// canopy (non-finite values, negative gap, non-positive density) by
+/// `cbd = fsg = 0`, which the kernel reads as "cannot crown".
+#[allow(clippy::type_complexity)]
+fn sanitize_canopy(
+    do_crowning: bool,
+    fsg: Option<Grid2<f32>>,
+    cbd: Option<Grid2<f32>>,
+    shape: (usize, usize),
+) -> Result<(Option<Grid2<f32>>, Option<Grid2<f32>>)> {
+    match (fsg, cbd) {
+        (None, None) => {
+            if do_crowning {
+                return Err(PropagatorError::InvalidBoundaryConditions(
+                    "do_crowning requires the canopy inputs fsg (fuel strata \
+                     gap) and cbd (canopy bulk density)"
+                        .into(),
+                ));
+            }
+            Ok((None, None))
+        }
+        (Some(mut fsg), Some(mut cbd)) => {
+            if fsg.shape() != shape || cbd.shape() != shape {
+                return Err(PropagatorError::InvalidBoundaryConditions(
+                    "fsg and cbd must have the same shape as veg".into(),
+                ));
+            }
+            for (gap, density) in fsg
+                .as_mut_slice()
+                .iter_mut()
+                .zip(cbd.as_mut_slice().iter_mut())
+            {
+                if !gap.is_finite() || !density.is_finite() || *gap < 0.0 || *density <= 0.0 {
+                    *gap = 0.0;
+                    *density = 0.0;
+                }
+            }
+            Ok((Some(fsg), Some(cbd)))
+        }
+        _ => Err(PropagatorError::InvalidBoundaryConditions(
+            "fsg and cbd must be provided together".into(),
+        )),
+    }
+}
+
 fn growth_shifts(
     old_origin: (i64, i64),
     old_shape: (usize, usize),

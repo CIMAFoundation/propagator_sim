@@ -55,6 +55,35 @@ MOISTURE_OF_EXTINCTION = 0.3
 
 RateOfSpreadModel = Literal["wang", "rothermel", "standard"]
 MoistureModel = Literal["trucchia", "baghino"]
+CrowningInitiationModel = Literal["cruz", "perrakis"]
+ActiveCrowningModel = Literal["alexander"]
+
+# Crown fire initiation, Cruz et al. (2004): logistic model of the
+# likelihood of crowning from 10-m wind speed (km/h), fuel strata gap (m),
+# estimated fine fuel moisture (%) and surface fuel consumption classes
+CRUZ_B0 = 4.236
+CRUZ_B_WIND = 0.357
+CRUZ_B_FSG = -0.710
+CRUZ_B_SFC_LOW = -4.613  # surface fuel consumption <= 1 kg/m2
+CRUZ_B_SFC_MID = -1.856  # 1 < surface fuel consumption <= 2 kg/m2
+CRUZ_B_MOISTURE = -0.331
+
+# Crown fire initiation, Perrakis et al. (2023), model 11
+PERRAKIS_B0 = -3.5550
+PERRAKIS_B_WIND = 1.4407
+PERRAKIS_B_FSG = -0.53211
+PERRAKIS_B_WIND_MOISTURE = -0.07019
+PERRAKIS_B_SFC = 2.4897
+
+# Active crown fire rate of spread (m/min) as in the original crowning
+# module (Alexander & Cruz): 11.02 * U^0.9 * CBD^0.9 * exp(-0.17 * EFFM)
+ALEXANDER_CROS_COEFF = 11.02
+ALEXANDER_CROS_WIND_EXPONENT = 0.9
+ALEXANDER_CROS_CBD_EXPONENT = 0.9
+ALEXANDER_CROS_MOISTURE = -0.17
+# Van Wagner's critical mass flow rate for solid crown flame (kg/m2/min):
+# the critical active crown ROS is CROWN_CRITICAL_MASS_FLOW / CBD
+CROWN_CRITICAL_MASS_FLOW = 3.0
 
 
 @jit(cache=False)
@@ -126,6 +155,51 @@ def get_p_moisture_fn(moist_model_code: MoistureModel) -> Any:
             return p_moisture_baghino
 
     raise ValueError(f"Unknown moist_model_code: {moist_model_code!r}")
+
+
+def get_p_crowning_initiation_fn(
+    crowning_model_code: CrowningInitiationModel,
+) -> Any:
+    """Select a crown fire initiation model by code.
+
+    Parameters
+    ----------
+    crowning_model_code : CrowningInitiationModel
+        The code of the crowning initiation model to select.
+
+    Returns
+    -------
+        function with signature
+        `(wind_speed, fuel_strata_gap, surface_fuel_consumption, moisture)
+        -> float` returning the probability of crowning initiation.
+    """
+    match crowning_model_code:
+        case "cruz":
+            return p_crowning_initiation_cruz
+        case "perrakis":
+            return p_crowning_initiation_perrakis
+
+    raise ValueError(f"Unknown crowning_model_code: {crowning_model_code!r}")
+
+
+def get_active_crowning_fn(crowning_model_code: ActiveCrowningModel) -> Any:
+    """Select an active crown fire criterion by code.
+
+    Parameters
+    ----------
+    crowning_model_code : ActiveCrowningModel
+        The code of the active crowning model to select.
+
+    Returns
+    -------
+        function with signature
+        `(wind_speed, canopy_bulk_density, moisture) -> bool`.
+    """
+    match crowning_model_code:
+        case "alexander":
+            return active_crowning_alexander
+
+    raise ValueError(f"Unknown crowning_model_code: {crowning_model_code!r}")
 
 
 @jit(cache=False)
@@ -599,3 +673,137 @@ def get_probability_to_neighbour(
     p_prob = clip(p_prob * moisture_effect, 0, 1.0)
     # try the propagation
     return p_prob
+
+
+@jit(cache=False, nopython=True)
+def logistic(g: float) -> float:
+    """Numerically stable logistic function 1 / (1 + exp(-g))."""
+    if g >= 0.0:
+        return 1.0 / (1.0 + np.exp(-g))
+    e = np.exp(g)
+    return e / (1.0 + e)
+
+
+@jit(cache=False, nopython=True)
+def p_crowning_initiation_cruz(
+    wind_speed: float,
+    fuel_strata_gap: float,
+    surface_fuel_consumption: float,
+    moisture: float,
+) -> float:
+    """
+    Probability of crown fire initiation, Cruz et al. (2004),
+    "Modeling the likelihood of crown fire occurrence in conifer forest
+    stands".
+
+    Parameters
+    ----------
+    wind_speed : float
+        Wind speed at 10 meters (km/h).
+    fuel_strata_gap : float
+        Fuel strata gap (m): distance between surface fuel and canopy base.
+    surface_fuel_consumption : float
+        Available surface fuel for combustion (kg/m2).
+    moisture : float
+        Fine dead fuel moisture content (fraction).
+
+    Returns
+    -------
+    float
+        The probability of crowning initiation.
+    """
+    moisture_perc = moisture * 100.0
+    # surface fuel consumption enters as categories
+    if surface_fuel_consumption <= 1.0:
+        sfc_term = CRUZ_B_SFC_LOW
+    elif surface_fuel_consumption <= 2.0:
+        sfc_term = CRUZ_B_SFC_MID
+    else:
+        sfc_term = 0.0
+    g_x = (
+        CRUZ_B0
+        + CRUZ_B_WIND * wind_speed
+        + CRUZ_B_FSG * fuel_strata_gap
+        + sfc_term
+        + CRUZ_B_MOISTURE * moisture_perc
+    )
+    return logistic(g_x)
+
+
+@jit(cache=False, nopython=True)
+def p_crowning_initiation_perrakis(
+    wind_speed: float,
+    fuel_strata_gap: float,
+    surface_fuel_consumption: float,
+    moisture: float,
+) -> float:
+    """
+    Probability of crown fire initiation, Perrakis et al. (2023),
+    "Improved logistic models of crown fire probability in Canadian
+    conifer forests" (model 11).
+
+    Parameters
+    ----------
+    wind_speed : float
+        Wind speed at 10 meters (km/h).
+    fuel_strata_gap : float
+        Fuel strata gap (m): distance between surface fuel and canopy base.
+    surface_fuel_consumption : float
+        Available surface fuel for combustion (kg/m2).
+    moisture : float
+        Fine dead fuel moisture content (fraction).
+
+    Returns
+    -------
+    float
+        The probability of crowning initiation (0 without surface fuel).
+    """
+    if surface_fuel_consumption <= 0.0:
+        return 0.0
+    moisture_perc = moisture * 100.0
+    g_x = (
+        PERRAKIS_B0
+        + PERRAKIS_B_WIND * wind_speed
+        + PERRAKIS_B_FSG * fuel_strata_gap**1.5
+        + PERRAKIS_B_WIND_MOISTURE * (wind_speed * moisture_perc)
+        + PERRAKIS_B_SFC * np.log(surface_fuel_consumption)
+    )
+    return logistic(g_x)
+
+
+@jit(cache=False, nopython=True)
+def active_crowning_alexander(
+    wind_speed: float,
+    canopy_bulk_density: float,
+    moisture: float,
+) -> bool:
+    """
+    Active crown fire criterion: the active crown fire rate of spread
+    (Alexander & Cruz, "Evaluating a model for predicting active crown fire
+    rate of spread using wildfire observations") must reach Van Wagner's
+    critical rate 3 / CBD (m/min).
+
+    Parameters
+    ----------
+    wind_speed : float
+        Wind speed at 10 meters (km/h).
+    canopy_bulk_density : float
+        Canopy bulk density (kg/m3), strictly positive.
+    moisture : float
+        Fine dead fuel moisture content (fraction).
+
+    Returns
+    -------
+    bool
+        True if the crown fire is active, False if passive.
+    """
+    moisture_perc = moisture * 100.0
+    ros_crown_active = (
+        ALEXANDER_CROS_COEFF
+        * wind_speed**ALEXANDER_CROS_WIND_EXPONENT
+        * canopy_bulk_density**ALEXANDER_CROS_CBD_EXPONENT
+        * np.exp(ALEXANDER_CROS_MOISTURE * moisture_perc)
+    )
+    # CAC: criterion for active crowning
+    cac = ros_crown_active / (CROWN_CRITICAL_MASS_FLOW / canopy_bulk_density)
+    return cac >= 1.0

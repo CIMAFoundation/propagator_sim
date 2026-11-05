@@ -4,7 +4,8 @@
 use crate::grid::Grid2;
 use crate::models::{flame_height, radiant_reach};
 use crate::tiles::{
-    Tile, TileGrid, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV, TILE_SHIFT, TILE_SIZE,
+    Tile, TileGrid, FLAG_CROWN, FLAG_CROWN_ACTIVE, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV,
+    TILE_SHIFT, TILE_SIZE,
 };
 
 /// Per-cell aggregates across realizations (see spec §3.4).
@@ -41,6 +42,10 @@ pub struct StateFold {
     pub radiant_sum: Grid2<f64>,
     /// maximum radiant reach (m) across realizations
     pub radiant_max: Grid2<f32>,
+    /// burning realizations with a crown fire (passive or active)
+    pub crown_count: Grid2<i32>,
+    /// burning realizations with an active crown fire
+    pub crown_active_count: Grid2<i32>,
 }
 
 impl StateFold {
@@ -60,6 +65,8 @@ impl StateFold {
             flame_max: Grid2::filled(rows, cols, 0.0),
             radiant_sum: Grid2::filled(rows, cols, 0.0),
             radiant_max: Grid2::filled(rows, cols, 0.0),
+            crown_count: Grid2::filled(rows, cols, 0),
+            crown_active_count: Grid2::filled(rows, cols, 0),
         }
     }
 
@@ -87,6 +94,12 @@ impl StateFold {
             return;
         }
         self.count[(row, col)] += 1;
+        if flags & FLAG_CROWN != 0 {
+            self.crown_count[(row, col)] += 1;
+            if flags & FLAG_CROWN_ACTIVE != 0 {
+                self.crown_active_count[(row, col)] += 1;
+            }
+        }
         if arrival < self.arrival_min[(row, col)] {
             self.arrival_min[(row, col)] = arrival;
         }
@@ -151,6 +164,8 @@ impl StateFold {
                 self.count[dst] += block.count[src];
                 self.spot_gen_count[dst] += block.spot_gen_count[src];
                 self.spot_recv_count[dst] += block.spot_recv_count[src];
+                self.crown_count[dst] += block.crown_count[src];
+                self.crown_active_count[dst] += block.crown_active_count[src];
                 if block.arrival_min[src] < self.arrival_min[dst] {
                     self.arrival_min[dst] = block.arrival_min[src];
                 }
@@ -224,5 +239,10 @@ pub struct PropagatorOutput {
     pub radiant_reach_mean: Grid2<f32>,
     /// max radiant reach across realizations, m — 0 where never burnt
     pub radiant_reach_max: Grid2<f32>,
+    /// probability of crown fire, passive or active (crown fire module;
+    /// all zero when crowning is disabled)
+    pub crowning_probability: Grid2<f32>,
+    /// probability of active crown fire
+    pub active_crowning_probability: Grid2<f32>,
     pub stats: PropagatorStats,
 }

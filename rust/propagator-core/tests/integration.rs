@@ -141,6 +141,7 @@ fn two_fuel_sim(non_vegetated_at: (usize, usize), ignition: (usize, usize)) -> P
             spotting: false,
             prob_ign_by_embers: 0.0,
             burn: true,
+            crowning: false,
             spread_probability: vec![(3, 1.0)],
         },
         FuelDef {
@@ -154,6 +155,7 @@ fn two_fuel_sim(non_vegetated_at: (usize, usize), ignition: (usize, usize)) -> P
             spotting: false,
             prob_ign_by_embers: 0.0,
             burn: false,
+            crowning: false,
             spread_probability: vec![(5, 1.0)],
         },
     ])
@@ -654,4 +656,65 @@ fn growth_must_be_tile_aligned_and_containing() {
         sim.expand(veg, dem, (0, 0)),
         Err(PropagatorError::InvalidGrowth(_))
     ));
+}
+
+fn conifer_sim(do_crowning: bool, canopy: Option<(f32, f32)>) -> Propagator {
+    let veg = Grid2::filled(ROWS, COLS, 5); // conifers: crowning-prone
+    let mut config = PropagatorConfig::new(veg, Grid2::filled(ROWS, COLS, 0.0));
+    config.realizations = 8;
+    config.seed = Some(5);
+    config.oob_mode = OobMode::Ignore;
+    config.do_crowning = do_crowning;
+    if let Some((fsg, cbd)) = canopy {
+        config.fsg = Some(Grid2::filled(ROWS, COLS, fsg));
+        config.cbd = Some(Grid2::filled(ROWS, COLS, cbd));
+    }
+    let mut sim = Propagator::new(config).unwrap();
+    sim.set_boundary_conditions(basic_conditions((64, 64))).unwrap();
+    sim.step_window(3600).unwrap();
+    sim
+}
+
+#[test]
+fn crowning_disabled_or_without_canopy_is_bitwise_unchanged() {
+    let base = conifer_sim(false, None).get_fire_status().unwrap();
+    for (do_crowning, canopy) in [(false, Some((1.0, 0.3))), (true, Some((1.0, 0.0)))] {
+        let status = conifer_sim(do_crowning, canopy).get_fire_status().unwrap();
+        for (a, b) in base.iter().zip(status.iter()) {
+            assert_eq!(a.as_slice(), b.as_slice());
+        }
+    }
+    assert!(base.iter().all(|g| g.as_slice().iter().all(|&s| s <= 1)));
+}
+
+#[test]
+fn crowning_marks_crown_fire_status() {
+    let mut sim = conifer_sim(true, Some((0.5, 0.3)));
+    let status = sim.get_fire_status().unwrap();
+    let crowned: usize = status
+        .iter()
+        .map(|g| g.as_slice().iter().filter(|&&s| s >= 2).count())
+        .sum();
+    assert!(crowned > 0);
+    // the ignition cell is a surface fire (ignitions never crown)
+    assert!(status.iter().all(|g| g[(64, 64)] == 1));
+    let output = sim.get_output().unwrap();
+    for (c, f) in output
+        .crowning_probability
+        .as_slice()
+        .iter()
+        .zip(output.fire_probability.as_slice())
+    {
+        assert!(c <= f);
+    }
+}
+
+#[test]
+fn crowning_requires_canopy_inputs() {
+    let mut config = PropagatorConfig::new(
+        Grid2::filled(ROWS, COLS, 5),
+        Grid2::filled(ROWS, COLS, 0.0),
+    );
+    config.do_crowning = true;
+    assert!(Propagator::new(config).is_err());
 }

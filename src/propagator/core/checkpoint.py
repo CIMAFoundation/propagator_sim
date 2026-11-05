@@ -30,8 +30,10 @@ from propagator.core.tile_store import (
 )
 
 # version 2 adds incremental frozen-tile references (sidecar .tiles file
-# on disk); version 1 files load fine with an empty frozen index
-CHECKPOINT_VERSION = 2
+# on disk); version 1 files load fine with an empty frozen index.
+# version 3 adds the crown fire module (do_crowning, fsg, cbd); older
+# files load with crowning disabled
+CHECKPOINT_VERSION = 3
 
 # Array fields serialized directly as npz entries (None allowed for the
 # optional weather/actions fields).
@@ -54,6 +56,8 @@ _ARRAY_FIELDS = (
     "tile_arrival",
     "tile_ros",
     "tile_fli",
+    "fsg",
+    "cbd",
 )
 
 
@@ -111,6 +115,11 @@ class PropagatorCheckpoint:
     # with a huge frozen interior stays cheap.
     frozen_index: TileIndex = field(default_factory=dict)
     frozen_source: TileStore | Path | None = None
+
+    # crown fire module: flag and static canopy inputs (None when unset)
+    do_crowning: bool = False
+    fsg: npt.NDArray[np.floating] | None = None
+    cbd: npt.NDArray[np.floating] | None = None
 
     @property
     def shape(self) -> tuple[int, int]:
@@ -175,6 +184,7 @@ class PropagatorCheckpoint:
             cellsize=np.float64(self.cellsize),
             realizations=np.int64(self.realizations),
             do_spotting=np.bool_(self.do_spotting),
+            do_crowning=np.bool_(self.do_crowning),
             scheduler_events=np.frombuffer(
                 pickle.dumps(self.scheduler_events), dtype=np.uint8
             ),
@@ -232,6 +242,11 @@ class PropagatorCheckpoint:
                 cellsize=float(data["cellsize"]),
                 realizations=int(data["realizations"]),
                 do_spotting=bool(data["do_spotting"]),
+                do_crowning=(
+                    bool(data["do_crowning"])
+                    if "do_crowning" in data.files
+                    else False
+                ),
                 scheduler_events=scheduler_events,
                 frozen_index=frozen_index,
                 frozen_source=frozen_source,

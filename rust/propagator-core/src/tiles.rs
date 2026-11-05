@@ -13,6 +13,10 @@ pub const TILE_CELLS: usize = TILE_SIZE * TILE_SIZE;
 pub const FLAG_FIRE: u8 = 1;
 pub const FLAG_SPOT_GEN: u8 = 2;
 pub const FLAG_SPOT_RECV: u8 = 4;
+/// crown fire (passive or active) in a burnt cell (crown fire module)
+pub const FLAG_CROWN: u8 = 8;
+/// active crown fire (set together with `FLAG_CROWN`)
+pub const FLAG_CROWN_ACTIVE: u8 = 16;
 
 // tile index sentinels
 pub const UNALLOCATED: i32 = -1;

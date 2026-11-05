@@ -9,6 +9,8 @@ from .models import (
 from .numba import (
     FUEL_SYSTEM_LEGACY,
     fuelsystem_from_dict,
+    get_active_crowning_fn,
+    get_p_crowning_initiation_fn,
     get_p_moisture_fn,
     get_p_time_fn,
 )
@@ -31,6 +33,8 @@ __all__ = [
     "TILE_SIZE",
     "FUEL_SYSTEM_LEGACY",
     "fuelsystem_from_dict",
+    "get_active_crowning_fn",
+    "get_p_crowning_initiation_fn",
     "get_p_moisture_fn",
     "get_p_time_fn",
     "__version__",

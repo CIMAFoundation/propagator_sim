@@ -267,6 +267,127 @@ pub fn probability_to_neighbour(
     clip(p * moisture_effect, 0.0, 1.0)
 }
 
+// Crown fire initiation, Cruz et al. (2004): logistic model of the
+// likelihood of crowning (10-m wind km/h, fuel strata gap m, fine fuel
+// moisture %, surface fuel consumption classes).
+const CRUZ_B0: f64 = 4.236;
+const CRUZ_B_WIND: f64 = 0.357;
+const CRUZ_B_FSG: f64 = -0.710;
+/// surface fuel consumption <= 1 kg/m^2
+const CRUZ_B_SFC_LOW: f64 = -4.613;
+/// 1 < surface fuel consumption <= 2 kg/m^2
+const CRUZ_B_SFC_MID: f64 = -1.856;
+const CRUZ_B_MOISTURE: f64 = -0.331;
+
+// Crown fire initiation, Perrakis et al. (2023), model 11.
+const PERRAKIS_B0: f64 = -3.5550;
+const PERRAKIS_B_WIND: f64 = 1.4407;
+const PERRAKIS_B_FSG: f64 = -0.53211;
+const PERRAKIS_B_WIND_MOISTURE: f64 = -0.07019;
+const PERRAKIS_B_SFC: f64 = 2.4897;
+
+// Active crown fire rate of spread (m/min) as in the numba crowning
+// module: 11.02 * U^0.9 * CBD^0.9 * exp(-0.17 * EFFM).
+const ALEXANDER_CROS_COEFF: f64 = 11.02;
+const ALEXANDER_CROS_WIND_EXPONENT: f64 = 0.9;
+const ALEXANDER_CROS_CBD_EXPONENT: f64 = 0.9;
+const ALEXANDER_CROS_MOISTURE: f64 = -0.17;
+/// Van Wagner's critical mass flow rate (kg/m^2/min): the critical active
+/// crown ROS is `CROWN_CRITICAL_MASS_FLOW / CBD`.
+const CROWN_CRITICAL_MASS_FLOW: f64 = 3.0;
+
+/// Crown fire initiation model (crown fire module).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum CrowningInitiationModel {
+    /// Cruz et al. (2004) logistic model (default).
+    #[default]
+    Cruz,
+    /// Perrakis et al. (2023) logistic model 11.
+    Perrakis,
+}
+
+/// Active crown fire criterion (crown fire module).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum ActiveCrowningModel {
+    /// Alexander & Cruz active crown ROS against Van Wagner's 3 / CBD.
+    #[default]
+    Alexander,
+}
+
+/// Numerically stable logistic function `1 / (1 + exp(-g))`.
+#[inline]
+fn logistic(g: f64) -> f64 {
+    if g >= 0.0 {
+        1.0 / (1.0 + (-g).exp())
+    } else {
+        let e = g.exp();
+        e / (1.0 + e)
+    }
+}
+
+/// Probability of crown fire initiation.
+///
+/// `wind_speed` km/h at 10 m, `fuel_strata_gap` m, `surface_fuel` (surface
+/// fuel consumption) kg/m^2, `moisture` fine dead fuel moisture fraction.
+pub fn p_crowning_initiation(
+    model: CrowningInitiationModel,
+    wind_speed: f64,
+    fuel_strata_gap: f64,
+    surface_fuel: f64,
+    moisture: f64,
+) -> f64 {
+    let moisture_perc = moisture * 100.0;
+    match model {
+        CrowningInitiationModel::Cruz => {
+            let sfc_term = if surface_fuel <= 1.0 {
+                CRUZ_B_SFC_LOW
+            } else if surface_fuel <= 2.0 {
+                CRUZ_B_SFC_MID
+            } else {
+                0.0
+            };
+            logistic(
+                CRUZ_B0
+                    + CRUZ_B_WIND * wind_speed
+                    + CRUZ_B_FSG * fuel_strata_gap
+                    + sfc_term
+                    + CRUZ_B_MOISTURE * moisture_perc,
+            )
+        }
+        CrowningInitiationModel::Perrakis => {
+            if surface_fuel <= 0.0 {
+                return 0.0;
+            }
+            logistic(
+                PERRAKIS_B0
+                    + PERRAKIS_B_WIND * wind_speed
+                    + PERRAKIS_B_FSG * fuel_strata_gap.powf(1.5)
+                    + PERRAKIS_B_WIND_MOISTURE * (wind_speed * moisture_perc)
+                    + PERRAKIS_B_SFC * surface_fuel.ln(),
+            )
+        }
+    }
+}
+
+/// Whether a crown fire is active (otherwise passive). `canopy_bulk_density`
+/// kg/m^3 must be positive.
+pub fn active_crowning(
+    model: ActiveCrowningModel,
+    wind_speed: f64,
+    canopy_bulk_density: f64,
+    moisture: f64,
+) -> bool {
+    match model {
+        ActiveCrowningModel::Alexander => {
+            let ros_active = ALEXANDER_CROS_COEFF
+                * wind_speed.powf(ALEXANDER_CROS_WIND_EXPONENT)
+                * canopy_bulk_density.powf(ALEXANDER_CROS_CBD_EXPONENT)
+                * (ALEXANDER_CROS_MOISTURE * moisture * 100.0).exp();
+            ros_active / (CROWN_CRITICAL_MASS_FLOW / canopy_bulk_density) >= 1.0
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -363,5 +484,33 @@ mod tests {
         let fli = 5000.0;
         assert!((radiant_reach(fli) - 4.0 * flame_height(fli)).abs() < 1e-12);
         assert_eq!(radiant_reach(1e9), RADIANT_REACH_MAX_M);
+    }
+
+    #[test]
+    fn crowning_initiation_matches_logistic_models() {
+        // Cruz: g = 4.236 + 0.357*20 - 0.710*2 - 4.613 - 0.331*6
+        let g: f64 = 4.236 + 0.357 * 20.0 - 0.710 * 2.0 - 4.613 - 0.331 * 6.0;
+        let expected = 1.0 / (1.0 + (-g).exp());
+        let p = p_crowning_initiation(CrowningInitiationModel::Cruz, 20.0, 2.0, 1.0, 0.06);
+        assert!((p - expected).abs() < 1e-12);
+        // more wind, higher probability; larger gap, lower probability
+        for model in [CrowningInitiationModel::Cruz, CrowningInitiationModel::Perrakis] {
+            let base = p_crowning_initiation(model, 5.0, 4.0, 1.5, 0.1);
+            assert!(p_crowning_initiation(model, 10.0, 4.0, 1.5, 0.1) >= base);
+            assert!(p_crowning_initiation(model, 5.0, 8.0, 1.5, 0.1) <= base);
+            assert!((0.0..=1.0).contains(&base));
+        }
+        // no surface fuel: Perrakis is 0 (log of zero consumption)
+        assert_eq!(
+            p_crowning_initiation(CrowningInitiationModel::Perrakis, 20.0, 2.0, 0.0, 0.06),
+            0.0
+        );
+    }
+
+    #[test]
+    fn active_crowning_needs_dense_canopy() {
+        let model = ActiveCrowningModel::Alexander;
+        assert!(active_crowning(model, 30.0, 0.3, 0.06));
+        assert!(!active_crowning(model, 5.0, 0.05, 0.2));
     }
 }

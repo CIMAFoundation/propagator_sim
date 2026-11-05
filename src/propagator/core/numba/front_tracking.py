@@ -12,6 +12,7 @@ from .propagation import (
     MAX_SPOTTING_EMBERS,
     N_NEIGHBOURS,
     compute_spotting,
+    crown_fire_flags,
     try_spread_to_neighbour,
 )
 from .tiles import (
@@ -155,6 +156,11 @@ def advance_front_until(
     out_of_bounds: npt.NDArray[np.int8],
     track_spotting: bool,
     halt_on_boundary: bool,
+    do_crowning: bool,
+    fuel_strata_gap: npt.NDArray[np.float32],
+    canopy_bulk_density: npt.NDArray[np.float32],
+    p_crowning_init_fn,
+    active_crowning_fn,
 ) -> None:
     n_realizations = sizes.shape[0]
     n_rows = veg.shape[0]
@@ -256,6 +262,21 @@ def advance_front_until(
 
             w_dir_r = wind_dir[row, col]
             w_speed_r = wind_speed[row, col]
+
+            # crown fire module: a cell reached by a spreading surface
+            # front (ros > 0; ignitions and ember landings carry 0) may
+            # crown; the status rides on the cell's flags
+            if do_crowning and ros_value > 0.0:
+                tile_flags_r[tile, local_row, local_col] |= crown_fire_flags(
+                    idx_from,
+                    fuel_strata_gap[row, col],
+                    canopy_bulk_density[row, col],
+                    w_speed_r,
+                    moisture[row, col],
+                    fuels,
+                    p_crowning_init_fn,
+                    active_crowning_fn,
+                )
 
             for neighbour_index in range(N_NEIGHBOURS):
                 (

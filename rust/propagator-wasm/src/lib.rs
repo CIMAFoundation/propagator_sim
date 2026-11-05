@@ -146,6 +146,8 @@ impl FuelSystemBuilder {
             spotting,
             prob_ign_by_embers,
             burn,
+            // the crown fire module is not exposed to the wasm demo
+            crowning: false,
             spread_probability: spread_to.into_iter().zip(spread_prob).collect(),
         });
         Ok(())

@@ -7,6 +7,8 @@ from .core import (
     PropagatorOutOfBoundsError,
     PropagatorStats,
     fuelsystem_from_dict,
+    get_active_crowning_fn,
+    get_p_crowning_initiation_fn,
     get_p_moisture_fn,
     get_p_time_fn,
 )
@@ -36,6 +38,8 @@ __all__ = [
     "PropagatorStats",
     "FUEL_SYSTEM_LEGACY",
     "fuelsystem_from_dict",
+    "get_active_crowning_fn",
+    "get_p_crowning_initiation_fn",
     "get_p_moisture_fn",
     "get_p_time_fn",
 ]

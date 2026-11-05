@@ -56,7 +56,7 @@ pub use fuels::{
     NO_FUEL,
 };
 pub use grid::Grid2;
-pub use models::{MoistureModel, RosModel};
+pub use models::{ActiveCrowningModel, CrowningInitiationModel, MoistureModel, RosModel};
 pub use propagator::{
     OobMode, Propagator, PropagatorConfig, CELLSIZE_DEFAULT, REALIZATIONS_DEFAULT,
 };
@@ -65,5 +65,5 @@ pub use scheduler::{
 };
 pub use tile_store::{TileIndex, TileKey, TileStore, RECORD_SIZE};
 pub use tiles::{
-    FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV, TILE_SIZE,
+    FLAG_CROWN, FLAG_CROWN_ACTIVE, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV, TILE_SIZE,
 };

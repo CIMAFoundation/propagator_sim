@@ -7,16 +7,17 @@
 //! exactly as the Python fuel dictionaries store them, so the Rust core's
 //! internal `/60` and `/100` conversions reproduce numba's byte for byte.
 
-use numpy::ndarray::Array2;
-use numpy::{IntoPyArray, PyArray2, PyReadonlyArray2};
+use numpy::ndarray::{Array2, Array3};
+use numpy::{IntoPyArray, PyArray2, PyArray3, PyReadonlyArray2};
 use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use propagator_core::{
-    BoundaryConditions, FieldInput, FuelDef, FuelSystem, Grid2, Ignitions, MoistureModel, OobMode,
-    Propagator as CorePropagator, PropagatorConfig, PropagatorError, RosModel,
+    ActiveCrowningModel, BoundaryConditions, CrowningInitiationModel, FieldInput, FuelDef,
+    FuelSystem, Grid2, Ignitions, MoistureModel, OobMode, Propagator as CorePropagator,
+    PropagatorConfig, PropagatorError, RosModel,
 };
 use propagator_geo::{extract_isochrone as extract_isochrone_geo, IsochroneOptions};
 
@@ -105,6 +106,25 @@ fn moisture_from_str(s: &str) -> PyResult<MoistureModel> {
         "baghino" => Ok(MoistureModel::Baghino),
         _ => Err(PyValueError::new_err(format!(
             "unknown moisture model: {s}"
+        ))),
+    }
+}
+
+fn crowning_initiation_from_str(s: &str) -> PyResult<CrowningInitiationModel> {
+    match s.to_ascii_lowercase().as_str() {
+        "cruz" => Ok(CrowningInitiationModel::Cruz),
+        "perrakis" => Ok(CrowningInitiationModel::Perrakis),
+        _ => Err(PyValueError::new_err(format!(
+            "unknown crowning initiation model: {s}"
+        ))),
+    }
+}
+
+fn active_crowning_from_str(s: &str) -> PyResult<ActiveCrowningModel> {
+    match s.to_ascii_lowercase().as_str() {
+        "alexander" => Ok(ActiveCrowningModel::Alexander),
+        _ => Err(PyValueError::new_err(format!(
+            "unknown active crowning model: {s}"
         ))),
     }
 }
@@ -202,6 +222,10 @@ fn parse_fuels(fuels: &Bound<'_, PyDict>) -> PyResult<FuelSystem> {
             Some(v) => v.extract()?,
             None => true,
         };
+        let crowning: bool = match get("crowning") {
+            Some(v) => v.extract()?,
+            None => false,
+        };
         let spread_probability: Vec<(i32, f64)> = match get("spread_probability") {
             Some(v) => {
                 let sp: Bound<'_, PyDict> = v.extract().map_err(|_| {
@@ -229,6 +253,7 @@ fn parse_fuels(fuels: &Bound<'_, PyDict>) -> PyResult<FuelSystem> {
             spotting,
             prob_ign_by_embers,
             burn,
+            crowning,
             spread_probability,
         });
     }
@@ -354,6 +379,11 @@ impl Propagator {
         moisture_model = "trucchia",
         cellsize = 20.0,
         n_threads = None,
+        do_crowning = false,
+        fsg = None,
+        cbd = None,
+        crowning_initiation_model = "cruz",
+        active_crowning_model = "alexander",
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -370,6 +400,11 @@ impl Propagator {
         moisture_model: &str,
         cellsize: f64,
         n_threads: Option<usize>,
+        do_crowning: bool,
+        fsg: Option<PyReadonlyArray2<f32>>,
+        cbd: Option<PyReadonlyArray2<f32>>,
+        crowning_initiation_model: &str,
+        active_crowning_model: &str,
     ) -> PyResult<Self> {
         let veg = grid_i32(veg);
         let dem = grid_f64(dem);
@@ -392,6 +427,11 @@ impl Propagator {
             }
         };
         config.n_threads = n_threads;
+        config.do_crowning = do_crowning;
+        config.fsg = fsg.map(grid_f32);
+        config.cbd = cbd.map(grid_f32);
+        config.crowning_initiation_model = crowning_initiation_from_str(crowning_initiation_model)?;
+        config.active_crowning_model = active_crowning_from_str(active_crowning_model)?;
         if let Some(fuels) = fuels {
             config.fuels = Some(parse_fuels(&fuels)?);
         }
@@ -550,6 +590,20 @@ impl Propagator {
         self.inner.edge_cache_bytes()
     }
 
+    /// Dense `(realizations, rows, cols)` fire status: 0 unburnt, 1 surface
+    /// fire, 2 passive crown fire, 3 active crown fire. Analysis/tests only.
+    fn get_fire_status<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray3<u8>>> {
+        let grids = self.inner.get_fire_status().map_err(err)?;
+        let (rows, cols) = self.inner.shape();
+        let mut data = Vec::with_capacity(grids.len() * rows * cols);
+        for grid in &grids {
+            data.extend_from_slice(grid.as_slice());
+        }
+        Ok(Array3::from_shape_vec((grids.len(), rows, cols), data)
+            .expect("grid shapes match the realization count")
+            .into_pyarray(py))
+    }
+
     /// Snapshot as a dict of numpy rasters plus a nested `stats` dict; the
     /// Python adapter re-wraps this into the core's dataclasses.
     fn get_output<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
@@ -595,6 +649,14 @@ impl Propagator {
         d.set_item(
             "radiant_reach_max",
             f32_grid_to_py(py, &out.radiant_reach_max),
+        )?;
+        d.set_item(
+            "crowning_probability",
+            f32_grid_to_py(py, &out.crowning_probability),
+        )?;
+        d.set_item(
+            "active_crowning_probability",
+            f32_grid_to_py(py, &out.active_crowning_probability),
         )?;
 
         let stats = PyDict::new(py);

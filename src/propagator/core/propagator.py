@@ -21,6 +21,8 @@ from propagator.core.checkpoint import (
 )
 from propagator.core.constants import (
     CELLSIZE,
+    CROWNING_ACTIVE_DEFAULT,
+    CROWNING_INITIATION_DEFAULT,
     MOISTURE_MODEL_DEFAULT,
     NO_FUEL,
     REALIZATIONS,
@@ -33,6 +35,8 @@ from propagator.core.models import (
     UpdateBatch,
 )
 from propagator.core.numba import (
+    FLAG_CROWN,
+    FLAG_CROWN_ACTIVE,
     FLAG_FIRE,
     FLAG_SPOT_GEN,
     FLAG_SPOT_RECV,
@@ -49,6 +53,8 @@ from propagator.core.numba import (
     build_fuel_index_grid,
     flood_reachable,
     fold_state_tiles,
+    get_active_crowning_fn,
+    get_p_crowning_initiation_fn,
     get_p_moisture_fn,
     get_p_time_fn,
     materialize_tiles,
@@ -95,6 +101,9 @@ class StateFold:
     # radiant reach (m) of each burning realization: sum and max
     radiant_sum: npt.NDArray[np.float64]
     radiant_max: npt.NDArray[np.float32]
+    # burning realizations that crowned (passive or active) / actively
+    crown_count: npt.NDArray[np.int32]
+    crown_active_count: npt.NDArray[np.int32]
 
 
 def _empty_fold(shape: tuple[int, int]) -> StateFold:
@@ -112,6 +121,8 @@ def _empty_fold(shape: tuple[int, int]) -> StateFold:
         flame_max=np.zeros(shape, dtype=np.float32),
         radiant_sum=np.zeros(shape, dtype=np.float64),
         radiant_max=np.zeros(shape, dtype=np.float32),
+        crown_count=np.zeros(shape, dtype=np.int32),
+        crown_active_count=np.zeros(shape, dtype=np.int32),
     )
 
 
@@ -133,6 +144,11 @@ def _accumulate_frozen_record(
     fire = (flags & FLAG_FIRE).astype(bool)
     count = block.count
     count += fire
+    crown = fire & (flags & FLAG_CROWN).astype(bool)
+    crown_count = block.crown_count
+    crown_count += crown
+    crown_active_count = block.crown_active_count
+    crown_active_count += crown & (flags & FLAG_CROWN_ACTIVE).astype(bool)
 
     np.minimum(
         block.arrival_min,
@@ -159,6 +175,21 @@ def _accumulate_frozen_record(
         block.radiant_sum,
         block.radiant_max,
     )
+
+
+def _pad_canopy(
+    values: npt.NDArray[np.floating] | None,
+    row_shift: int,
+    col_shift: int,
+    new_shape: tuple[int, ...],
+) -> npt.NDArray[np.float32] | None:
+    """Place a canopy field into a grown grid; new cells get no canopy."""
+    if values is None:
+        return None
+    out = np.zeros(new_shape, dtype=np.float32)
+    rows, cols = values.shape
+    out[row_shift : row_shift + rows, col_shift : col_shift + cols] = values
+    return out
 
 
 @dataclass
@@ -199,6 +230,26 @@ class Propagator:
     out_of_bounds_mode: Literal["ignore", "error"], optional
         Whether to raise an error if out-of-bounds updates are detected.
         Default is "error".
+    do_crowning : bool, optional
+        Whether to enable the crown fire module (default False). Requires
+        `fsg` and `cbd`; crowning is evaluated in cells whose fuel has
+        `crowning=True` and a positive canopy bulk density.
+    fsg : numpy.ndarray, optional
+        2D array of fuel strata gap values (m); non-finite or negative
+        values mean "no canopy".
+    cbd : numpy.ndarray, optional
+        2D array of canopy bulk density values (kg/m^3); non-finite or
+        non-positive values mean "no canopy".
+    p_crowning_init_fn: Any, optional
+        The function to compute the crowning initiation probability (must
+        be jit-compiled), see `get_p_crowning_initiation_fn`.
+            signature: (wind_speed: float, fuel_strata_gap: float,
+            surface_fuel_consumption: float, moisture: float) -> float
+    active_crowning_fn: Any, optional
+        The active crowning criterion (must be jit-compiled), see
+        `get_active_crowning_fn`.
+            signature: (wind_speed: float, canopy_bulk_density: float,
+            moisture: float) -> bool
     """
 
     # domain parameters for the simulation
@@ -282,6 +333,17 @@ class Propagator:
 
     out_of_bounds_mode: Literal["ignore", "raise"] = "raise"
 
+    # crown fire module (off by default; see docs/crown_fire.md)
+    do_crowning: bool = field(default=False)
+    fsg: npt.NDArray[np.floating] | None = None  # fuel strata gap [m]
+    cbd: npt.NDArray[np.floating] | None = None  # canopy bulk density
+    p_crowning_init_fn: Any = field(
+        default=get_p_crowning_initiation_fn(CROWNING_INITIATION_DEFAULT)
+    )
+    active_crowning_fn: Any = field(
+        default=get_active_crowning_fn(CROWNING_ACTIVE_DEFAULT)
+    )
+
     def __post_init__(self):
         """Allocate internal state arrays based
         on the vegetation grid shape."""
@@ -340,10 +402,57 @@ class Propagator:
             self.fuels = self.fuels.copy()
             self.fuels.disable_spotting()
         self._fuel_idx = build_fuel_index_grid(self.fuels, self.veg)
+        self._set_canopy(self.fsg, self.cbd)
         if self.freeze_dir is not None:
             self._tile_store = TileStore(self.freeze_dir)
         if self.seed is not None:
             self.reseed(self.seed)
+
+    def _set_canopy(
+        self,
+        fsg: npt.ArrayLike | None,
+        cbd: npt.ArrayLike | None,
+    ) -> None:
+        """Validate and store the canopy inputs of the crown fire module.
+
+        Cells without a usable canopy (non-finite values, negative fuel
+        strata gap or non-positive bulk density) get cbd = 0, which the
+        kernel reads as "cannot crown"; this keeps NaN out of the
+        fastmath kernel.
+        """
+        if fsg is None and cbd is None:
+            if self.do_crowning:
+                raise ValueError(
+                    "do_crowning requires the canopy inputs fsg (fuel "
+                    "strata gap) and cbd (canopy bulk density)."
+                )
+            self.fsg = None
+            self.cbd = None
+            return
+        if fsg is None or cbd is None:
+            raise ValueError("fsg and cbd must be provided together")
+        shape = self.veg.shape
+        fsg = np.array(upcast_to_ndarray(fsg, shape), dtype=np.float32)
+        cbd = np.array(upcast_to_ndarray(cbd, shape), dtype=np.float32)
+        if fsg.shape != shape or cbd.shape != shape:
+            raise ValueError("fsg and cbd must have the same shape as veg")
+        no_canopy = (
+            ~np.isfinite(fsg) | ~np.isfinite(cbd) | (fsg < 0) | (cbd <= 0)
+        )
+        fsg[no_canopy] = 0.0
+        cbd[no_canopy] = 0.0
+        self.fsg = fsg
+        self.cbd = cbd
+
+    def _crowning_inputs(
+        self,
+    ) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
+        """Canopy arrays for the kernel (1x1 placeholders when off)."""
+        if self.do_crowning and self.fsg is not None:
+            assert self.cbd is not None
+            return self.fsg, self.cbd  # type: ignore[return-value]
+        placeholder = np.zeros((1, 1), dtype=np.float32)
+        return placeholder, placeholder
 
     def reseed(self, seed: int) -> None:
         """Seed the JIT kernels' per-thread RNGs deterministically.
@@ -376,6 +485,16 @@ class Propagator:
     ) -> npt.NDArray[np.floating]:
         """Return per-cell spotting receiving probability."""
         return self._probability(self._fold_state().spot_recv_count)
+
+    def compute_crowning_probability(self) -> npt.NDArray[np.floating]:
+        """Return per-cell probability of crown fire (passive or active)."""
+        return self._probability(self._fold_state().crown_count)
+
+    def compute_active_crowning_probability(
+        self,
+    ) -> npt.NDArray[np.floating]:
+        """Return per-cell probability of active crown fire."""
+        return self._probability(self._fold_state().crown_active_count)
 
     def _probability(
         self, count: npt.NDArray[np.int32]
@@ -489,6 +608,8 @@ class Propagator:
             fold.flame_max,
             fold.radiant_sum,
             fold.radiant_max,
+            fold.crown_count,
+            fold.crown_active_count,
         )
         self._fold_frozen(fold)
         return fold
@@ -532,6 +653,19 @@ class Propagator:
         return ((self._materialize_flags() & FLAG_SPOT_RECV) != 0).astype(
             np.uint8
         )
+
+    def get_fire_status(self) -> npt.NDArray[np.uint8]:
+        """Materialize the dense (realizations, rows, cols) fire status.
+
+        0 = unburnt, 1 = surface fire, 2 = passive crown fire,
+        3 = active crown fire. Without the crown fire module every burnt
+        cell is 1.
+        """
+        flags = self._materialize_flags()
+        status = ((flags & FLAG_FIRE) != 0).astype(np.uint8)
+        status += ((flags & FLAG_CROWN) != 0).astype(np.uint8)
+        status += ((flags & FLAG_CROWN_ACTIVE) != 0).astype(np.uint8)
+        return status
 
     def get_arrival_time(self) -> npt.NDArray[np.int32]:
         """Materialize the dense (realizations, rows, cols) arrival times.
@@ -1033,6 +1167,7 @@ class Propagator:
         # cell (heap intact), so the caller can checkpoint, expand the
         # domain via from_checkpoint and resume without losing spread
         halt_on_boundary = self.out_of_bounds_mode == "raise"
+        fsg, cbd = self._crowning_inputs()
 
         while True:
             advance_front_until(
@@ -1065,6 +1200,11 @@ class Propagator:
                 out_of_bounds,
                 self.do_spotting,
                 halt_on_boundary,
+                bool(self.do_crowning),
+                fsg,
+                cbd,
+                self.p_crowning_init_fn,
+                self.active_crowning_fn,
             )
 
             if int(np.sum(self._front_overflow)) == 0:
@@ -1147,6 +1287,10 @@ class Propagator:
         flame_height_mean = self._masked_mean(fold.flame_sum, fold.count)
         radiant_reach_max = fold.radiant_max
         radiant_reach_mean = self._masked_mean(fold.radiant_sum, fold.count)
+        crowning_probability = self._probability(fold.crown_count)
+        active_crowning_probability = self._probability(
+            fold.crown_active_count
+        )
         stats = self.compute_stats(fire_probability)
 
         return PropagatorOutput(
@@ -1164,6 +1308,8 @@ class Propagator:
             flame_height_max=flame_height_max,
             radiant_reach_mean=radiant_reach_mean,
             radiant_reach_max=radiant_reach_max,
+            crowning_probability=crowning_probability,
+            active_crowning_probability=active_crowning_probability,
             stats=stats,
         )
 
@@ -1557,6 +1703,10 @@ class Propagator:
             fold.spot_recv_count[rows, cols] += block.spot_recv_count[
                 :height, :width
             ]
+            fold.crown_count[rows, cols] += block.crown_count[:height, :width]
+            fold.crown_active_count[rows, cols] += block.crown_active_count[
+                :height, :width
+            ]
             np.minimum(
                 fold.arrival_min[rows, cols],
                 block.arrival_min[:height, :width],
@@ -1659,6 +1809,8 @@ class Propagator:
         veg: npt.NDArray[np.integer],
         dem: npt.NDArray[np.floating],
         origin: tuple[int, int],
+        fsg: npt.NDArray[np.floating] | None = None,
+        cbd: npt.NDArray[np.floating] | None = None,
     ) -> None:
         """Grow the domain in place, preserving all simulation state.
 
@@ -1669,6 +1821,8 @@ class Propagator:
         growth must be a multiple of TILE_SIZE cells. Vegetation in the
         overlap keeps the current (possibly mutated) values; weather pads
         by edge replication until fresh boundary conditions arrive.
+        Canopy inputs (crown fire module) are taken from `fsg`/`cbd` when
+        given (full new grid); otherwise the new cells have no canopy.
         """
         old_shape = self.veg.shape
         row_shift, col_shift = self._growth_shifts(
@@ -1685,6 +1839,10 @@ class Propagator:
         self.dem = dem
         self._fuel_idx = build_fuel_index_grid(self.fuels, self.veg)
         self.origin = (int(origin[0]), int(origin[1]))
+        if fsg is None and cbd is None and self.fsg is not None:
+            fsg = _pad_canopy(self.fsg, row_shift, col_shift, new_shape)
+            cbd = _pad_canopy(self.cbd, row_shift, col_shift, new_shape)
+        self._set_canopy(fsg, cbd)
 
         # front heaps: shift coordinates in place
         if row_shift:
@@ -1780,6 +1938,9 @@ class Propagator:
             tile_ros=self._tile_ros[:, :tile_count].copy(),
             tile_fli=self._tile_fli[:, :tile_count].copy(),
             scheduler_events=self.scheduler.snapshot(),
+            do_crowning=bool(self.do_crowning),
+            fsg=_optional("fsg"),
+            cbd=_optional("cbd"),
             frozen_index=(
                 self._tile_store.snapshot_index()
                 if self._tile_store is not None
@@ -1829,6 +1990,10 @@ class Propagator:
         out_of_bounds_mode: Literal["ignore", "raise"] = "raise",
         seed: int | None = None,
         freeze_dir: str | Path | None = None,
+        fsg: npt.NDArray[np.floating] | None = None,
+        cbd: npt.NDArray[np.floating] | None = None,
+        p_crowning_init_fn: Any = None,
+        active_crowning_fn: Any = None,
     ) -> "Propagator":
         """Build a propagator resuming from a checkpoint.
 
@@ -1840,8 +2005,11 @@ class Propagator:
         transfer without being rewritten. Vegetation in the overlap is
         taken from the checkpoint, preserving past `vegetation_changes`.
 
-        `fuels`, `p_time_fn` and `p_moist_fn` are not serialized; pass
-        the same objects used originally (defaults apply when omitted).
+        `fuels`, `p_time_fn`, `p_moist_fn` and the crowning functions
+        are not serialized; pass the same objects used originally
+        (defaults apply when omitted). Canopy inputs are restored from the
+        checkpoint; on a grown domain pass `fsg`/`cbd` for the new grid,
+        otherwise the new cells have no canopy.
         """
         if veg is None:
             if dem is not None or origin is not None:
@@ -1853,6 +2021,8 @@ class Propagator:
             origin = checkpoint.origin
             row_shift = 0
             col_shift = 0
+            if fsg is None and cbd is None:
+                fsg, cbd = checkpoint.fsg, checkpoint.cbd
         else:
             if origin is None:
                 origin = checkpoint.origin
@@ -1865,6 +2035,13 @@ class Propagator:
                 row_shift : row_shift + old_rows,
                 col_shift : col_shift + old_cols,
             ] = checkpoint.veg
+            if fsg is None and cbd is None and checkpoint.fsg is not None:
+                fsg = _pad_canopy(
+                    checkpoint.fsg, row_shift, col_shift, veg.shape
+                )
+                cbd = _pad_canopy(
+                    checkpoint.cbd, row_shift, col_shift, veg.shape
+                )
 
         extra: dict[str, Any] = {}
         if fuels is not None:
@@ -1873,6 +2050,10 @@ class Propagator:
             extra["p_time_fn"] = p_time_fn
         if p_moist_fn is not None:
             extra["p_moist_fn"] = p_moist_fn
+        if p_crowning_init_fn is not None:
+            extra["p_crowning_init_fn"] = p_crowning_init_fn
+        if active_crowning_fn is not None:
+            extra["active_crowning_fn"] = active_crowning_fn
 
         propagator = cls(
             veg=veg,
@@ -1884,6 +2065,9 @@ class Propagator:
             seed=seed,
             freeze_dir=freeze_dir,
             out_of_bounds_mode=out_of_bounds_mode,
+            do_crowning=checkpoint.do_crowning,
+            fsg=fsg,
+            cbd=cbd,
             **extra,
         )
         propagator._load_state(checkpoint, row_shift, col_shift)
@@ -1906,6 +2090,8 @@ class Propagator:
             raise ValueError("Checkpoint realizations mismatch")
         if checkpoint.do_spotting != self.do_spotting:
             raise ValueError("Checkpoint do_spotting mismatch")
+        if checkpoint.do_crowning != self.do_crowning:
+            raise ValueError("Checkpoint do_crowning mismatch")
         if checkpoint.cellsize != self.cellsize:
             raise ValueError("Checkpoint cellsize mismatch")
 

@@ -22,6 +22,10 @@ from propagator.core.numba.functions import flame_height, radiant_reach
 FLAG_FIRE = np.uint8(1)
 FLAG_SPOT_GEN = np.uint8(2)
 FLAG_SPOT_RECV = np.uint8(4)
+# crown fire status of a burnt cell (crown fire module): FLAG_CROWN marks
+# any crown fire (passive or active), FLAG_CROWN_ACTIVE an active one
+FLAG_CROWN = np.uint8(8)
+FLAG_CROWN_ACTIVE = np.uint8(16)
 
 # tile_idx sentinels: -1 = never allocated; -2 = frozen to disk. A tile is
 # only frozen when every in-domain cell is burnt or fuel-free, so kernels
@@ -69,6 +73,8 @@ def fold_state_tiles(
     flame_max: npt.NDArray[np.float32],
     radiant_sum: npt.NDArray[np.float64],
     radiant_max: npt.NDArray[np.float32],
+    crown_count: npt.NDArray[np.int32],
+    crown_active_count: npt.NDArray[np.int32],
 ) -> None:
     """Aggregate tiled state across realizations into per-cell 2D maps.
 
@@ -80,6 +86,8 @@ def fold_state_tiles(
     nansum/nanmax behaviour. `flame_sum`/`flame_max` and
     `radiant_sum`/`radiant_max` aggregate the flame height and radiant
     reach derived from each realization's fireline intensity.
+    `crown_count`/`crown_active_count` count the burnt realizations that
+    crowned (passive or active) and that crowned actively.
     """
     n_realizations, tiles_h, tiles_w = tile_idx.shape
     n_rows = count.shape[0]
@@ -114,6 +122,10 @@ def fold_state_tiles(
                     if not flags & FLAG_FIRE:
                         continue
                     count[row, col] += 1
+                    if flags & FLAG_CROWN:
+                        crown_count[row, col] += 1
+                        if flags & FLAG_CROWN_ACTIVE:
+                            crown_active_count[row, col] += 1
                     arrival = tile_arrival[
                         realization, tile, local_row, local_col
                     ]

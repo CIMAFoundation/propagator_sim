@@ -1,10 +1,17 @@
 from .front_tracking import FRONT_RESERVE, TILE_RESERVE, advance_front_until
 from .functions import (
+    ActiveCrowningModel,
+    CrowningInitiationModel,
     MoistureModel,
     RateOfSpreadModel,
+    active_crowning_alexander,
     flame_height,
+    get_active_crowning_fn,
+    get_p_crowning_initiation_fn,
     get_p_moisture_fn,
     get_p_time_fn,
+    p_crowning_initiation_cruz,
+    p_crowning_initiation_perrakis,
     radiant_reach,
 )
 from .models import (
@@ -15,6 +22,8 @@ from .models import (
 )
 from .rng import seed_rngs
 from .tiles import (
+    FLAG_CROWN,
+    FLAG_CROWN_ACTIVE,
     FLAG_FIRE,
     FLAG_SPOT_GEN,
     FLAG_SPOT_RECV,
@@ -37,12 +46,21 @@ __all__ = [
     "fuelsystem_from_dict",
     "get_p_moisture_fn",
     "get_p_time_fn",
+    "get_p_crowning_initiation_fn",
+    "get_active_crowning_fn",
+    "p_crowning_initiation_cruz",
+    "p_crowning_initiation_perrakis",
+    "active_crowning_alexander",
+    "ActiveCrowningModel",
+    "CrowningInitiationModel",
     "MoistureModel",
     "RateOfSpreadModel",
     "advance_front_until",
     "FuelSystem",
     "FRONT_RESERVE",
     "TILE_RESERVE",
+    "FLAG_CROWN",
+    "FLAG_CROWN_ACTIVE",
     "FLAG_FIRE",
     "FLAG_SPOT_GEN",
     "FLAG_SPOT_RECV",

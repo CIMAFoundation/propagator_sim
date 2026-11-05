@@ -20,10 +20,14 @@ use crate::front::FrontHeap;
 use crate::fuels::{FuelSystem, NO_FUEL};
 use crate::grid::Grid2;
 use crate::models::{
-    fireline_intensity, lhv_fuel, p_time, probability_to_neighbour, MoistureModel, RosModel,
+    active_crowning, fireline_intensity, lhv_fuel, p_crowning_initiation, p_time,
+    probability_to_neighbour, ActiveCrowningModel, CrowningInitiationModel, MoistureModel,
+    RosModel,
 };
 use crate::rng::Rng;
-use crate::tiles::{local_index, TileGrid, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV};
+use crate::tiles::{
+    local_index, TileGrid, FLAG_CROWN, FLAG_CROWN_ACTIVE, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV,
+};
 
 // 8-connected neighbour lattice
 pub const N_NEIGHBOURS: usize = 8;
@@ -106,6 +110,55 @@ pub struct SharedInputs<'a> {
     pub do_spotting: bool,
     /// per-cell edge cache for the current generation of the inputs
     pub edges: &'a EdgeCache,
+    /// crown fire module inputs; `None` when crowning is disabled
+    pub crowning: Option<CrowningInputs<'a>>,
+}
+
+/// Canopy inputs and model selection of the crown fire module.
+pub struct CrowningInputs<'a> {
+    /// fuel strata gap, m (0 where there is no canopy)
+    pub fsg: &'a Grid2<f32>,
+    /// canopy bulk density, kg/m^3 (0 where there is no canopy)
+    pub cbd: &'a Grid2<f32>,
+    pub initiation_model: CrowningInitiationModel,
+    pub active_model: ActiveCrowningModel,
+}
+
+/// Crown fire status flags of a cell reached by a spreading surface front
+/// (0, `FLAG_CROWN` or `FLAG_CROWN | FLAG_CROWN_ACTIVE`). One uniform draw
+/// is consumed only for crowning-prone fuels with a canopy, mirroring
+/// `crown_fire_flags` in the numba core.
+#[inline]
+#[allow(clippy::too_many_arguments, clippy::neg_cmp_op_on_partial_ord)]
+fn crown_fire_flags(
+    crowning: &CrowningInputs<'_>,
+    fuels: &FuelSystem,
+    idx: usize,
+    row: usize,
+    col: usize,
+    w_speed: f64,
+    moisture: f64,
+    rng: &mut Rng,
+) -> u8 {
+    let cbd = crowning.cbd[(row, col)] as f64;
+    if !fuels.crowning[idx] || !(cbd > 0.0) {
+        return 0;
+    }
+    let p_crown = p_crowning_initiation(
+        crowning.initiation_model,
+        w_speed,
+        crowning.fsg[(row, col)] as f64,
+        fuels.d0[idx],
+        moisture,
+    );
+    if !(p_crown > rng.uniform()) {
+        return 0;
+    }
+    if active_crowning(crowning.active_model, w_speed, cbd, moisture) {
+        FLAG_CROWN | FLAG_CROWN_ACTIVE
+    } else {
+        FLAG_CROWN
+    }
 }
 
 /// Mutable state of one realization.
@@ -203,6 +256,24 @@ pub fn advance_front_until(
 
         let w_dir = shared.wind_dir[(row, col)] as f64;
         let w_speed = shared.wind_speed[(row, col)] as f64;
+
+        // crown fire module: a cell reached by a spreading surface front
+        // (ros > 0; ignitions and ember landings carry 0) may crown
+        if let Some(crowning) = &shared.crowning {
+            if ros_value > 0.0 {
+                let flags = crown_fire_flags(
+                    crowning,
+                    shared.fuels,
+                    idx_from,
+                    row,
+                    col,
+                    w_speed,
+                    shared.moisture[(row, col)] as f64,
+                    &mut real.rng,
+                );
+                real.tiles.tile_mut(slot).flags[local] |= flags;
+            }
+        }
 
         // 8-neighbour spread: one Bernoulli draw per spreadable, unburnt
         // neighbour. Edge quantities come from the shared cache and are

@@ -87,9 +87,18 @@ class Propagator:
         moisture_model: str = "trucchia",
         cellsize: float = 20.0,
         n_threads: Optional[int] = None,
+        do_crowning: bool = False,
+        fsg: Optional[np.ndarray] = None,
+        cbd: Optional[np.ndarray] = None,
+        crowning_initiation_model: str = "cruz",
+        active_crowning_model: str = "alexander",
     ) -> None:
         dem = np.ascontiguousarray(dem, dtype=np.float64)
         veg = np.ascontiguousarray(veg, dtype=np.int32)
+        if fsg is not None:
+            fsg = np.ascontiguousarray(fsg, dtype=np.float32)
+        if cbd is not None:
+            cbd = np.ascontiguousarray(cbd, dtype=np.float32)
         self._sim = _rust.Propagator(
             dem,
             veg,
@@ -104,6 +113,11 @@ class Propagator:
             moisture_model=moisture_model,
             cellsize=float(cellsize),
             n_threads=n_threads,
+            do_crowning=do_crowning,
+            fsg=fsg,
+            cbd=cbd,
+            crowning_initiation_model=crowning_initiation_model,
+            active_crowning_model=active_crowning_model,
         )
 
     # ---- properties mirrored from the numba Propagator -------------------
@@ -204,6 +218,11 @@ class Propagator:
         reused across realizations; grows with the reached area)."""
         return int(self._sim.edge_cache_bytes())
 
+    def get_fire_status(self) -> np.ndarray:
+        """Dense (realizations, rows, cols) fire status: 0 unburnt,
+        1 surface, 2 passive crown, 3 active crown fire."""
+        return self._sim.get_fire_status()
+
     def get_output(self) -> PropagatorOutput:
         out = self._sim.get_output()
         s = out["stats"]
@@ -233,5 +252,7 @@ class Propagator:
             flame_height_max=out["flame_height_max"],
             radiant_reach_mean=out["radiant_reach_mean"],
             radiant_reach_max=out["radiant_reach_max"],
+            crowning_probability=out["crowning_probability"],
+            active_crowning_probability=out["active_crowning_probability"],
             stats=stats,
         )

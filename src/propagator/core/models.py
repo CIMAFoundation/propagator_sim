@@ -180,4 +180,8 @@ class PropagatorOutput:
     # burnt)
     radiant_reach_mean: npt.NDArray[np.floating]
     radiant_reach_max: npt.NDArray[np.floating]
+    # crown fire module: probability of crown fire (passive or active) and
+    # of active crown fire (all zero when crowning is disabled)
+    crowning_probability: npt.NDArray[np.floating]
+    active_crowning_probability: npt.NDArray[np.floating]
     stats: PropagatorStats

@@ -19,7 +19,7 @@ from .functions import (
     lhv_fuel,
 )
 from .models import FuelSystem
-from .tiles import FLAG_FIRE, read_flags
+from .tiles import FLAG_CROWN, FLAG_CROWN_ACTIVE, FLAG_FIRE, read_flags
 
 # P_c = P_c0 (1 + P_cd), where P_c0 constant spread_probability of
 # ignition by spotting and P_cd is a correction factor that
@@ -480,3 +480,65 @@ def try_spread_to_neighbour(
         p_time_fn,
     )
     return True, row_to, col_to, transition_time, ros, fli
+
+
+@jit(cache=False, nopython=True)
+def crown_fire_flags(
+    idx: int,
+    fuel_strata_gap: float,
+    canopy_bulk_density: float,
+    w_speed: float,
+    moisture: float,
+    fuels: FuelSystem,
+    p_crowning_init_fn: Any,
+    active_crowning_fn: Any,
+) -> np.uint8:
+    """Crown fire status of a cell reached by a surface fire front.
+
+    Crowning is only evaluated for crowning-prone fuels with a canopy
+    (canopy bulk density > 0). Initiation is stochastic: the cell crowns
+    with the probability given by `p_crowning_init_fn`; a crowning cell is
+    an active crown fire when `active_crowning_fn` holds, passive
+    otherwise. No random number is drawn for cells that cannot crown.
+
+    Parameters
+    ----------
+    idx : int
+        The dense fuel index of the cell.
+    fuel_strata_gap : float
+        Fuel strata gap of the cell (m).
+    canopy_bulk_density : float
+        Canopy bulk density of the cell (kg/m3).
+    w_speed : float
+        Wind speed at the cell (km/h).
+    moisture : float
+        Fine dead fuel moisture at the cell (fraction).
+    fuels : FuelSystem
+        The fuel system.
+    p_crowning_init_fn : Any
+        Crowning initiation probability (must be jit-compiled), signature
+        (wind_speed, fuel_strata_gap, surface_fuel_consumption, moisture)
+        -> float.
+    active_crowning_fn : Any
+        Active crowning criterion (must be jit-compiled), signature
+        (wind_speed, canopy_bulk_density, moisture) -> bool.
+
+    Returns
+    -------
+    numpy.uint8
+        0 (surface fire), FLAG_CROWN (passive crown fire) or
+        FLAG_CROWN | FLAG_CROWN_ACTIVE (active crown fire).
+    """
+    if not fuels.crowning[idx] or not canopy_bulk_density > 0.0:
+        return np.uint8(0)
+    p_crown_init = p_crowning_init_fn(
+        w_speed,
+        fuel_strata_gap,
+        fuels.d0[idx],
+        moisture,
+    )
+    if not p_crown_init > random():
+        return np.uint8(0)
+    if active_crowning_fn(w_speed, canopy_bulk_density, moisture):
+        return np.uint8(FLAG_CROWN | FLAG_CROWN_ACTIVE)
+    return np.uint8(FLAG_CROWN)

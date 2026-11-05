@@ -16,6 +16,9 @@ TILE_MASK = TILE_SIZE - 1
 # --- DEFAULT MODELS ---
 ROS_DEFAULT: Literal["wang", "rothermel", "standard"] = "wang"
 MOISTURE_MODEL_DEFAULT: Literal["trucchia", "baghino"] = "trucchia"
+# crown fire module (off unless `do_crowning` is set)
+CROWNING_INITIATION_DEFAULT: Literal["cruz", "perrakis"] = "cruz"
+CROWNING_ACTIVE_DEFAULT: Literal["alexander"] = "alexander"
 
 
 # --- FUEL SYSTEM LEGACY ---
@@ -42,6 +45,7 @@ FUEL_SYSTEM_LEGACY_DICT = {
     #     spotting=False,  # if the fuel type is prone to spotting (optional)
     #     prob_ign_by_embers=0.0,  # prob. of ignition by embers (optional)
     #     burn=True,  # if the fuel type is combustible (optional)
+    #     crowning=False,  # if the fuel type is prone to crowning (optional)
     # ),
     1: dict(
         name="broadleaves",
@@ -126,6 +130,7 @@ FUEL_SYSTEM_LEGACY_DICT = {
         },
         spotting=True,
         prob_ign_by_embers=0.4,
+        crowning=True,
     ),
     6: dict(
         name="agro-forestry areas",

@@ -8,13 +8,14 @@ use std::sync::Arc;
 use crate::front::FrontHeap;
 use crate::fuels::FuelSystem;
 use crate::grid::Grid2;
-use crate::models::{MoistureModel, RosModel};
+use crate::models::{ActiveCrowningModel, CrowningInitiationModel, MoistureModel, RosModel};
 use crate::scheduler::SchedulerEvent;
 use crate::tile_store::{TileIndex, TileStore};
 use crate::tiles::TileGrid;
 use crate::OobMode;
 
-pub const CHECKPOINT_VERSION: u32 = 1;
+/// version 2 adds the crown fire module (`do_crowning`, canopy inputs)
+pub const CHECKPOINT_VERSION: u32 = 2;
 
 /// Immutable snapshot of a `Propagator`'s dynamic state.
 ///
@@ -44,6 +45,11 @@ pub struct PropagatorCheckpoint {
     pub wind_dir: Option<Grid2<f32>>,
     pub wind_speed: Option<Grid2<f32>>,
     pub actions_moisture: Option<Grid2<f32>>,
+
+    /// crown fire module flag and (sanitized) canopy inputs
+    pub do_crowning: bool,
+    pub fsg: Option<Grid2<f32>>,
+    pub cbd: Option<Grid2<f32>>,
 
     /// per-realization front heaps and tiled state
     pub(crate) heaps: Vec<FrontHeap>,
@@ -88,6 +94,11 @@ pub struct ResumeOptions {
     pub fuels: Option<FuelSystem>,
     pub ros_model: Option<RosModel>,
     pub moisture_model: Option<MoistureModel>,
+    pub crowning_initiation_model: Option<CrowningInitiationModel>,
+    pub active_crowning_model: Option<ActiveCrowningModel>,
+    /// canopy inputs (fsg, cbd) for a grown `domain`; when `None` the
+    /// checkpointed canopy is kept and new cells have no canopy
+    pub canopy: Option<(Grid2<f32>, Grid2<f32>)>,
     pub oob_mode: OobMode,
     pub seed: Option<u64>,
     pub freeze_dir: Option<PathBuf>,

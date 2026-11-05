@@ -31,6 +31,8 @@ pub struct FuelDef {
     pub spotting: bool,
     pub prob_ign_by_embers: f64,
     pub burn: bool,
+    /// prone to crowning (crown fire module)
+    pub crowning: bool,
     /// base spread probability toward other fuel ids
     pub spread_probability: Vec<(i32, f64)>,
 }
@@ -49,6 +51,7 @@ pub struct FuelSystem {
     pub(crate) spotting: Vec<bool>,
     pub(crate) prob_ign_by_embers: Vec<f64>,
     pub(crate) burn: Vec<bool>,
+    pub(crate) crowning: Vec<bool>,
     /// row-major (n, n): spread_probability[from * n + to]
     spread_probability: Vec<f64>,
     non_vegetated: Option<i32>,
@@ -73,6 +76,7 @@ impl FuelSystem {
             spotting: Vec::with_capacity(n),
             prob_ign_by_embers: Vec::with_capacity(n),
             burn: Vec::with_capacity(n),
+            crowning: Vec::with_capacity(n),
             spread_probability: vec![0.0; n * n],
             non_vegetated: None,
         };
@@ -107,6 +111,7 @@ impl FuelSystem {
             system.spotting.push(def.spotting);
             system.prob_ign_by_embers.push(def.prob_ign_by_embers);
             system.burn.push(def.burn);
+            system.crowning.push(def.crowning);
             if !def.burn {
                 system.non_vegetated = Some(def.id);
             }
@@ -202,6 +207,7 @@ pub fn legacy_fuel_defs() -> Vec<FuelDef> {
             spotting: false,
             prob_ign_by_embers: 0.0,
             burn: true,
+            crowning: false,
             spread_probability: probs([
                 (1, 0.3),
                 (2, 0.375),
@@ -223,6 +229,7 @@ pub fn legacy_fuel_defs() -> Vec<FuelDef> {
             spotting: false,
             prob_ign_by_embers: 0.0,
             burn: true,
+            crowning: false,
             spread_probability: probs([
                 (1, 0.375),
                 (2, 0.375),
@@ -244,6 +251,7 @@ pub fn legacy_fuel_defs() -> Vec<FuelDef> {
             spotting: false,
             prob_ign_by_embers: 0.0,
             burn: false,
+            crowning: false,
             spread_probability: probs([
                 (1, 0.005),
                 (2, 0.005),
@@ -265,6 +273,7 @@ pub fn legacy_fuel_defs() -> Vec<FuelDef> {
             spotting: false,
             prob_ign_by_embers: 0.0,
             burn: true,
+            crowning: false,
             spread_probability: probs([
                 (1, 0.25),
                 (2, 0.35),
@@ -286,6 +295,7 @@ pub fn legacy_fuel_defs() -> Vec<FuelDef> {
             spotting: true,
             prob_ign_by_embers: 0.4,
             burn: true,
+            crowning: true,
             spread_probability: probs([
                 (1, 0.275),
                 (2, 0.4),
@@ -307,6 +317,7 @@ pub fn legacy_fuel_defs() -> Vec<FuelDef> {
             spotting: false,
             prob_ign_by_embers: 0.0,
             burn: true,
+            crowning: false,
             spread_probability: probs([
                 (1, 0.25),
                 (2, 0.3),
@@ -328,6 +339,7 @@ pub fn legacy_fuel_defs() -> Vec<FuelDef> {
             spotting: false,
             prob_ign_by_embers: 0.0,
             burn: true,
+            crowning: false,
             spread_probability: probs([
                 (1, 0.25),
                 (2, 0.375),
@@ -365,6 +377,9 @@ mod tests {
         // conifers spotting
         assert!(fuels.spotting[4]);
         assert!((fuels.prob_ign_by_embers[4] - 0.4).abs() < 1e-12);
+        // conifers crowning, as in the numba legacy table
+        assert!(fuels.crowning[4]);
+        assert!(!fuels.crowning[0]);
         // transition probability lookup
         let from = 0; // broadleaves
         let to = 4; // conifers
