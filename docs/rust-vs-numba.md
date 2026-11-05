@@ -37,7 +37,7 @@ the same thing to both.
 | Per-realization state | slices of shared N-D arrays | independent owned structures |
 | Front-heap growth | preallocate + *suspend-and-regrow* | grow `Vec`s on demand |
 | RNG | one per **thread** | one per **realization** |
-| Reproducibility | fixed machine **and** thread count | any thread count |
+| Reproducibility | fixed machine, thread count **and** `step` windows | any thread count or windows |
 | Parallelism | numba `prange` / OpenMP | scoped OS threads over realizations |
 | First-step latency | includes JIT warm-up | none |
 
@@ -51,9 +51,29 @@ across threads. Two runs with the same seed are bitwise-identical only on the
 same machine **and** with the same numba thread count (`NUMBA_NUM_THREADS`);
 change the thread count and the per-realization streams shift.
 
+When there are more realizations than threads, the run must also use the same
+sequence of `step` windows. The kernel advances each realization to the end of
+the window before moving on to the next, so realizations sharing a thread take
+turns drawing from that thread's RNG. Splitting a window (`step(1800);
+step(3600)` instead of `step(5400)`) changes the order in which they draw, so
+every realization gets different numbers. Measured with 8 realizations on the
+numba core:
+
+| threads | split windows bitwise-equal to one window? |
+|---:|---|
+| 1 | no |
+| 4 | no |
+| 8 | yes |
+
+Both runs are valid samples of the same ensemble, but a seeded run is
+repeatable only if the caller keeps both the thread count and the output
+cadence fixed (a different CLI output interval, or a front end that advances
+in irregular steps, breaks it). With one realization, or at least one thread
+per realization, the windows do not matter.
+
 The **Rust core** seeds each *realization* independently (from
 `seed ⊕ realization`), so a seeded run is bitwise reproducible **regardless
-of thread count** — the same 100 realizations come out identically on 1 or 32
+of thread count and of how the run is split into `step` windows** — the same 100 realizations come out identically on 1 or 32
 threads. This also makes tile freezing provably behaviour-neutral: it never
 perturbs the RNG stream.
 

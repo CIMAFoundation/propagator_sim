@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   Rust adapter and wasm bindings and included in the web memory guardrail
   for `core: "rust"`.
 
+- Docs: `rust-vs-numba.md` now states that seeded numba runs with more
+  realizations than threads are bitwise repeatable only with the same
+  sequence of `step` windows (the realizations sharing a thread take turns
+  on its RNG), with measurements; the Rust core is unaffected.
+
 ### Added
 
 - Core parity: `boundary_proximity(margin)` — which edges (N/S/W/E) have
