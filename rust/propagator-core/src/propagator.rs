@@ -12,6 +12,7 @@ use crate::checkpoint::{
 };
 use crate::edges::EdgeCache;
 use crate::error::{PropagatorError, Result};
+use crate::front::FrontHeap;
 use crate::fold::{fold_realization, PropagatorOutput, PropagatorStats, StateFold};
 use crate::fuels::{legacy_fuel_system, FuelSystem};
 use crate::grid::Grid2;
@@ -353,6 +354,32 @@ impl Propagator {
     /// Bytes currently held by the shared edge cache.
     pub fn edge_cache_bytes(&self) -> usize {
         self.edges.allocated_bytes()
+    }
+
+    /// Release edge-cache tiles that no realization will read soon: those
+    /// with no pending front event within `margin_tiles` tiles in any
+    /// realization. A cell's cached edges are only read when that cell
+    /// burns, and the cache holds deterministic values, so a released tile
+    /// is simply recomputed if fire comes back: results stay bitwise
+    /// identical. Needs no `freeze_dir`. Returns the tiles released.
+    pub fn trim_edge_cache(&mut self, margin_tiles: usize) -> usize {
+        let shape = self.edges.tiles_shape();
+        let mut near = vec![false; shape.0 * shape.1];
+        for real in &self.reals {
+            mark_near_events(&real.heap, shape, margin_tiles, &mut near);
+        }
+        let mut released = 0;
+        for tile_row in 0..shape.0 {
+            for tile_col in 0..shape.1 {
+                if !near[tile_row * shape.1 + tile_col]
+                    && self.edges.is_allocated(tile_row, tile_col)
+                {
+                    self.edges.release_tile(tile_row, tile_col);
+                    released += 1;
+                }
+            }
+        }
+        released
     }
 
     /// Which domain edges the front is pressing against, as
@@ -1758,6 +1785,31 @@ fn freezable_tiles(
         .collect()
 }
 
+/// Mark in `near` (a `tiles_h x tiles_w` row-major grid) every tile within
+/// `margin` tiles (Chebyshev distance) of a pending event of `heap`.
+fn mark_near_events(
+    heap: &FrontHeap,
+    (tiles_h, tiles_w): (usize, usize),
+    margin: usize,
+    near: &mut [bool],
+) {
+    for (row, col) in heap.event_cells() {
+        if row < 0 || col < 0 {
+            continue;
+        }
+        let (tile_row, tile_col) = ((row as usize) >> TILE_SHIFT, (col as usize) >> TILE_SHIFT);
+        if tile_row >= tiles_h || tile_col >= tiles_w {
+            continue;
+        }
+        let row_hi = (tile_row + margin).min(tiles_h - 1);
+        let col_hi = (tile_col + margin).min(tiles_w - 1);
+        for near_row in tile_row.saturating_sub(margin)..=row_hi {
+            let base = near_row * tiles_w;
+            near[base + tile_col.saturating_sub(margin)..=base + col_hi].fill(true);
+        }
+    }
+}
+
 /// Live tiles of one realization that fuzzy freezing moves to disk as
 /// cold, in tile-position order: not `dead`, at least
 /// `min_inactive_fraction` of their in-domain cells burnt or fuel-free,
@@ -1771,23 +1823,13 @@ fn cold_tiles(
 ) -> Vec<(usize, usize, i32, FrozenSummary)> {
     let tiles = &real.tiles;
     let (tiles_h, tiles_w) = tiles.tiles_shape();
-    let margin = fuzzy.event_margin_tiles;
     let mut near_event = vec![false; tiles_h * tiles_w];
-    for (row, col) in real.heap.event_cells() {
-        if row < 0 || col < 0 {
-            continue;
-        }
-        let (tile_row, tile_col) = ((row as usize) >> TILE_SHIFT, (col as usize) >> TILE_SHIFT);
-        if tile_row >= tiles_h || tile_col >= tiles_w {
-            continue;
-        }
-        let row_hi = (tile_row + margin).min(tiles_h - 1);
-        let col_hi = (tile_col + margin).min(tiles_w - 1);
-        for near_row in tile_row.saturating_sub(margin)..=row_hi {
-            let base = near_row * tiles_w;
-            near_event[base + tile_col.saturating_sub(margin)..=base + col_hi].fill(true);
-        }
-    }
+    mark_near_events(
+        &real.heap,
+        (tiles_h, tiles_w),
+        fuzzy.event_margin_tiles,
+        &mut near_event,
+    );
     let dead: HashSet<(usize, usize)> = dead.iter().map(|t| (t.0, t.1)).collect();
     tiles
         .allocated()

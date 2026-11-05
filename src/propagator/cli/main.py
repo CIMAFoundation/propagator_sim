@@ -112,6 +112,13 @@ class PropagatorCLILegacy(BaseSettings):
         description="Fuzzy freezing: keep tiles live within this many "
         "tiles of a pending front event",
     )
+    edge_cache_trim_margin: Optional[int] = Field(
+        1,
+        ge=0,
+        description="Rust core: after each output, free edge-cache tiles "
+        "with no front event within this many tiles (results unchanged; "
+        "null disables)",
+    )
     seed: Optional[int] = Field(
         None,
         description="Seed for the simulation RNGs (reproducible for a "
@@ -494,6 +501,7 @@ def main() -> None:
         cog_loader=cog_loader,
         grow_margin=cli.grow_margin,
         freeze_dir=cli.freeze_dir,
+        edge_cache_trim_margin=cli.edge_cache_trim_margin,
         on_domain_grow=_on_domain_grow,
         verbose=cli.verbose,
     )

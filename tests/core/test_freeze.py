@@ -374,7 +374,9 @@ def test_rust_freeze_diagnostic_reports_counts():
     )
 
 
-def _rust_spotting_run(tmp_path, fuzzy: float | None):
+def _rust_spotting_run(
+    tmp_path, fuzzy: float | None, trim_margin: int | None = None
+):
     pytest.importorskip("propagator_rust")
     from propagator.core.constants import (  # type: ignore
         FUEL_SYSTEM_LEGACY_DICT,
@@ -405,6 +407,8 @@ def _rust_spotting_run(tmp_path, fuzzy: float | None):
     )
     for _ in range(36):
         simulator.step(seconds=600)
+        if trim_margin is not None:
+            simulator.trim_edge_cache(trim_margin)
         if fuzzy is not None:
             simulator.freeze_inactive_tiles()
     return simulator
@@ -455,4 +459,16 @@ def test_rust_fuzzy_freeze_requires_freeze_dir():
             realizations=1,
             fuels_dict=FUEL_SYSTEM_LEGACY_DICT,
             fuzzy_freeze_threshold=0.9,
+        )
+
+
+def test_rust_edge_cache_trim_is_result_neutral(tmp_path):
+    plain_sim = _rust_spotting_run(tmp_path, None)
+    plain = plain_sim.get_output()
+    trimmed_sim = _rust_spotting_run(tmp_path, None, trim_margin=0)
+    trimmed = trimmed_sim.get_output()
+    assert trimmed_sim.edge_cache_bytes() < plain_sim.edge_cache_bytes()
+    for name in ("fire_probability", "min_arrival_time", "ros_max", "fli_max"):
+        np.testing.assert_array_equal(
+            getattr(plain, name), getattr(trimmed, name), err_msg=name
         )

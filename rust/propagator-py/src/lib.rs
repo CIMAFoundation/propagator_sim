@@ -594,6 +594,13 @@ impl Propagator {
         self.inner.edge_cache_bytes()
     }
 
+    /// Release edge-cache tiles with no pending front event within
+    /// `margin_tiles` tiles in any realization; returns the tiles released.
+    /// Results are unchanged: released tiles are recomputed on demand.
+    fn trim_edge_cache(&mut self, margin_tiles: usize) -> usize {
+        self.inner.trim_edge_cache(margin_tiles)
+    }
+
     /// Snapshot as a dict of numpy rasters plus a nested `stats` dict; the
     /// Python adapter re-wraps this into the core's dataclasses.
     fn get_output<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {

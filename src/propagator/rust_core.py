@@ -219,6 +219,13 @@ class Propagator:
     def freeze_inactive_tiles(self) -> int:
         return self._sim.freeze_inactive_tiles()
 
+    def trim_edge_cache(self, margin_tiles: int = 1) -> int:
+        """Release edge-cache tiles with no pending front event within
+        ``margin_tiles`` tiles in any realization; returns how many were
+        released. Results are unchanged (released tiles are recomputed on
+        demand); needs no ``freeze_dir``."""
+        return int(self._sim.trim_edge_cache(margin_tiles))
+
     def freeze_diagnostic(self) -> dict[str, int]:
         """Count, without freezing, how many live tiles each freeze
         criterion would freeze now.

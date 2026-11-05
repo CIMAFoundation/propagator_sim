@@ -278,6 +278,18 @@ bitwise identical. Lower thresholds free more memory at the price of
 more fault-ins. The option requires `freeze_dir`; the numba core does
 not support it.
 
+### Edge-cache trimming (Rust core only)
+
+The Rust core caches the realization-independent spread quantities of
+every cell edge (probability, transition time, RoS, intensity) in 32×32
+blocks of ~168 KB, shared by all realizations. A block is only read when
+one of its cells burns, so blocks far from every front are dead weight.
+After each output the runner calls `trim_edge_cache(margin)`, which frees
+the blocks with no pending front event within `margin` tiles in any
+realization; a freed block is recomputed with identical values if fire
+comes back, so results stay bitwise identical. It needs no `freeze_dir`.
+The margin is `--edge_cache_trim_margin` (default `1`; `null` disables).
+
 Frozen tiles are 13 KB each in an append-only fixed-record file
 (`frozen_tiles.bin`). The store is session-scoped: `save()` copies the
 records a checkpoint references into a sidecar file (see below), so
@@ -289,8 +301,8 @@ Rendering outputs does **not** re-read frozen tiles from disk. When a
 tile is frozen, its contribution to the output aggregates (burn counts,
 spotting counts, arrival min/sum, RoS and intensity sum/max) is folded
 into an in-memory cache — one block per spatial tile position,
-aggregated across all realizations (~44 bytes per frozen cell, i.e.
-~45 KB per 32×32 position). `get_output()` then adds these cached
+aggregated across all realizations (~72 bytes per frozen cell, i.e.
+~72 KB per 32×32 position). `get_output()` then adds these cached
 blocks to the live-tile fold, so hourly outputs on a run with a huge
 frozen interior cost no tile I/O at all.
 

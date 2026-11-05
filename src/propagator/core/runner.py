@@ -38,6 +38,9 @@ class SimulationRunner:
     #: growing until the process is killed. None means no ceiling.
     max_domain_cells: Optional[int] = None
     freeze_dir: object | None = None
+    #: Rust core: after each output, release edge-cache tiles with no front
+    #: event within this many tiles (results unchanged). None disables.
+    edge_cache_trim_margin: Optional[int] = 1
     on_domain_grow: Optional[Callable[[GeographicInfo], None]] = None
     verbose: bool = False
 
@@ -208,6 +211,13 @@ class SimulationRunner:
                 self.grow_domain()
 
         output = self.simulator.get_output()
+
+        trim_edge_cache = getattr(self.simulator, "trim_edge_cache", None)
+        if (
+            trim_edge_cache is not None
+            and self.edge_cache_trim_margin is not None
+        ):
+            trim_edge_cache(self.edge_cache_trim_margin)
 
         if self.freeze_dir is not None:
             self.simulator.freeze_inactive_tiles()
