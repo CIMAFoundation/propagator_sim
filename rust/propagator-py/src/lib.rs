@@ -543,6 +543,14 @@ impl Propagator {
         self.inner.freeze_inactive_tiles().map_err(err)
     }
 
+    /// Try to put the fire out where `success` (float32 grid, probability
+    /// of success per cell, 0 = not attempted) is positive, in every
+    /// realization; returns the number of front events cancelled. See
+    /// `Propagator::extinguish` in the Rust core.
+    fn extinguish(&mut self, success: PyReadonlyArray2<f32>) -> PyResult<usize> {
+        self.inner.extinguish(&grid_f32(success)).map_err(err)
+    }
+
     /// Bytes held by the shared per-cell edge cache (spread quantities
     /// reused across realizations; grows with the reached area, not with
     /// the realization count).

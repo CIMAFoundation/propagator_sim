@@ -1,4 +1,11 @@
-from .front_tracking import FRONT_RESERVE, TILE_RESERVE, advance_front_until
+from .front_tracking import (
+    FRONT_RESERVE,
+    SRC_EXTERNAL,
+    TILE_RESERVE,
+    advance_front_until,
+    draw_extinguish,
+    heap_retain,
+)
 from .functions import (
     MoistureModel,
     RateOfSpreadModel,
@@ -42,6 +49,9 @@ __all__ = [
     "advance_front_until",
     "FuelSystem",
     "FRONT_RESERVE",
+    "SRC_EXTERNAL",
+    "heap_retain",
+    "draw_extinguish",
     "TILE_RESERVE",
     "FLAG_FIRE",
     "FLAG_SPOT_GEN",
