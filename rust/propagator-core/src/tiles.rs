@@ -70,6 +70,7 @@ impl FrozenSummary {
     }
 
     /// Open-cell mask (all zero when solid).
+    #[cfg(test)]
     pub fn open(&self) -> RowMask {
         match self {
             FrozenSummary::Solid => [0; TILE_SIZE],
@@ -291,6 +292,7 @@ impl TileGrid {
 /// 8-connected flood fill over `open` cells from the given seeds, marking
 /// `reachable`. Grids are `grid_h x grid_w` row-major; seeds outside
 /// `open` are ignored.
+#[cfg(test)]
 pub fn flood_reachable(
     open: &[bool],
     grid_h: usize,

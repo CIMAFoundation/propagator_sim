@@ -5,7 +5,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use crate::checkpoint::{
     reanchor_event, PropagatorCheckpoint, ResumeOptions, CHECKPOINT_VERSION,
@@ -13,7 +13,7 @@ use crate::checkpoint::{
 use crate::edges::EdgeCache;
 use crate::error::{PropagatorError, Result};
 use crate::fold::{fold_realization, PropagatorOutput, PropagatorStats, StateFold};
-use crate::fuels::{legacy_fuel_system, FuelSystem, NO_FUEL};
+use crate::fuels::{legacy_fuel_system, FuelSystem};
 use crate::grid::Grid2;
 use crate::kernel::{advance_all, Realization, SharedInputs};
 use crate::models::{MoistureModel, RosModel};
@@ -22,9 +22,10 @@ use crate::scheduler::{
     BoundaryConditions, Ignitions, Scheduler, SchedulerEvent, UpdateBatch,
 };
 use crate::tile_store::{record_to_tile, TileKey, TileStore};
+use crate::reach::{is_empty, live_open, FuelMasks, Reach};
 use crate::tiles::{
-    flood_reachable, local_index, FrozenSummary, RowMask, Tile, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV,
-    TILE_SHIFT, TILE_SIZE,
+    FrozenSummary, Tile, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV, FROZEN_TILE, TILE_SHIFT,
+    TILE_SIZE,
 };
 
 /// Behaviour when fire reaches the boundary ring.
@@ -124,6 +125,9 @@ pub struct Propagator {
     fold_blocks: HashMap<(i64, i64), StateFold>,
     fold_dirty: HashSet<(i64, i64)>,
     fold_valid: bool,
+    /// per-tile fuel masks of `veg` for the freeze/thaw floods; reset
+    /// whenever the vegetation or the grid changes
+    fuel_masks: OnceLock<FuelMasks>,
 }
 
 impl Propagator {
@@ -188,6 +192,7 @@ impl Propagator {
             fold_blocks: HashMap::new(),
             fold_dirty: HashSet::new(),
             fold_valid: true,
+            fuel_masks: OnceLock::new(),
         })
     }
 
@@ -603,6 +608,7 @@ impl Propagator {
             }
         }
         self.fuel_idx = self.fuels.build_fuel_index_grid(&self.veg)?;
+        self.fuel_masks = OnceLock::new();
         self.edges.invalidate();
         Ok(())
     }
@@ -617,11 +623,7 @@ impl Propagator {
                 seeds[updates.realizations[i] as usize]
                     .push((updates.rows[i] as usize, updates.cols[i] as usize));
             }
-            for (realization, cells) in seeds.iter().enumerate() {
-                if !cells.is_empty() {
-                    self.thaw_for_ignition(realization, cells)?;
-                }
-            }
+            self.thaw_for_ignitions(&seeds)?;
         }
         // push order unchanged: heap layout and RNG use are as before
         for i in 0..updates.len() {
@@ -908,82 +910,52 @@ impl Propagator {
         )
     }
 
-    /// `true` for cells (of the tile-padded grid) that could still
-    /// ignite: in-domain cells with fuel.
-    fn ignitable_grid(&self) -> (Vec<bool>, usize, usize) {
-        let (rows, cols) = self.veg.shape();
-        let (tiles_h, tiles_w) = self.reals[0].tiles.tiles_shape();
-        let grid_h = tiles_h * TILE_SIZE;
-        let grid_w = tiles_w * TILE_SIZE;
-        let mut ignitable = vec![false; grid_h * grid_w];
-        for row in 0..rows {
-            for col in 0..cols {
-                ignitable[row * grid_w + col] = self.veg[(row, col)] != NO_FUEL;
-            }
-        }
-        (ignitable, grid_h, grid_w)
+    /// Per-tile fuel masks of the current vegetation (built on first use,
+    /// dropped whenever the vegetation or the grid changes).
+    fn fuel_masks(&self) -> &FuelMasks {
+        self.fuel_masks.get_or_init(|| FuelMasks::build(&self.veg))
     }
 
     /// Freeze burned-out tiles to disk and release their memory.
     ///
     /// A tile is frozen (per realization) when propagation can never
     /// touch it again. With spotting disabled that holds for any tile
-    /// with no *reachable* unburnt fuel cell; with spotting enabled the
-    /// stricter "every cell burnt or fuel-free" criterion applies.
-    /// Freezing changes neither the dynamics nor the RNG streams; seeded
-    /// runs stay bitwise identical. Returns the number of tiles frozen.
+    /// with no *reachable* unburnt fuel cell (sparse flood, see
+    /// [`crate::reach`]: it may only over-approximate reachability); with
+    /// spotting enabled the stricter "every cell burnt or fuel-free"
+    /// criterion applies. Freezing changes neither the dynamics nor the
+    /// RNG streams; seeded runs stay bitwise identical. Returns the number
+    /// of tiles frozen.
     pub fn freeze_inactive_tiles(&mut self) -> Result<usize> {
         let store = self
             .store
             .clone()
             .ok_or(PropagatorError::FreezeDirNotSet)?;
-        let (ignitable, grid_h, grid_w) = self.ignitable_grid();
-        let mut frozen_total = 0usize;
+        let do_spotting = self.do_spotting;
+        let fuel = self.fuel_masks();
+        // classification is read-only and independent per realization
+        let decisions = map_realizations(&self.reals, self.n_threads, |_, real| {
+            freezable_tiles(real, fuel, do_spotting)
+        });
 
-        for r in 0..self.n_realizations {
-            let allocated: Vec<(usize, usize, i32)> =
-                self.reals[r].tiles.allocated().collect();
-            if allocated.is_empty() {
+        // writes and fold accumulation stay sequential, in realization
+        // then tile-position order, exactly as before
+        let mut frozen_total = 0usize;
+        for (r, to_freeze) in decisions.into_iter().enumerate() {
+            if to_freeze.is_empty() {
                 continue;
             }
-
-            let freezable: Vec<bool> = if self.do_spotting {
-                // every in-domain fuel cell of the tile must be burnt
-                allocated
-                    .iter()
-                    .map(|&(tile_row, tile_col, slot)| {
-                        let tile = self.reals[r].tiles.tile(slot);
-                        tile_all_inactive(tile, tile_row, tile_col, &ignitable, grid_w)
-                    })
-                    .collect()
-            } else {
-                let reachable = self.reachable_grid(r, &allocated, &ignitable, grid_h, grid_w);
-                allocated
-                    .iter()
-                    .map(|&(tile_row, tile_col, _)| {
-                        !tile_any(&reachable, tile_row, tile_col, grid_w)
-                    })
-                    .collect()
-            };
-
-            let mut to_freeze: Vec<(usize, usize, i32, FrozenSummary)> = Vec::new();
-            for (&(tile_row, tile_col, slot), &can_freeze) in
-                allocated.iter().zip(freezable.iter())
-            {
-                if !can_freeze {
-                    continue;
-                }
+            for &(tile_row, tile_col, slot, _) in &to_freeze {
                 let key = self.tile_world_key(r, tile_row, tile_col);
-                let summary = {
-                    let tile = self.reals[r].tiles.tile(slot);
-                    store.freeze(key, tile)?;
-                    FrozenSummary::from_open(&open_mask(
-                        tile, tile_row, tile_col, &ignitable, grid_w,
-                    ))
-                };
-                let tile = self.reals[r].tiles.tile(slot).clone();
-                self.fold_cache_add(&key, &tile);
-                to_freeze.push((tile_row, tile_col, slot, summary));
+                let tile = self.reals[r].tiles.tile(slot);
+                store.freeze(key, tile)?;
+                fold_cache_add(
+                    &mut self.fold_blocks,
+                    &self.fold_dirty,
+                    self.fold_valid,
+                    &key,
+                    tile,
+                );
             }
             frozen_total += to_freeze.len();
             self.reals[r].tiles.freeze_tiles(to_freeze);
@@ -992,6 +964,36 @@ impl Propagator {
             self.release_dead_edge_tiles();
         }
         Ok(frozen_total)
+    }
+
+    /// Count, without freezing anything, how many allocated (live) tiles
+    /// each freeze criterion would freeze right now. With spotting enabled
+    /// `blocked_by_strict` is the number of tiles kept live only because
+    /// spotting uses the strict "every fuel cell burnt" criterion instead
+    /// of reachability. Needs no freeze store.
+    pub fn freeze_diagnostic(&self) -> FreezeDiagnostic {
+        let fuel = self.fuel_masks();
+        let per_real = map_realizations(&self.reals, self.n_threads, |_, real| {
+            let strict: HashSet<(usize, usize)> = freezable_tiles(real, fuel, true)
+                .into_iter()
+                .map(|(row, col, _, _)| (row, col))
+                .collect();
+            let reachability = freezable_tiles(real, fuel, false);
+            let allocated = real.tiles.allocated().count();
+            let blocked = reachability
+                .iter()
+                .filter(|t| !strict.contains(&(t.0, t.1)))
+                .count();
+            (allocated, strict.len(), reachability.len(), blocked)
+        });
+        let mut diagnostic = FreezeDiagnostic::default();
+        for (allocated, strict, reachability, blocked) in per_real {
+            diagnostic.allocated += allocated;
+            diagnostic.strict_freezable += strict;
+            diagnostic.reachability_freezable += reachability;
+            diagnostic.blocked_by_strict += blocked;
+        }
+        diagnostic
     }
 
     /// Free cached edges of blocks no realization holds a live tile for:
@@ -1010,44 +1012,6 @@ impl Propagator {
                 }
             }
         }
-    }
-
-    /// Cells reachable from any pending front event through unburnt fuel
-    /// (fire only spreads through unburnt fuel: components with no seed
-    /// can never burn).
-    fn reachable_grid(
-        &self,
-        realization: usize,
-        allocated: &[(usize, usize, i32)],
-        ignitable: &[bool],
-        grid_h: usize,
-        grid_w: usize,
-    ) -> Vec<bool> {
-        let tiles = &self.reals[realization].tiles;
-        let mut open: Vec<bool> = ignitable.to_vec();
-        for &(tile_row, tile_col, slot) in allocated {
-            let tile = tiles.tile(slot);
-            let row0 = tile_row << TILE_SHIFT;
-            let col0 = tile_col << TILE_SHIFT;
-            for local_row in 0..TILE_SIZE {
-                for local_col in 0..TILE_SIZE {
-                    if tile.flags[local_row * TILE_SIZE + local_col] & FLAG_FIRE != 0 {
-                        open[(row0 + local_row) * grid_w + (col0 + local_col)] = false;
-                    }
-                }
-            }
-        }
-        let seeds: Vec<(usize, usize)> = self.reals[realization]
-            .heap
-            .event_cells()
-            .filter(|&(row, col)| {
-                row >= 0 && col >= 0 && (row as usize) < grid_h && (col as usize) < grid_w
-            })
-            .map(|(row, col)| (row as usize, col as usize))
-            .collect();
-        let mut reachable = vec![false; grid_h * grid_w];
-        flood_reachable(&open, grid_h, grid_w, &seeds, &mut reachable);
-        reachable
     }
 
     /// Load a frozen tile back into the pool.
@@ -1075,74 +1039,82 @@ impl Propagator {
         Ok(keys.len())
     }
 
-    /// Thaw every frozen tile new ignitions at `cells` could reach: their
-    /// whole unburnt-fuel components must be live again for the kernel to
-    /// propagate through them. The ignition tiles themselves are always
-    /// thawed.
-    fn thaw_for_ignition(&mut self, realization: usize, cells: &[(usize, usize)]) -> Result<()> {
-        if self.store.is_none() || self.reals[realization].tiles.frozen_count() == 0 {
+    /// Thaw every frozen tile new ignitions could reach (`seeds[r]` are
+    /// realization `r`'s ignition cells): their whole unburnt-fuel
+    /// components must be live again for the kernel to propagate through
+    /// them. One sparse flood per realization, from the in-RAM frozen
+    /// summaries: solid tiles are never reached, only tiles that actually
+    /// thaw are read from disk, and an ignition's own tile always thaws.
+    fn thaw_for_ignitions(&mut self, seeds: &[Vec<(usize, usize)>]) -> Result<()> {
+        if self.store.is_none() {
             return Ok(());
         }
-        let frozen: Vec<(usize, usize)> =
-            self.reals[realization].tiles.frozen_positions().collect();
-        if frozen.is_empty() {
-            return Ok(());
-        }
-
-        let (ignitable, grid_h, grid_w) = self.ignitable_grid();
-        // burnt-state union of live and frozen tiles; frozen tiles come
-        // from their in-RAM summaries, never from disk
-        let mut open = ignitable;
-        {
-            let tiles = &self.reals[realization].tiles;
-            for (tile_row, tile_col, slot) in tiles.allocated() {
-                let tile = tiles.tile(slot);
-                close_burnt_cells(&mut open, tile, tile_row, tile_col, grid_w);
+        let fuel = self.fuel_masks();
+        let to_thaw = map_realizations(&self.reals, self.n_threads, |r, real| {
+            let cells = &seeds[r];
+            if cells.is_empty() || real.tiles.frozen_count() == 0 {
+                return Vec::new();
             }
-            for &(tile_row, tile_col) in &frozen {
-                // a missing summary keeps every fuel cell open (safe)
-                if let Some(summary) = tiles.frozen_summary(tile_row, tile_col) {
-                    close_unsummarized_cells(&mut open, &summary.open(), tile_row, tile_col, grid_w);
-                }
+            let mut reach = Reach::build(&real.tiles, fuel);
+            for &(row, col) in cells {
+                reach.seed_cell(row, col);
             }
-        }
-
-        let mut reachable = vec![false; grid_h * grid_w];
-        flood_reachable(&open, grid_h, grid_w, cells, &mut reachable);
-
-        let target_tiles: HashSet<(usize, usize)> = cells
-            .iter()
-            .map(|&(row, col)| (row >> TILE_SHIFT, col >> TILE_SHIFT))
-            .collect();
-        for (tile_row, tile_col) in frozen {
-            // solid tiles have no open cell, so only their own ignitions
-            // thaw them; only thawed tiles are read back from disk
-            if target_tiles.contains(&(tile_row, tile_col))
-                || tile_any(&reachable, tile_row, tile_col, grid_w)
-            {
+            reach.run();
+            let targets: HashSet<(usize, usize)> = cells
+                .iter()
+                .map(|&(row, col)| (row >> TILE_SHIFT, col >> TILE_SHIFT))
+                .collect();
+            real.tiles
+                .frozen_positions()
+                .filter(|&(tile_row, tile_col)| {
+                    targets.contains(&(tile_row, tile_col)) || reach.reached(tile_row, tile_col)
+                })
+                .collect::<Vec<_>>()
+        });
+        for (realization, positions) in to_thaw.into_iter().enumerate() {
+            for (tile_row, tile_col) in positions {
                 self.thaw_tile(realization, tile_row, tile_col)?;
             }
         }
         Ok(())
     }
 
-    // --- frozen-fold cache ---------------------------------------------------
-
-    fn fold_cache_add(&mut self, key: &TileKey, tile: &Tile) {
-        if !self.fold_valid {
-            return;
+    /// Thaw frozen tiles that straddled the old south/east domain edge
+    /// and gain in-domain cells when the grid grows: their summaries (and
+    /// the kernel, which reads frozen tiles as burnt) know nothing of the
+    /// new cells. `old_shape` is in the old grid, the shift places it in
+    /// the new one.
+    fn thaw_grown_edge_tiles(
+        &mut self,
+        old_shape: (usize, usize),
+        row_shift: usize,
+        col_shift: usize,
+    ) -> Result<()> {
+        if self.store.is_none() {
+            return Ok(());
         }
-        let position = (key.1, key.2);
-        if self.fold_dirty.contains(&position) {
-            // the block will be rebuilt from the store anyway
-            return;
+        let (rows, cols) = self.veg.shape();
+        let (tiles_h, tiles_w) = self.reals[0].tiles.tiles_shape();
+        let mut positions: Vec<(usize, usize)> = Vec::new();
+        if !old_shape.0.is_multiple_of(TILE_SIZE) && row_shift + old_shape.0 < rows {
+            let tile_row = (row_shift + old_shape.0) >> TILE_SHIFT;
+            positions.extend((0..tiles_w).map(|tile_col| (tile_row, tile_col)));
         }
-        let block = self
-            .fold_blocks
-            .entry(position)
-            .or_insert_with(|| StateFold::empty(TILE_SIZE, TILE_SIZE));
-        block.accumulate_tile(tile, 0, 0);
+        if !old_shape.1.is_multiple_of(TILE_SIZE) && col_shift + old_shape.1 < cols {
+            let tile_col = (col_shift + old_shape.1) >> TILE_SHIFT;
+            positions.extend((0..tiles_h).map(|tile_row| (tile_row, tile_col)));
+        }
+        for realization in 0..self.n_realizations {
+            for &(tile_row, tile_col) in &positions {
+                if self.reals[realization].tiles.slot_of(tile_row, tile_col) == FROZEN_TILE {
+                    self.thaw_tile(realization, tile_row, tile_col)?;
+                }
+            }
+        }
+        Ok(())
     }
+
+    // --- frozen-fold cache ---------------------------------------------------
 
     /// A record left this position (thaw): min/max aggregates cannot be
     /// subtracted, so the whole position is rebuilt lazily.
@@ -1265,6 +1237,7 @@ impl Propagator {
         }
         self.veg = checkpoint.veg.clone();
         self.fuel_idx = self.fuels.build_fuel_index_grid(&self.veg)?;
+        self.fuel_masks = OnceLock::new();
         self.load_state(checkpoint, 0, 0)
     }
 
@@ -1343,6 +1316,7 @@ impl Propagator {
         self.veg = veg;
         self.dem = dem;
         self.fuel_idx = self.fuels.build_fuel_index_grid(&self.veg)?;
+        self.fuel_masks = OnceLock::new();
         self.origin = origin;
         self.edges.reset(new_shape.0, new_shape.1);
 
@@ -1353,6 +1327,7 @@ impl Propagator {
             real.tiles
                 .reanchor(new_shape.0, new_shape.1, tile_row0, tile_col0);
         }
+        self.thaw_grown_edge_tiles(old_shape, row_shift, col_shift)?;
 
         for field in [&mut self.moisture, &mut self.wind_dir, &mut self.wind_speed] {
             if let Some(grid) = field.take() {
@@ -1451,7 +1426,12 @@ impl Propagator {
             self.scheduler.add_event(*event_time, event);
         }
 
-        self.restore_frozen(checkpoint)
+        self.fuel_masks = OnceLock::new();
+        self.restore_frozen(checkpoint)?;
+        if grew {
+            self.thaw_grown_edge_tiles(old_shape, row_shift, col_shift)?;
+        }
+        Ok(())
     }
 
     /// Re-attach a checkpoint's frozen tiles to this propagator: same
@@ -1556,99 +1536,120 @@ fn scatter_tile<T: Clone>(
     }
 }
 
-/// Every cell of the tile is burnt or non-ignitable.
-fn tile_all_inactive(
+/// Freeze-criterion counts over every realization's live tiles, from
+/// [`Propagator::freeze_diagnostic`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct FreezeDiagnostic {
+    /// live (allocated) tiles
+    pub allocated: usize,
+    /// tiles the strict (spotting) criterion would freeze: every
+    /// in-domain fuel cell burnt
+    pub strict_freezable: usize,
+    /// tiles the reachability (no-spotting) criterion would freeze
+    pub reachability_freezable: usize,
+    /// tiles reachability would freeze but the strict criterion keeps
+    pub blocked_by_strict: usize,
+}
+
+/// `f(r, &reals[r])` for every realization, in order: on scoped threads
+/// when `n_threads > 1`, else sequentially (no thread is ever spawned,
+/// so this works on targets without threads such as wasm32).
+fn map_realizations<T, F>(reals: &[Realization], n_threads: usize, f: F) -> Vec<T>
+where
+    T: Send,
+    F: Fn(usize, &Realization) -> T + Sync,
+{
+    let n_threads = n_threads.max(1).min(reals.len().max(1));
+    if n_threads <= 1 {
+        return reals.iter().enumerate().map(|(r, real)| f(r, real)).collect();
+    }
+    let chunk_size = reals.len().div_ceil(n_threads);
+    let f = &f;
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = reals
+            .chunks(chunk_size)
+            .enumerate()
+            .map(|(chunk, slice)| {
+                scope.spawn(move || {
+                    slice
+                        .iter()
+                        .enumerate()
+                        .map(|(i, real)| f(chunk * chunk_size + i, real))
+                        .collect::<Vec<T>>()
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .flat_map(|handle| handle.join().expect("freeze worker panicked"))
+            .collect()
+    })
+}
+
+/// Live tiles of one realization that can be frozen, in tile-position
+/// order, each with its frozen summary. `strict`: every in-domain fuel
+/// cell burnt (the spotting criterion); otherwise no cell reachable from
+/// a pending front event (sparse over-approximation).
+fn freezable_tiles(
+    real: &Realization,
+    fuel: &FuelMasks,
+    strict: bool,
+) -> Vec<(usize, usize, i32, FrozenSummary)> {
+    let tiles = &real.tiles;
+    if strict || real.heap.is_empty() {
+        // no flood needed: open masks alone decide (an empty heap reaches
+        // nothing, so every tile freezes)
+        return tiles
+            .allocated()
+            .filter_map(|(tile_row, tile_col, slot)| {
+                let open = live_open(tiles.tile(slot), fuel.get(tile_row, tile_col));
+                if strict && !is_empty(&open) {
+                    return None;
+                }
+                Some((tile_row, tile_col, slot, FrozenSummary::from_open(&open)))
+            })
+            .collect();
+    }
+    let mut reach = Reach::build(tiles, fuel);
+    let (tiles_h, tiles_w) = tiles.tiles_shape();
+    for (row, col) in real.heap.event_cells() {
+        if row >= 0
+            && col >= 0
+            && ((row as usize) >> TILE_SHIFT) < tiles_h
+            && ((col as usize) >> TILE_SHIFT) < tiles_w
+        {
+            reach.seed_cell(row as usize, col as usize);
+        }
+    }
+    reach.run();
+    tiles
+        .allocated()
+        .filter(|&(tile_row, tile_col, _)| !reach.reached(tile_row, tile_col))
+        .map(|(tile_row, tile_col, slot)| {
+            let open = reach.open_mask(tile_row, tile_col);
+            (tile_row, tile_col, slot, FrozenSummary::from_open(&open))
+        })
+        .collect()
+}
+
+/// Accumulate a newly frozen tile into the frozen-fold cache.
+fn fold_cache_add(
+    blocks: &mut HashMap<(i64, i64), StateFold>,
+    dirty: &HashSet<(i64, i64)>,
+    valid: bool,
+    key: &TileKey,
     tile: &Tile,
-    tile_row: usize,
-    tile_col: usize,
-    ignitable: &[bool],
-    grid_w: usize,
-) -> bool {
-    let row0 = tile_row << TILE_SHIFT;
-    let col0 = tile_col << TILE_SHIFT;
-    for local_row in 0..TILE_SIZE {
-        for local_col in 0..TILE_SIZE {
-            let burnt =
-                tile.flags[local_row * TILE_SIZE + local_col] & FLAG_FIRE != 0;
-            if !burnt && ignitable[(row0 + local_row) * grid_w + (col0 + local_col)] {
-                return false;
-            }
-        }
-    }
-    true
-}
-
-/// Any true cell of `mask` inside the tile's block.
-fn tile_any(mask: &[bool], tile_row: usize, tile_col: usize, grid_w: usize) -> bool {
-    let row0 = tile_row << TILE_SHIFT;
-    let col0 = tile_col << TILE_SHIFT;
-    for local_row in 0..TILE_SIZE {
-        let base = (row0 + local_row) * grid_w + col0;
-        if mask[base..base + TILE_SIZE].iter().any(|&v| v) {
-            return true;
-        }
-    }
-    false
-}
-
-/// Open cells (in-domain fuel, unburnt) of a live tile.
-fn open_mask(
-    tile: &Tile,
-    tile_row: usize,
-    tile_col: usize,
-    ignitable: &[bool],
-    grid_w: usize,
-) -> RowMask {
-    let row0 = tile_row << TILE_SHIFT;
-    let col0 = tile_col << TILE_SHIFT;
-    let mut mask: RowMask = [0; TILE_SIZE];
-    for (local_row, bits) in mask.iter_mut().enumerate() {
-        for local_col in 0..TILE_SIZE {
-            let burnt = tile.flags[local_row * TILE_SIZE + local_col] & FLAG_FIRE != 0;
-            if !burnt && ignitable[(row0 + local_row) * grid_w + (col0 + local_col)] {
-                *bits |= 1 << local_col;
-            }
-        }
-    }
-    mask
-}
-
-/// Clear `open` inside the tile wherever `mask` has no open cell.
-fn close_unsummarized_cells(
-    open: &mut [bool],
-    mask: &RowMask,
-    tile_row: usize,
-    tile_col: usize,
-    grid_w: usize,
 ) {
-    let row0 = tile_row << TILE_SHIFT;
-    let col0 = tile_col << TILE_SHIFT;
-    for (local_row, bits) in mask.iter().enumerate() {
-        for local_col in 0..TILE_SIZE {
-            if bits >> local_col & 1 == 0 {
-                open[(row0 + local_row) * grid_w + (col0 + local_col)] = false;
-            }
-        }
+    if !valid {
+        return;
     }
-}
-
-/// Clear `open` where the tile's cells are burnt.
-fn close_burnt_cells(
-    open: &mut [bool],
-    tile: &Tile,
-    tile_row: usize,
-    tile_col: usize,
-    grid_w: usize,
-) {
-    let row0 = tile_row << TILE_SHIFT;
-    let col0 = tile_col << TILE_SHIFT;
-    for local_row in 0..TILE_SIZE {
-        for local_col in 0..TILE_SIZE {
-            if tile.flags[local_index(row0 + local_row, col0 + local_col)] & FLAG_FIRE
-                != 0
-            {
-                open[(row0 + local_row) * grid_w + (col0 + local_col)] = false;
-            }
-        }
+    let position = (key.1, key.2);
+    if dirty.contains(&position) {
+        // the block will be rebuilt from the store anyway
+        return;
     }
+    blocks
+        .entry(position)
+        .or_insert_with(|| StateFold::empty(TILE_SIZE, TILE_SIZE))
+        .accumulate_tile(tile, 0, 0);
 }

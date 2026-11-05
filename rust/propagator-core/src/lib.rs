@@ -42,6 +42,7 @@ mod grid;
 mod kernel;
 mod models;
 mod propagator;
+mod reach;
 mod rng;
 mod scheduler;
 mod tile_store;
@@ -58,7 +59,8 @@ pub use fuels::{
 pub use grid::Grid2;
 pub use models::{MoistureModel, RosModel};
 pub use propagator::{
-    OobMode, Propagator, PropagatorConfig, CELLSIZE_DEFAULT, REALIZATIONS_DEFAULT,
+    FreezeDiagnostic, OobMode, Propagator, PropagatorConfig, CELLSIZE_DEFAULT,
+    REALIZATIONS_DEFAULT,
 };
 pub use scheduler::{
     BoundaryConditions, FieldInput, Ignitions, Scheduler, SchedulerEvent, UpdateBatch,
