@@ -232,7 +232,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   reading the clone's future state). The store is now only the append-only
   file; each realization owns the offsets of its frozen tiles, so clones
   and checkpoints share the file but never the index. Fold-cache rebuilds
-  also read frozen tiles in sorted key order now.
+  also read frozen tiles in sorted key order now. `TileStore` is no longer
+  part of the crate's public API (it was never reachable from a
+  `Propagator`); `TileKey`, `TileIndex` and `RECORD_SIZE` stay exported.
 
 - Rust core: growing the domain (`expand`, `from_checkpoint`) on a grid
   whose size is not a multiple of 32 left frozen tiles on the old south /

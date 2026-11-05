@@ -14,7 +14,7 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Mutex;
 
 use crate::error::Result;
@@ -77,8 +77,7 @@ struct StoreInner {
 /// frozen: every propagator (and every clone or checkpoint of one) keeps
 /// its own `{tile -> offset}` index, so several of them can share one file
 /// without seeing each other's freezes and thaws.
-pub struct TileStore {
-    pub path: PathBuf,
+pub(crate) struct TileStore {
     inner: Mutex<StoreInner>,
 }
 
@@ -96,12 +95,12 @@ impl TileStore {
             .truncate(true)
             .open(&path)?;
         Ok(TileStore {
-            path,
             inner: Mutex::new(StoreInner { file, end: 0 }),
         })
     }
 
     /// Bytes written so far (records are never overwritten or reclaimed).
+    #[cfg(test)]
     pub fn len_bytes(&self) -> u64 {
         self.inner.lock().unwrap().end
     }
