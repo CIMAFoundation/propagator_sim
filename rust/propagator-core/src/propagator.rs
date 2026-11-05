@@ -608,17 +608,27 @@ impl Propagator {
     }
 
     fn schedule_ignitions(&mut self, time: i64, updates: &UpdateBatch) -> Result<()> {
+        // a new ignition seeds spread through areas that may have been
+        // frozen as unreachable: bring its whole component back, with one
+        // multi-seed flood per realization for the whole batch
+        if self.store.as_ref().is_some_and(|store| !store.is_empty()) {
+            let mut seeds: Vec<Vec<(usize, usize)>> = vec![Vec::new(); self.n_realizations];
+            for i in 0..updates.len() {
+                seeds[updates.realizations[i] as usize]
+                    .push((updates.rows[i] as usize, updates.cols[i] as usize));
+            }
+            for (realization, cells) in seeds.iter().enumerate() {
+                if !cells.is_empty() {
+                    self.thaw_for_ignition(realization, cells)?;
+                }
+            }
+        }
+        // push order unchanged: heap layout and RNG use are as before
         for i in 0..updates.len() {
-            let realization = updates.realizations[i] as usize;
-            let row = updates.rows[i];
-            let col = updates.cols[i];
-            // a new ignition seeds spread through areas that may have been
-            // frozen as unreachable: bring its whole component back
-            self.thaw_for_ignition(realization, row as usize, col as usize)?;
-            self.reals[realization].heap.push(
+            self.reals[updates.realizations[i] as usize].heap.push(
                 time,
-                row,
-                col,
+                updates.rows[i],
+                updates.cols[i],
                 updates.ros[i],
                 updates.fli[i],
             );
@@ -1064,10 +1074,11 @@ impl Propagator {
         Ok(keys.len())
     }
 
-    /// Thaw every frozen tile a new ignition at (row, col) could reach:
-    /// its whole unburnt-fuel component must be live again for the
-    /// kernel to propagate through it.
-    fn thaw_for_ignition(&mut self, realization: usize, row: usize, col: usize) -> Result<()> {
+    /// Thaw every frozen tile new ignitions at `cells` could reach: their
+    /// whole unburnt-fuel components must be live again for the kernel to
+    /// propagate through them. The ignition tiles themselves are always
+    /// thawed.
+    fn thaw_for_ignition(&mut self, realization: usize, cells: &[(usize, usize)]) -> Result<()> {
         let Some(store) = self.store.clone() else {
             return Ok(());
         };
@@ -1093,12 +1104,15 @@ impl Propagator {
         }
 
         let mut reachable = vec![false; grid_h * grid_w];
-        flood_reachable(&open, grid_h, grid_w, &[(row, col)], &mut reachable);
+        flood_reachable(&open, grid_h, grid_w, cells, &mut reachable);
 
-        let target_tile = (row >> TILE_SHIFT, col >> TILE_SHIFT);
+        let target_tiles: HashSet<(usize, usize)> = cells
+            .iter()
+            .map(|&(row, col)| (row >> TILE_SHIFT, col >> TILE_SHIFT))
+            .collect();
         for key in &frozen_keys {
             let (tile_row, tile_col) = self.tile_local_pos(key);
-            if (tile_row, tile_col) == target_tile
+            if target_tiles.contains(&(tile_row, tile_col))
                 || tile_any(&reachable, tile_row, tile_col, grid_w)
             {
                 self.thaw_tile(realization, tile_row, tile_col)?;
