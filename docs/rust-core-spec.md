@@ -378,16 +378,25 @@ propagation window.
   identically to `seconds`).
 - `next_time() -> Option<i64>`: min of the scheduler's next time and the
   earliest front event across realizations; `None` when fully idle.
-- `extinguish(mask) -> usize` (Rust only): put the fire out over a
-  `Grid2<bool>` area at the current time, in every realization. Every
-  pending front event *into* a masked cell is dropped, and so is every
-  contact-spread event *from* a masked cell (each heap event records the
-  neighbour it came from, `FrontHeap::src`, or `SRC_EXTERNAL` for
-  ignitions and ember landings); pending ignition boundary conditions on
-  masked cells are dropped too. Burnt cells stay burnt and the vegetation
-  is untouched, so unburnt masked cells can burn again from fire that
+- `extinguish(success) -> usize`: try to put the fire out over an area at
+  the current time. `success` is a grid of per-cell probabilities of
+  success (NaN or ≤ 0 = not attempted, ≥ 1 = certain; the Python cores
+  also take a bool mask). Each realization draws its own outcome per cell:
+  one uniform per cell with 0 < p < 1, in row-major order, from the
+  realization's RNG (Rust) or the kernels' per-thread RNGs inside a
+  `prange` over realizations (numba), so seeded runs stay reproducible
+  and certain outcomes draw nothing. Where it succeeds, every pending front
+  event *into* the cell is dropped, and so is every contact-spread event
+  *from* it (each heap event records the neighbour it came from,
+  `FrontHeap::src` / `_front_src`, or `SRC_EXTERNAL` = 255 for ignitions
+  and ember landings); pending ignition boundary conditions on the cell
+  (for that realization) are dropped too. Burnt cells stay burnt and the
+  vegetation is untouched, so unburnt cells can burn again from fire that
   ignites later; embers already in flight still land. Returns the number
-  of front events cancelled. Checkpoints capture the effect.
+  of front events cancelled. Checkpoints capture the effect; numba
+  checkpoints store the event sources from version 3 (older files load
+  with every source external, so only spread *into* cleared cells is
+  cancelled).
 - `Propagator` is `Clone`: a clone is an independent simulator with the
   same state (used to run forecasts from the live state). The edge cache
   is not copied; the clone refills it lazily, with identical results.

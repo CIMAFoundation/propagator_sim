@@ -673,14 +673,14 @@ fn extinguishing_the_whole_fire_stops_it_without_touching_fuel() {
     let before = burnt_cells(&sim);
     // A box well around the burnt area of every realization.
     let fires = sim.get_fire().unwrap();
-    let mut mask = Grid2::filled(ROWS, COLS, false);
+    let mut mask = Grid2::filled(ROWS, COLS, 0.0f32);
     for row in 0..ROWS {
         for col in 0..COLS {
             if fires.iter().any(|f| f[(row, col)] != 0) {
                 for (dr, dc) in [(-1i64, -1i64), (-1, 0), (-1, 1), (0, -1), (0, 0), (0, 1), (1, -1), (1, 0), (1, 1)] {
                     let (r, c) = (row as i64 + dr, col as i64 + dc);
                     if r >= 0 && c >= 0 && (r as usize) < ROWS && (c as usize) < COLS {
-                        mask[(r as usize, c as usize)] = true;
+                        mask[(r as usize, c as usize)] = 1.0;
                     }
                 }
             }
@@ -703,10 +703,10 @@ fn extinguished_unburnt_cells_can_burn_again_from_later_fire() {
     // Wind from the north: the front runs south (growing rows).
     sim.set_boundary_conditions(basic_conditions((30, 64))).unwrap();
     sim.step_window(60).unwrap();
-    let mut band = Grid2::filled(ROWS, COLS, false);
+    let mut band = Grid2::filled(ROWS, COLS, 0.0f32);
     for row in 60..64 {
         for col in 0..COLS {
-            band[(row, col)] = true;
+            band[(row, col)] = 1.0;
         }
     }
     sim.extinguish(&band).unwrap();
@@ -727,8 +727,52 @@ fn extinguish_is_captured_by_checkpoints() {
     sim.step_window(600).unwrap();
     let cp = sim.checkpoint();
     let mut a = sim.clone();
-    a.extinguish(&Grid2::filled(ROWS, COLS, true)).unwrap();
+    a.extinguish(&Grid2::filled(ROWS, COLS, 1.0f32)).unwrap();
     assert_eq!(a.next_time(), None);
     a.restore(&cp).unwrap();
     assert!(a.next_time().is_some());
+}
+
+fn fronts(sim: &Propagator) -> Vec<Vec<u8>> {
+    sim.get_fire()
+        .unwrap()
+        .iter()
+        .map(|g| g.as_slice().to_vec())
+        .collect()
+}
+
+#[test]
+fn extinguish_with_zero_probability_changes_nothing() {
+    // p = 0 is "not attempted": no event dropped and no RNG draw, so the run
+    // stays bitwise identical to one without the call
+    let mut a = new_sim(4);
+    let mut b = new_sim(4);
+    for sim in [&mut a, &mut b] {
+        sim.set_boundary_conditions(basic_conditions((64, 64))).unwrap();
+        sim.step_window(900).unwrap();
+    }
+    assert_eq!(a.extinguish(&Grid2::filled(ROWS, COLS, 0.0f32)).unwrap(), 0);
+    a.step_window(3600).unwrap();
+    b.step_window(3600).unwrap();
+    assert_eq!(fronts(&a), fronts(&b));
+}
+
+#[test]
+fn extinguish_success_is_drawn_per_realization_and_reproducible() {
+    let run = |seed: u64, p: f32| {
+        let mut sim = new_sim(seed);
+        sim.set_boundary_conditions(basic_conditions((64, 64))).unwrap();
+        sim.step_window(900).unwrap();
+        let dropped = sim.extinguish(&Grid2::filled(ROWS, COLS, p)).unwrap();
+        sim.step_window(3600).unwrap();
+        (dropped, fronts(&sim), sim.next_time())
+    };
+    let (all, _, next_all) = run(6, 1.0);
+    let (half, fire_half, next_half) = run(6, 0.5);
+    assert_eq!(next_all, None);
+    // a coin flip per cell: some of the front survives, but not all of it
+    assert!(half > 0 && half < all, "half {half} all {all}");
+    assert!(next_half.is_some());
+    // same seed, same outcome
+    assert_eq!(run(6, 0.5).1, fire_half);
 }

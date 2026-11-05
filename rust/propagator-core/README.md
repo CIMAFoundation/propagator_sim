@@ -60,4 +60,5 @@ println!("burned area: {:.1} ha", output.stats.area_mean / 10_000.0);
 
 The same example is the crate documentation (`cargo doc --open`).
 `tests/integration.rs` covers the rest of the API: actions, checkpoints,
-domain growth, tile freezing and `extinguish`.
+domain growth, tile freezing and `extinguish` (with a per-cell
+probability of success).
