@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Rust core: `Propagator::extinguish(mask)` puts the fire out over an area
+  in every realization (pending spread into and out of the masked cells is
+  cancelled, fuel is untouched, embers in flight still land), and
+  `Propagator` is now `Clone`. Front heap events record the neighbour they
+  came from (`FrontHeap::src`, `push_from`, `retain`). Seeded runs without
+  `extinguish` are bitwise identical.
+- Rust core: `flame_height`, `radiant_reach` and their constants are public,
+  so applications can apply the same relations to their own intensities.
+- Rust core usable as a Git dependency (`rust/propagator-core/README.md`),
+  so downstream projects no longer need to vendor a copy.
 - Flame height outputs `flame_height_mean` and `flame_height_max` (m), on
   both the Rust and the numba core and as CLI rasters. Each realization's
   fireline intensity is turned into a flame height with Byram's relation

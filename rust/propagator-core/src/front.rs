@@ -22,7 +22,16 @@ pub struct FrontHeap {
     pub ros: Vec<f32>,
     /// fireline intensity carried into the target cell, kW/m
     pub fli: Vec<f32>,
+    /// where the event came from: an index into the kernel's 8-neighbour
+    /// lattice (the source cell is `target - NEIGHBOURS[src]`), or
+    /// [`SRC_EXTERNAL`] for ignitions and ember landings. Lets
+    /// [`crate::Propagator::extinguish`] cancel the spread of put-out cells.
+    pub src: Vec<u8>,
 }
+
+/// Source code of an event not produced by contact spread (an ignition
+/// boundary condition or an ember landing).
+pub const SRC_EXTERNAL: u8 = u8::MAX;
 
 impl FrontHeap {
     /// An empty heap.
@@ -67,6 +76,7 @@ impl FrontHeap {
         self.cols.swap(i, j);
         self.ros.swap(i, j);
         self.fli.swap(i, j);
+        self.src.swap(i, j);
     }
 
     /// Schedule an ignition event, keeping the heap invariant.
@@ -75,6 +85,12 @@ impl FrontHeap {
     /// sifted up — repeatedly swapped with its parent while it is earlier —
     /// until every parent precedes its children again. O(log n).
     pub fn push(&mut self, time: i64, row: i32, col: i32, ros: f32, fli: f32) {
+        self.push_from(time, row, col, ros, fli, SRC_EXTERNAL);
+    }
+
+    /// [`FrontHeap::push`] recording the event's source (see [`FrontHeap::src`]).
+    pub fn push_from(&mut self, time: i64, row: i32, col: i32, ros: f32, fli: f32, src: u8) {
+        self.src.push(src);
         self.times.push(time);
         self.rows.push(row);
         self.cols.push(col);
@@ -110,6 +126,7 @@ impl FrontHeap {
             self.ros.pop().unwrap(),
             self.fli.pop().unwrap(),
         );
+        self.src.pop();
         let size = self.times.len();
         let mut idx = 0;
         loop {
@@ -145,6 +162,46 @@ impl FrontHeap {
         }
     }
 
+    /// Keep only the events for which `keep(row, col, src)` holds, then
+    /// restore the heap invariant. Returns how many events were dropped.
+    pub fn retain(&mut self, mut keep: impl FnMut(i32, i32, u8) -> bool) -> usize {
+        let n = self.times.len();
+        let mut w = 0;
+        for i in 0..n {
+            if keep(self.rows[i], self.cols[i], self.src[i]) {
+                self.swap(w, i);
+                w += 1;
+            }
+        }
+        self.times.truncate(w);
+        self.rows.truncate(w);
+        self.cols.truncate(w);
+        self.ros.truncate(w);
+        self.fli.truncate(w);
+        self.src.truncate(w);
+        // Floyd heapify: sift down every internal node, last first.
+        for start in (0..w / 2).rev() {
+            let mut idx = start;
+            loop {
+                let left = idx * 2 + 1;
+                if left >= w {
+                    break;
+                }
+                let right = left + 1;
+                let mut smallest = left;
+                if right < w && self.times[right] < self.times[left] {
+                    smallest = right;
+                }
+                if self.times[idx] <= self.times[smallest] {
+                    break;
+                }
+                self.swap(idx, smallest);
+                idx = smallest;
+            }
+        }
+        n - w
+    }
+
     /// Pending event target cells (unordered).
     pub fn event_cells(&self) -> impl Iterator<Item = (i32, i32)> + '_ {
         self.rows.iter().copied().zip(self.cols.iter().copied())
@@ -166,6 +223,26 @@ mod tests {
             assert!(t >= last);
             last = t;
         }
+    }
+
+    #[test]
+    fn retain_drops_events_and_keeps_order() {
+        let mut heap = FrontHeap::new();
+        for (i, t) in [5i64, 1, 4, 1, 3, 9, 0, 7, 2].iter().enumerate() {
+            heap.push_from(*t, i as i32, 0, 0.0, 0.0, i as u8);
+        }
+        let dropped = heap.retain(|row, _, _| row % 3 != 0);
+        assert_eq!(dropped, 3);
+        let mut last = i64::MIN;
+        let mut seen = Vec::new();
+        while let Some((t, r, _, _, _)) = heap.pop_min() {
+            assert!(t >= last);
+            last = t;
+            seen.push(r);
+        }
+        seen.sort();
+        assert_eq!(seen, vec![1, 2, 4, 5, 7, 8]);
+        assert!(heap.src.is_empty());
     }
 
     #[test]

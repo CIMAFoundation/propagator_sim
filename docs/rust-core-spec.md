@@ -378,6 +378,19 @@ propagation window.
   identically to `seconds`).
 - `next_time() -> Option<i64>`: min of the scheduler's next time and the
   earliest front event across realizations; `None` when fully idle.
+- `extinguish(mask) -> usize` (Rust only): put the fire out over a
+  `Grid2<bool>` area at the current time, in every realization. Every
+  pending front event *into* a masked cell is dropped, and so is every
+  contact-spread event *from* a masked cell (each heap event records the
+  neighbour it came from, `FrontHeap::src`, or `SRC_EXTERNAL` for
+  ignitions and ember landings); pending ignition boundary conditions on
+  masked cells are dropped too. Burnt cells stay burnt and the vegetation
+  is untouched, so unburnt masked cells can burn again from fire that
+  ignites later; embers already in flight still land. Returns the number
+  of front events cancelled. Checkpoints capture the effect.
+- `Propagator` is `Clone`: a clone is an independent simulator with the
+  same state (used to run forecasts from the live state). The edge cache
+  is not copied; the clone refills it lazily, with identical results.
 
 ### 6.5 Outputs
 

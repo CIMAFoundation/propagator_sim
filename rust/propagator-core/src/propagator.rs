@@ -89,6 +89,7 @@ impl PropagatorConfig {
 }
 
 /// Stochastic cellular wildfire spread simulator (see spec §1).
+#[derive(Clone)]
 pub struct Propagator {
     veg: Grid2<i32>,
     dem: Grid2<f64>,
@@ -359,6 +360,61 @@ impl Propagator {
 
         self.scheduler.add_event(bc.time, event);
         Ok(())
+    }
+
+    /// Put the fire out over `mask` (`true` = inside the area) in every
+    /// realization, at the current time. This is an intervention on the
+    /// pending front, not on the fuel:
+    ///
+    /// - every pending front event *into* a masked cell is cancelled (the
+    ///   cell does not ignite now), and so is every contact-spread event
+    ///   *from* a masked cell (an already burning cell stops spreading);
+    /// - pending ignition boundary conditions on masked cells are dropped;
+    /// - burnt cells stay burnt (their fuel is consumed) and the vegetation
+    ///   grid is untouched, so masked cells that are still unburnt can be
+    ///   reached again later by fire that ignites *after* this call;
+    /// - embers already in flight (spotting events) still land.
+    ///
+    /// Returns the number of front events cancelled.
+    pub fn extinguish(&mut self, mask: &Grid2<bool>) -> Result<usize> {
+        if mask.shape() != self.veg.shape() {
+            return Err(PropagatorError::InvalidBoundaryConditions(
+                "extinguish mask shape mismatch".into(),
+            ));
+        }
+        let (rows, cols) = (mask.rows() as i64, mask.cols() as i64);
+        let masked = |row: i64, col: i64| {
+            row >= 0 && col >= 0 && row < rows && col < cols && mask[(row as usize, col as usize)]
+        };
+        let mut dropped = 0;
+        for real in &mut self.reals {
+            dropped += real.heap.retain(|row, col, src| {
+                let (row, col) = (row as i64, col as i64);
+                if masked(row, col) {
+                    return false;
+                }
+                match crate::kernel::NEIGHBOURS.get(src as usize) {
+                    Some(&(dr, dc)) => !masked(row - dr, col - dc),
+                    None => true,
+                }
+            });
+            // a halt on the boundary may have been caused by a dropped event
+            real.halted_on_boundary = false;
+        }
+        for (_, event) in self.scheduler.events_mut() {
+            let u = &event.updates;
+            if u.is_empty() {
+                continue;
+            }
+            let mut kept = UpdateBatch::default();
+            for i in 0..u.len() {
+                if !masked(u.rows[i] as i64, u.cols[i] as i64) {
+                    kept.push(u.rows[i], u.cols[i], u.realizations[i], u.ros[i], u.fli[i]);
+                }
+            }
+            event.updates = kept;
+        }
+        Ok(dropped)
     }
 
     fn ignitions_to_updates(&self, ignitions: &Ignitions) -> Result<UpdateBatch> {
