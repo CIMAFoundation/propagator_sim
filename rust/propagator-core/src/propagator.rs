@@ -22,7 +22,7 @@ use crate::rng::Rng;
 use crate::scheduler::{
     BoundaryConditions, Ignitions, Scheduler, SchedulerEvent, UpdateBatch,
 };
-use crate::tile_store::{record_to_tile, TileKey, TileStore, RECORD_SIZE};
+use crate::tile_store::{record_to_tile, TileIndex, TileKey, TileStore, RECORD_SIZE};
 use crate::reach::{is_empty, live_open, FuelMasks, Reach};
 use crate::tiles::{
     FrozenSummary, Tile, COLD_TILE, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV, FROZEN_TILE,
@@ -854,7 +854,7 @@ impl Propagator {
         // a new ignition seeds spread through areas that may have been
         // frozen as unreachable: bring its whole component back, with one
         // multi-seed flood per realization for the whole batch
-        if self.store.as_ref().is_some_and(|store| !store.is_empty()) {
+        if self.store.is_some() && self.reals.iter().any(|real| !real.frozen.is_empty()) {
             let mut seeds: Vec<Vec<(usize, usize)>> = vec![Vec::new(); self.n_realizations];
             for i in 0..updates.len() {
                 seeds[updates.realizations[i] as usize]
@@ -1074,8 +1074,8 @@ impl Propagator {
             }
         }
         if let Some(store) = &self.store {
-            for key in store.keys() {
-                let tile = store.read(&key)?;
+            for (key, offset) in self.frozen_entries() {
+                let tile = store.read(offset)?;
                 let (tile_row, tile_col) = self.tile_local_pos(&key);
                 scatter_tile(
                     &mut out[key.0 as usize],
@@ -1140,6 +1140,22 @@ impl Propagator {
         )
     }
 
+    /// `(key, record offset)` of every frozen (dead or cold) tile, sorted
+    /// by key so reads and fold rebuilds happen in a deterministic order.
+    fn frozen_entries(&self) -> Vec<(TileKey, u64)> {
+        let mut entries: Vec<(TileKey, u64)> = self
+            .reals
+            .iter()
+            .flat_map(|real| {
+                real.frozen
+                    .iter()
+                    .map(move |(&(row, col), &offset)| ((real.index, row, col), offset))
+            })
+            .collect();
+        entries.sort_unstable_by_key(|&(key, _)| key);
+        entries
+    }
+
     fn tile_local_pos(&self, key: &TileKey) -> (usize, usize) {
         (
             ((key.1 - self.origin.0) >> TILE_SHIFT) as usize,
@@ -1191,8 +1207,9 @@ impl Propagator {
             }
             for &(tile_row, tile_col, slot, _) in dead.iter().chain(cold.iter()) {
                 let key = self.tile_world_key(r, tile_row, tile_col);
+                let offset = store.freeze(self.reals[r].tiles.tile(slot))?;
+                self.reals[r].frozen.insert((key.1, key.2), offset);
                 let tile = self.reals[r].tiles.tile(slot);
-                store.freeze(key, tile)?;
                 fold_cache_add(
                     &mut self.fold_blocks,
                     &self.fold_dirty,
@@ -1262,7 +1279,11 @@ impl Propagator {
     fn thaw_tile(&mut self, realization: usize, tile_row: usize, tile_col: usize) -> Result<()> {
         let store = self.store.clone().expect("thaw without a tile store");
         let key = self.tile_world_key(realization, tile_row, tile_col);
-        let tile = store.thaw(&key)?;
+        let offset = self.reals[realization]
+            .frozen
+            .remove(&(key.1, key.2))
+            .expect("thaw of a tile that is not frozen");
+        let tile = store.read(offset)?;
         self.reals[realization]
             .tiles
             .insert_tile(tile_row, tile_col, tile);
@@ -1272,10 +1293,10 @@ impl Propagator {
 
     /// Load every frozen tile back into memory; returns the count.
     pub fn thaw_all(&mut self) -> Result<usize> {
-        let Some(store) = self.store.clone() else {
+        if self.store.is_none() {
             return Ok(0);
-        };
-        let keys = store.keys();
+        }
+        let keys: Vec<TileKey> = self.frozen_entries().into_iter().map(|(key, _)| key).collect();
         for key in &keys {
             let (tile_row, tile_col) = self.tile_local_pos(key);
             self.thaw_tile(key.0 as usize, tile_row, tile_col)?;
@@ -1396,14 +1417,14 @@ impl Propagator {
             self.fold_blocks.clear();
             None // rebuild everything
         };
-        for key in store.keys() {
+        for (key, offset) in self.frozen_entries() {
             let position = (key.1, key.2);
             if let Some(rebuild) = &rebuild {
                 if !rebuild.contains(&position) {
                     continue;
                 }
             }
-            let tile = store.read(&key)?;
+            let tile = store.read(offset)?;
             let block = self
                 .fold_blocks
                 .entry(position)
@@ -1435,11 +1456,7 @@ impl Propagator {
 
     /// Snapshot the full dynamic state as an immutable checkpoint.
     pub fn checkpoint(&self) -> PropagatorCheckpoint {
-        let frozen_index = self
-            .store
-            .as_ref()
-            .map(|store| store.snapshot_index())
-            .unwrap_or_default();
+        let frozen_index: TileIndex = self.frozen_entries().into_iter().collect();
         let frozen_source = match &self.store {
             Some(store) if !frozen_index.is_empty() => Some(store.clone()),
             _ => None,
@@ -1683,15 +1700,15 @@ impl Propagator {
     }
 
     /// Re-attach a checkpoint's frozen tiles to this propagator: same
-    /// session store — roll the index back (records are append-only);
-    /// other store — stream-copy the records in; no store — load the
-    /// records straight into the tile pools instead.
+    /// store file — adopt the checkpoint's offsets (records are
+    /// append-only); another file — copy the records in; no store — load
+    /// the records straight into the tile pools instead.
     fn restore_frozen(&mut self, checkpoint: &PropagatorCheckpoint) -> Result<()> {
         self.fold_cache_invalidate();
+        for real in &mut self.reals {
+            real.frozen.clear();
+        }
         if checkpoint.frozen_index.is_empty() {
-            if let Some(store) = &self.store {
-                store.restore_index(Default::default());
-            }
             return Ok(());
         }
         let source = checkpoint.frozen_source.as_ref().ok_or_else(|| {
@@ -1701,14 +1718,16 @@ impl Propagator {
         })?;
 
         if let Some(store) = self.store.clone() {
-            if Arc::ptr_eq(&store, source) {
-                store.restore_index(checkpoint.frozen_index.clone());
-                return Ok(());
-            }
-            store.restore_index(Default::default());
+            let same_file = Arc::ptr_eq(&store, source);
             for (key, offset) in &checkpoint.frozen_index {
-                let payload = source.read_bytes(*offset)?;
-                store.write_record(*key, &payload)?;
+                // same file: adopt the offsets (records are append-only);
+                // another file: copy the records into this one
+                let offset = if same_file {
+                    *offset
+                } else {
+                    store.append(&source.read_bytes(*offset)?)?
+                };
+                self.reals[key.0 as usize].frozen.insert((key.1, key.2), offset);
             }
             return Ok(());
         }
