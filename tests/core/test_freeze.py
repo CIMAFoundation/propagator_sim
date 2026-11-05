@@ -420,7 +420,12 @@ def test_rust_fuzzy_freeze_is_result_neutral(tmp_path):
         "cold_tiles",
         "fault_ins",
         "fault_in_bytes",
+        "live_tiles",
+        "live_tile_bytes",
+        "edge_cache_bytes",
+        "fold_cache_bytes",
     }
+    assert stats["live_tile_bytes"] == stats["live_tiles"] * 13312
     assert stats["fault_ins"] > 0
     assert stats["fault_in_bytes"] > 0
     for name in (

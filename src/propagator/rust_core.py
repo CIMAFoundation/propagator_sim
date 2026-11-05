@@ -235,7 +235,9 @@ class Propagator:
         """Tile freezing counters: ``dead_tiles`` (burned out, on disk),
         ``cold_tiles`` (fuzzy-frozen, on disk), ``fault_ins`` (cold tiles
         loaded back because the fire touched them) and ``fault_in_bytes``
-        (bytes read by those fault-ins)."""
+        (bytes read by those fault-ins), plus RAM gauges: ``live_tiles``
+        and ``live_tile_bytes`` (tiles in memory), ``edge_cache_bytes``
+        and ``fold_cache_bytes`` (frozen-tile output aggregates)."""
         return {k: int(v) for k, v in self._sim.freeze_stats().items()}
 
     def edge_cache_bytes(self) -> int:

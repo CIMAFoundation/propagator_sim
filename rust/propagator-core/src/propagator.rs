@@ -107,6 +107,14 @@ pub struct FreezeStats {
     pub fault_ins: u64,
     /// bytes read from the store by those fault-ins
     pub fault_in_bytes: u64,
+    /// tiles held in memory (pool slots), all realizations
+    pub live_tiles: usize,
+    /// bytes held by those in-memory tiles
+    pub live_tile_bytes: usize,
+    /// bytes held by the shared edge cache
+    pub edge_cache_bytes: usize,
+    /// bytes held in RAM by the frozen-tile output aggregates (fold cache)
+    pub fold_cache_bytes: usize,
 }
 
 impl PropagatorConfig {
@@ -310,14 +318,20 @@ impl Propagator {
         self.reals.iter().map(|real| real.tiles.frozen_count()).sum()
     }
 
-    /// Dead / cold tile counts and fault-in counters.
+    /// Dead / cold tile counts, fault-in counters and the RAM held by
+    /// live tiles, the edge cache and the frozen-fold cache.
     pub fn freeze_stats(&self) -> FreezeStats {
         let cold_tiles: usize = self.reals.iter().map(|real| real.tiles.cold_count()).sum();
+        let live_tiles: usize = self.reals.iter().map(|real| real.tiles.pool_len()).sum();
         FreezeStats {
             dead_tiles: self.frozen_tiles() - cold_tiles,
             cold_tiles,
             fault_ins: self.fault_ins,
             fault_in_bytes: self.fault_ins * RECORD_SIZE as u64,
+            live_tiles,
+            live_tile_bytes: live_tiles * std::mem::size_of::<Tile>(),
+            edge_cache_bytes: self.edges.allocated_bytes(),
+            fold_cache_bytes: self.fold_blocks.len() * StateFold::bytes_for(TILE_SIZE, TILE_SIZE),
         }
     }
 

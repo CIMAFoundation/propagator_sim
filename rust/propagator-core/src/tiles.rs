@@ -133,7 +133,6 @@ impl TileGrid {
         &self.pool
     }
 
-    #[allow(dead_code)]
     pub fn pool_len(&self) -> usize {
         self.pool.len()
     }

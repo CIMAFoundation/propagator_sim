@@ -223,5 +223,14 @@ class SimulationRunner:
                     f"{stats['fault_ins']} fault-ins "
                     f"({stats['fault_in_bytes'] / 2**20:.1f} MiB read)"
                 )
+                if "live_tile_bytes" in stats:
+                    info_msg(
+                        f"tile RAM: {stats['live_tiles']} live tiles "
+                        f"{stats['live_tile_bytes'] / 2**20:.1f} MiB, "
+                        "edge cache "
+                        f"{stats['edge_cache_bytes'] / 2**20:.1f} MiB, "
+                        "fold cache "
+                        f"{stats['fold_cache_bytes'] / 2**20:.1f} MiB"
+                    )
 
         return output

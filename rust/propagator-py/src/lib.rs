@@ -570,7 +570,9 @@ impl Propagator {
 
     /// Tile freezing counters: a dict with `dead_tiles`, `cold_tiles`
     /// (fuzzy-frozen, faulted back in on touch), `fault_ins` and
-    /// `fault_in_bytes` (read by those fault-ins).
+    /// `fault_in_bytes` (read by those fault-ins), plus RAM gauges:
+    /// `live_tiles`, `live_tile_bytes`, `edge_cache_bytes`,
+    /// `fold_cache_bytes`.
     fn freeze_stats<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let stats = self.inner.freeze_stats();
         let d = PyDict::new(py);
@@ -578,6 +580,10 @@ impl Propagator {
         d.set_item("cold_tiles", stats.cold_tiles)?;
         d.set_item("fault_ins", stats.fault_ins)?;
         d.set_item("fault_in_bytes", stats.fault_in_bytes)?;
+        d.set_item("live_tiles", stats.live_tiles)?;
+        d.set_item("live_tile_bytes", stats.live_tile_bytes)?;
+        d.set_item("edge_cache_bytes", stats.edge_cache_bytes)?;
+        d.set_item("fold_cache_bytes", stats.fold_cache_bytes)?;
         Ok(d)
     }
 
