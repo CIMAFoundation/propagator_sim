@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Rust core: `freeze_diagnostic()` (Rust adapter and py binding) counts,
+  without freezing anything, the live tiles each freeze criterion would
+  freeze, including `blocked_by_strict`: tiles kept in memory only by the
+  strict all-burnt criterion used with spotting.
+
 - `Propagator.extinguish(success)` on both cores (numba, Rust crate, Rust
   adapter): tries to put the fire out over an area, with a per-cell
   probability of success drawn independently in each realization, so the
@@ -35,6 +40,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   clamped to 10–200 m, and 0 for cells burnt without intensity.
 
 ### Changed
+
+- Rust core: tile freezing and ignition thaw no longer build full-grid
+  masks per realization. Reachability is a per-tile bitset flood over
+  allocated tiles, with all unallocated territory as one conservative sink
+  node (it can only keep more tiles live, never fewer); tiles with no open
+  cell freeze without a flood, and classification runs in parallel over
+  realizations. Each frozen tile keeps a small in-RAM summary (solid, or a
+  1024-bit open-cell mask), so ignitions thaw without reading the store,
+  and an ignition batch runs one flood per realization. On a 2048² grid
+  with 100 realizations `freeze_inactive_tiles` drops from 2.8 s to 0.02 s
+  per call and an ignition thaw from 7 s to 3 ms; seeded runs stay
+  bitwise identical with and without freezing.
 
 - Rust core: the heap kernel now evaluates the spread models once per edge
   per generation of the inputs through a shared, block-sparse `EdgeCache`
@@ -190,6 +207,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `fuel_idx` argument (see `propagator.core.numba.build_fuel_index_grid`).
 
 ### Fixed
+
+- Rust core: growing the domain (`expand`, `from_checkpoint`) on a grid
+  whose size is not a multiple of 32 left frozen tiles on the old south /
+  east edge frozen, so their newly in-domain cells read as burnt and could
+  never ignite. Such tiles are now thawed on growth.
 
 - Infinite suspend/regrow loop in the propagation driver on domains
   smaller than the per-pop tile reserve (grids up to roughly 180x180

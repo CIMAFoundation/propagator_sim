@@ -543,6 +543,22 @@ impl Propagator {
         self.inner.freeze_inactive_tiles().map_err(err)
     }
 
+    /// Count, without freezing anything, how many live tiles each freeze
+    /// criterion would freeze now: a dict with `allocated`,
+    /// `strict_freezable` (every fuel cell burnt, used with spotting),
+    /// `reachability_freezable` (no cell reachable from the front, used
+    /// without spotting) and `blocked_by_strict` (frozen by reachability
+    /// but kept by the strict criterion).
+    fn freeze_diagnostic<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let diagnostic = self.inner.freeze_diagnostic();
+        let d = PyDict::new(py);
+        d.set_item("allocated", diagnostic.allocated)?;
+        d.set_item("strict_freezable", diagnostic.strict_freezable)?;
+        d.set_item("reachability_freezable", diagnostic.reachability_freezable)?;
+        d.set_item("blocked_by_strict", diagnostic.blocked_by_strict)?;
+        Ok(d)
+    }
+
     /// Try to put the fire out where `success` (float32 grid, probability
     /// of success per cell, 0 = not attempted) is positive, in every
     /// realization; returns the number of front events cancelled. See

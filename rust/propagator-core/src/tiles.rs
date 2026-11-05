@@ -4,10 +4,15 @@
 //! in 32x32 tiles allocated on demand as fire reaches them, so memory
 //! scales with burned area instead of grid size x realizations.
 
+use std::collections::HashMap;
+
 pub const TILE_SHIFT: usize = 5;
 pub const TILE_SIZE: usize = 1 << TILE_SHIFT;
 pub const TILE_MASK: usize = TILE_SIZE - 1;
 pub const TILE_CELLS: usize = TILE_SIZE * TILE_SIZE;
+
+/// One bit per cell of a tile: `mask[local_row] >> local_col & 1`.
+pub type RowMask = [u32; TILE_SIZE];
 
 // flags bitfield
 pub const FLAG_FIRE: u8 = 1;
@@ -45,6 +50,35 @@ pub fn local_index(row: usize, col: usize) -> usize {
     (row & TILE_MASK) * TILE_SIZE + (col & TILE_MASK)
 }
 
+/// In-RAM digest of a frozen tile, recorded at freeze time so
+/// reachability never has to read the record back from disk.
+#[derive(Clone, Debug, PartialEq)]
+pub enum FrozenSummary {
+    /// no open cell (in-domain, fuel, unburnt): can never be reached
+    Solid,
+    /// the tile's open cells
+    Open(Box<RowMask>),
+}
+
+impl FrozenSummary {
+    pub fn from_open(open: &RowMask) -> FrozenSummary {
+        if open.iter().all(|&row| row == 0) {
+            FrozenSummary::Solid
+        } else {
+            FrozenSummary::Open(Box::new(*open))
+        }
+    }
+
+    /// Open-cell mask (all zero when solid).
+    #[cfg(test)]
+    pub fn open(&self) -> RowMask {
+        match self {
+            FrozenSummary::Solid => [0; TILE_SIZE],
+            FrozenSummary::Open(mask) => **mask,
+        }
+    }
+}
+
 /// One realization's tiled state: an index grid mapping every spatial
 /// 32x32 block to `UNALLOCATED`, `FROZEN_TILE`, or a slot in the pool.
 #[derive(Clone)]
@@ -53,6 +87,9 @@ pub struct TileGrid {
     tiles_w: usize,
     idx: Vec<i32>,
     pool: Vec<Box<Tile>>,
+    /// summary of every `FROZEN_TILE` position, keyed by (tile_row,
+    /// tile_col); travels with checkpoints and re-anchors with the grid
+    frozen: HashMap<(usize, usize), FrozenSummary>,
 }
 
 impl TileGrid {
@@ -64,6 +101,7 @@ impl TileGrid {
             tiles_w,
             idx: vec![UNALLOCATED; tiles_h * tiles_w],
             pool: Vec::new(),
+            frozen: HashMap::new(),
         }
     }
 
@@ -134,13 +172,15 @@ impl TileGrid {
         new_slot
     }
 
-    /// Insert an existing tile (thaw / checkpoint load) at a position.
+    /// Insert an existing tile (thaw / checkpoint load) at a position,
+    /// dropping its frozen summary if it had one.
     pub fn insert_tile(
         &mut self,
         tile_row: usize,
         tile_col: usize,
         tile: Box<Tile>,
     ) -> i32 {
+        self.frozen.remove(&(tile_row, tile_col));
         let slot = self.pool.len() as i32;
         self.pool.push(tile);
         self.set_slot(tile_row, tile_col, slot);
@@ -181,6 +221,29 @@ impl TileGrid {
         }
     }
 
+    /// Mark allocated tiles frozen, `(tile_row, tile_col, slot, summary)`
+    /// each: their slots are released and the summaries recorded.
+    pub fn freeze_tiles(&mut self, tiles: Vec<(usize, usize, i32, FrozenSummary)>) {
+        let slots: Vec<i32> = tiles.iter().map(|t| t.2).collect();
+        self.remove_slots(&slots, FROZEN_TILE);
+        for (tile_row, tile_col, _, summary) in tiles {
+            debug_assert_eq!(self.slot_of(tile_row, tile_col), FROZEN_TILE);
+            self.frozen.insert((tile_row, tile_col), summary);
+        }
+    }
+
+    /// Summary of a frozen position (`None` if not frozen, or frozen
+    /// without one: callers must then assume every fuel cell is open).
+    #[inline]
+    pub fn frozen_summary(&self, tile_row: usize, tile_col: usize) -> Option<&FrozenSummary> {
+        self.frozen.get(&(tile_row, tile_col))
+    }
+
+    /// Number of frozen tiles with a summary.
+    pub fn frozen_count(&self) -> usize {
+        self.frozen.len()
+    }
+
     /// Iterate allocated tiles: (tile_row, tile_col, slot).
     pub fn allocated(&self) -> impl Iterator<Item = (usize, usize, i32)> + '_ {
         let tiles_w = self.tiles_w;
@@ -217,12 +280,19 @@ impl TileGrid {
         self.tiles_h = tiles_h;
         self.tiles_w = tiles_w;
         self.idx = idx;
+        self.frozen = std::mem::take(&mut self.frozen)
+            .into_iter()
+            .map(|((tile_row, tile_col), summary)| {
+                ((tile_row + tile_row0, tile_col + tile_col0), summary)
+            })
+            .collect();
     }
 }
 
 /// 8-connected flood fill over `open` cells from the given seeds, marking
 /// `reachable`. Grids are `grid_h x grid_w` row-major; seeds outside
 /// `open` are ignored.
+#[cfg(test)]
 pub fn flood_reachable(
     open: &[bool],
     grid_h: usize,
