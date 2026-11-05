@@ -781,6 +781,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#propagator.core.numba.draw_extinguish" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        draw_extinguish
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.heap_retain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        heap_retain
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#propagator.core.numba.flame_height" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1377,6 +1399,28 @@
         
       </ul>
     </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.draw_extinguish" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        draw_extinguish
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.numba.heap_retain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        heap_retain
+      
+    </span>
+  </a>
   
 </li>
         
@@ -2158,6 +2202,52 @@ behaviour or integrate new stochastic components.</p>
 
 </div>
 
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="propagator.core.numba.draw_extinguish" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">draw_extinguish</span><span class="p">(</span><span class="n">probabilities</span><span class="p">,</span> <span class="n">realizations</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Outcome of an extinguish attempt per realization and attempted cell.</p>
+<p><code>probabilities</code> lists the attempted cells (p &gt; 0) in row-major order.
+Certain cells (p &gt;= 1) draw nothing; the others draw one uniform each,
+realization by realization, from the kernels' per-thread RNGs. The loop
+over realizations is a <code>prange</code> like the one in
+:func:<code>advance_front_until</code>, so each realization draws on the same
+thread as its spread and a run seeded with <code>Propagator.reseed</code> stays
+reproducible (same machine and thread count).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="propagator.core.numba.heap_retain" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">heap_retain</span><span class="p">(</span><span class="n">times</span><span class="p">,</span> <span class="n">rows</span><span class="p">,</span> <span class="n">cols</span><span class="p">,</span> <span class="n">ros</span><span class="p">,</span> <span class="n">fli</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">keep</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Keep the first <code>size</code> events whose <code>keep</code> flag is set, then
+restore the heap invariant (Floyd heapify). Returns the new size.</p>
+<p>Same algorithm as the Rust core's <code>FrontHeap::retain</code>: stable
+in-place compaction followed by sifting every internal node down.</p>
+
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-function">
 

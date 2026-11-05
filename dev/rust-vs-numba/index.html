@@ -997,8 +997,8 @@ the same thing to both.</p>
 </tr>
 <tr>
 <td>Reproducibility</td>
-<td>fixed machine <strong>and</strong> thread count</td>
-<td>any thread count</td>
+<td>fixed machine, thread count <strong>and</strong> <code>step</code> windows</td>
+<td>any thread count or windows</td>
 </tr>
 <tr>
 <td>Parallelism</td>
@@ -1019,9 +1019,43 @@ seeds thread <code>i</code> with <code>seed + i</code>) and partitions realizati
 across threads. Two runs with the same seed are bitwise-identical only on the
 same machine <strong>and</strong> with the same numba thread count (<code>NUMBA_NUM_THREADS</code>);
 change the thread count and the per-realization streams shift.</p>
+<p>When there are more realizations than threads, the run must also use the same
+sequence of <code>step</code> windows. The kernel advances each realization to the end of
+the window before moving on to the next, so realizations sharing a thread take
+turns drawing from that thread's RNG. Splitting a window (<code>step(1800);
+step(3600)</code> instead of <code>step(5400)</code>) changes the order in which they draw, so
+every realization gets different numbers. Measured with 8 realizations on the
+numba core:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">threads</th>
+<th>split windows bitwise-equal to one window?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">1</td>
+<td>no</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td>no</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td>yes</td>
+</tr>
+</tbody>
+</table>
+<p>Both runs are valid samples of the same ensemble, but a seeded run is
+repeatable only if the caller keeps both the thread count and the output
+cadence fixed (a different CLI output interval, or a front end that advances
+in irregular steps, breaks it). With one realization, or at least one thread
+per realization, the windows do not matter.</p>
 <p>The <strong>Rust core</strong> seeds each <em>realization</em> independently (from
 <code>seed ⊕ realization</code>), so a seeded run is bitwise reproducible <strong>regardless
-of thread count</strong> — the same 100 realizations come out identically on 1 or 32
+of thread count and of how the run is split into <code>step</code> windows</strong> — the same 100 realizations come out identically on 1 or 32
 threads. This also makes tile freezing provably behaviour-neutral: it never
 perturbs the RNG stream.</p>
 <p>Neither core captures RNG state in a checkpoint, so a run resumed from a

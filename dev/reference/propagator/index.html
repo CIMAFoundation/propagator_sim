@@ -1040,6 +1040,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.extinguish" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extinguish
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#propagator.core.Propagator.boundary_pressure" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1624,6 +1635,17 @@
     <span class="md-ellipsis">
       
         set_boundary_conditions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.extinguish" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extinguish
       
     </span>
   </a>
@@ -2630,6 +2652,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#propagator.core.Propagator.extinguish" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extinguish
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#propagator.core.Propagator.boundary_pressure" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3221,6 +3254,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#propagator.core.propagator.Propagator.extinguish" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extinguish
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#propagator.core.propagator.Propagator.boundary_pressure" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3779,7 +3823,7 @@ the supporting data models and scheduling helpers.</p>
 
 
 <h3 id="propagator.core.PropagatorCheckpoint" class="doc doc-heading">
-              <code class="highlight language-python"><span class="n">PropagatorCheckpoint</span><span class="p">(</span><span class="n">version</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">origin</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">realizations</span><span class="p">,</span> <span class="n">do_spotting</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">moisture</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">actions_moisture</span><span class="p">,</span> <span class="n">front_times</span><span class="p">,</span> <span class="n">front_rows</span><span class="p">,</span> <span class="n">front_cols</span><span class="p">,</span> <span class="n">front_ros</span><span class="p">,</span> <span class="n">front_fli</span><span class="p">,</span> <span class="n">front_sizes</span><span class="p">,</span> <span class="n">tile_idx</span><span class="p">,</span> <span class="n">tile_counts</span><span class="p">,</span> <span class="n">tile_flags</span><span class="p">,</span> <span class="n">tile_arrival</span><span class="p">,</span> <span class="n">tile_ros</span><span class="p">,</span> <span class="n">tile_fli</span><span class="p">,</span> <span class="n">scheduler_events</span><span class="p">,</span> <span class="n">frozen_index</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span> <span class="n">frozen_source</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+              <code class="highlight language-python"><span class="n">PropagatorCheckpoint</span><span class="p">(</span><span class="n">version</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">origin</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">realizations</span><span class="p">,</span> <span class="n">do_spotting</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">moisture</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">actions_moisture</span><span class="p">,</span> <span class="n">front_times</span><span class="p">,</span> <span class="n">front_rows</span><span class="p">,</span> <span class="n">front_cols</span><span class="p">,</span> <span class="n">front_ros</span><span class="p">,</span> <span class="n">front_fli</span><span class="p">,</span> <span class="n">front_sizes</span><span class="p">,</span> <span class="n">tile_idx</span><span class="p">,</span> <span class="n">tile_counts</span><span class="p">,</span> <span class="n">tile_flags</span><span class="p">,</span> <span class="n">tile_arrival</span><span class="p">,</span> <span class="n">tile_ros</span><span class="p">,</span> <span class="n">tile_fli</span><span class="p">,</span> <span class="n">scheduler_events</span><span class="p">,</span> <span class="n">frozen_index</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span> <span class="n">frozen_source</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">front_src</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
@@ -4954,6 +4998,101 @@ array; intended for analysis and tests, not for the hot path.</p>
             </td>
             <td>
                 <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="propagator.core.Propagator.extinguish" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">extinguish</span><span class="p">(</span><span class="n">success</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Try to put the fire out over an area, in every realization, now.</p>
+<p><code>success</code> gives, per cell, the probability (0–1) that the attempt
+succeeds there; NaN and values &lt;= 0 mean "not attempted", values</p>
+<blockquote>
+<p>= 1 always succeed, and a bool mask means certain success. Each
+realization draws its own outcome per cell, so the ensemble spreads
+the risk of failure. Where it succeeds the intervention acts on the
+pending front, not on the fuel:</p>
+</blockquote>
+<ul>
+<li>every pending front event <em>into</em> the cell is cancelled (the cell
+  does not ignite now), and so is every contact-spread event <em>from</em>
+  it (an already burning cell stops spreading);</li>
+<li>pending ignition boundary conditions on the cell are dropped;</li>
+<li>burnt cells stay burnt and the vegetation is untouched, so a cell
+  that is still unburnt can be reached again by fire that ignites
+  <em>after</em> this call;</li>
+<li>embers already in flight (spotting events) still land.</li>
+</ul>
+<p>Outcomes come from the kernels' RNG, one draw per cell with
+0 &lt; p &lt; 1, realization by realization in row-major order: runs
+seeded with :meth:<code>reseed</code> stay reproducible, and certain outcomes
+(p = 0 or 1) draw nothing.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>success</code>
+            </td>
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid with the shape of <code>veg</code>: probability of success per cell,
+or a bool mask.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of front events cancelled.</p>
+              </div>
             </td>
           </tr>
       </tbody>
@@ -6862,6 +7001,101 @@ array; intended for analysis and tests, not for the hot path.</p>
 <div class="doc doc-object doc-function">
 
 
+<h4 id="propagator.core.propagator.Propagator.extinguish" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">extinguish</span><span class="p">(</span><span class="n">success</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Try to put the fire out over an area, in every realization, now.</p>
+<p><code>success</code> gives, per cell, the probability (0–1) that the attempt
+succeeds there; NaN and values &lt;= 0 mean "not attempted", values</p>
+<blockquote>
+<p>= 1 always succeed, and a bool mask means certain success. Each
+realization draws its own outcome per cell, so the ensemble spreads
+the risk of failure. Where it succeeds the intervention acts on the
+pending front, not on the fuel:</p>
+</blockquote>
+<ul>
+<li>every pending front event <em>into</em> the cell is cancelled (the cell
+  does not ignite now), and so is every contact-spread event <em>from</em>
+  it (an already burning cell stops spreading);</li>
+<li>pending ignition boundary conditions on the cell are dropped;</li>
+<li>burnt cells stay burnt and the vegetation is untouched, so a cell
+  that is still unburnt can be reached again by fire that ignites
+  <em>after</em> this call;</li>
+<li>embers already in flight (spotting events) still land.</li>
+</ul>
+<p>Outcomes come from the kernels' RNG, one draw per cell with
+0 &lt; p &lt; 1, realization by realization in row-major order: runs
+seeded with :meth:<code>reseed</code> stay reproducible, and certain outcomes
+(p = 0 or 1) draw nothing.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>success</code>
+            </td>
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Grid with the shape of <code>veg</code>: probability of success per cell,
+or a bool mask.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of front events cancelled.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h4 id="propagator.core.propagator.Propagator.boundary_pressure" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">boundary_pressure</span><span class="p">()</span></code>
 
@@ -7577,7 +7811,7 @@ growth when the fire reaches a boundary.</p>
 
 
 <h3 id="propagator.core.checkpoint.PropagatorCheckpoint" class="doc doc-heading">
-              <code class="highlight language-python"><span class="n">PropagatorCheckpoint</span><span class="p">(</span><span class="n">version</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">origin</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">realizations</span><span class="p">,</span> <span class="n">do_spotting</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">moisture</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">actions_moisture</span><span class="p">,</span> <span class="n">front_times</span><span class="p">,</span> <span class="n">front_rows</span><span class="p">,</span> <span class="n">front_cols</span><span class="p">,</span> <span class="n">front_ros</span><span class="p">,</span> <span class="n">front_fli</span><span class="p">,</span> <span class="n">front_sizes</span><span class="p">,</span> <span class="n">tile_idx</span><span class="p">,</span> <span class="n">tile_counts</span><span class="p">,</span> <span class="n">tile_flags</span><span class="p">,</span> <span class="n">tile_arrival</span><span class="p">,</span> <span class="n">tile_ros</span><span class="p">,</span> <span class="n">tile_fli</span><span class="p">,</span> <span class="n">scheduler_events</span><span class="p">,</span> <span class="n">frozen_index</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span> <span class="n">frozen_source</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+              <code class="highlight language-python"><span class="n">PropagatorCheckpoint</span><span class="p">(</span><span class="n">version</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">origin</span><span class="p">,</span> <span class="n">cellsize</span><span class="p">,</span> <span class="n">realizations</span><span class="p">,</span> <span class="n">do_spotting</span><span class="p">,</span> <span class="n">veg</span><span class="p">,</span> <span class="n">dem</span><span class="p">,</span> <span class="n">moisture</span><span class="p">,</span> <span class="n">wind_dir</span><span class="p">,</span> <span class="n">wind_speed</span><span class="p">,</span> <span class="n">actions_moisture</span><span class="p">,</span> <span class="n">front_times</span><span class="p">,</span> <span class="n">front_rows</span><span class="p">,</span> <span class="n">front_cols</span><span class="p">,</span> <span class="n">front_ros</span><span class="p">,</span> <span class="n">front_fli</span><span class="p">,</span> <span class="n">front_sizes</span><span class="p">,</span> <span class="n">tile_idx</span><span class="p">,</span> <span class="n">tile_counts</span><span class="p">,</span> <span class="n">tile_flags</span><span class="p">,</span> <span class="n">tile_arrival</span><span class="p">,</span> <span class="n">tile_ros</span><span class="p">,</span> <span class="n">tile_fli</span><span class="p">,</span> <span class="n">scheduler_events</span><span class="p">,</span> <span class="n">frozen_index</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span> <span class="n">frozen_source</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">front_src</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>

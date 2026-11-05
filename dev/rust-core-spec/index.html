@@ -1659,6 +1659,28 @@ propagation window.</p>
   identically to <code>seconds</code>).</li>
 <li><code>next_time() -&gt; Option&lt;i64&gt;</code>: min of the scheduler's next time and the
   earliest front event across realizations; <code>None</code> when fully idle.</li>
+<li><code>extinguish(success) -&gt; usize</code>: try to put the fire out over an area at
+  the current time. <code>success</code> is a grid of per-cell probabilities of
+  success (NaN or ≤ 0 = not attempted, ≥ 1 = certain; the Python cores
+  also take a bool mask). Each realization draws its own outcome per cell:
+  one uniform per cell with 0 &lt; p &lt; 1, in row-major order, from the
+  realization's RNG (Rust) or the kernels' per-thread RNGs inside a
+  <code>prange</code> over realizations (numba), so seeded runs stay reproducible
+  and certain outcomes draw nothing. Where it succeeds, every pending front
+  event <em>into</em> the cell is dropped, and so is every contact-spread event
+  <em>from</em> it (each heap event records the neighbour it came from,
+  <code>FrontHeap::src</code> / <code>_front_src</code>, or <code>SRC_EXTERNAL</code> = 255 for ignitions
+  and ember landings); pending ignition boundary conditions on the cell
+  (for that realization) are dropped too. Burnt cells stay burnt and the
+  vegetation is untouched, so unburnt cells can burn again from fire that
+  ignites later; embers already in flight still land. Returns the number
+  of front events cancelled. Checkpoints capture the effect; numba
+  checkpoints store the event sources from version 3 (older files load
+  with every source external, so only spread <em>into</em> cleared cells is
+  cancelled).</li>
+<li><code>Propagator</code> is <code>Clone</code>: a clone is an independent simulator with the
+  same state (used to run forecasts from the live state). The edge cache
+  is not copied; the clone refills it lazily, with identical results.</li>
 </ul>
 <h3 id="65-outputs">6.5 Outputs</h3>
 <ul>
