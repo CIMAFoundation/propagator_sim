@@ -62,7 +62,8 @@ pub use models::{
     BYRAM_FLAME_EXPONENT, RADIANT_REACH_FLAME_HEIGHTS, RADIANT_REACH_MAX_M, RADIANT_REACH_MIN_M,
 };
 pub use propagator::{
-    FreezeDiagnostic, OobMode, Propagator, PropagatorConfig, CELLSIZE_DEFAULT,
+    FreezeDiagnostic, FreezeStats, FuzzyFreeze, OobMode, Propagator, PropagatorConfig,
+    CELLSIZE_DEFAULT,
     REALIZATIONS_DEFAULT,
 };
 pub use scheduler::{

@@ -24,6 +24,10 @@ pub const UNALLOCATED: i32 = -1;
 /// Frozen to disk: every in-domain cell provably can never ignite again,
 /// so reads treat the whole tile as burnt without touching the contents.
 pub const FROZEN_TILE: i32 = -2;
+/// Cold (fuzzy-frozen) to disk: stored like a frozen tile but may still
+/// burn, so it is never read as burnt; the kernel faults it back in
+/// before touching any of its cells.
+pub const COLD_TILE: i32 = -3;
 
 /// One tile's per-cell state (struct-of-arrays, ~13 KiB boxed).
 #[derive(Clone)]
@@ -87,9 +91,12 @@ pub struct TileGrid {
     tiles_w: usize,
     idx: Vec<i32>,
     pool: Vec<Box<Tile>>,
-    /// summary of every `FROZEN_TILE` position, keyed by (tile_row,
-    /// tile_col); travels with checkpoints and re-anchors with the grid
+    /// summary of every `FROZEN_TILE` and `COLD_TILE` position, keyed by
+    /// (tile_row, tile_col); travels with checkpoints and re-anchors with
+    /// the grid
     frozen: HashMap<(usize, usize), FrozenSummary>,
+    /// number of `COLD_TILE` positions (0 keeps the kernel's checks cheap)
+    cold: usize,
 }
 
 impl TileGrid {
@@ -102,6 +109,7 @@ impl TileGrid {
             idx: vec![UNALLOCATED; tiles_h * tiles_w],
             pool: Vec::new(),
             frozen: HashMap::new(),
+            cold: 0,
         }
     }
 
@@ -125,7 +133,6 @@ impl TileGrid {
         &self.pool
     }
 
-    #[allow(dead_code)]
     pub fn pool_len(&self) -> usize {
         self.pool.len()
     }
@@ -145,6 +152,7 @@ impl TileGrid {
     #[inline]
     pub fn read_flags(&self, row: usize, col: usize) -> u8 {
         let slot = self.slot_of(row >> TILE_SHIFT, col >> TILE_SHIFT);
+        debug_assert_ne!(slot, COLD_TILE, "reading a cold tile");
         if slot == FROZEN_TILE {
             return FLAG_FIRE;
         }
@@ -163,6 +171,7 @@ impl TileGrid {
         let tile_col = col >> TILE_SHIFT;
         let slot = self.slot_of(tile_row, tile_col);
         debug_assert_ne!(slot, FROZEN_TILE, "writing into a frozen tile");
+        debug_assert_ne!(slot, COLD_TILE, "writing into a cold tile");
         if slot >= 0 {
             return slot;
         }
@@ -180,6 +189,9 @@ impl TileGrid {
         tile_col: usize,
         tile: Box<Tile>,
     ) -> i32 {
+        if self.slot_of(tile_row, tile_col) == COLD_TILE {
+            self.cold -= 1;
+        }
         self.frozen.remove(&(tile_row, tile_col));
         let slot = self.pool.len() as i32;
         self.pool.push(tile);
@@ -223,13 +235,42 @@ impl TileGrid {
 
     /// Mark allocated tiles frozen, `(tile_row, tile_col, slot, summary)`
     /// each: their slots are released and the summaries recorded.
+    #[cfg(test)]
     pub fn freeze_tiles(&mut self, tiles: Vec<(usize, usize, i32, FrozenSummary)>) {
-        let slots: Vec<i32> = tiles.iter().map(|t| t.2).collect();
+        self.store_tiles(tiles, Vec::new());
+    }
+
+    /// Release allocated tiles to disk in one pass (slots are only valid
+    /// until the pool compacts): `dead` become `FROZEN_TILE`, `cold`
+    /// become `COLD_TILE`, each with its summary recorded.
+    pub fn store_tiles(
+        &mut self,
+        dead: Vec<(usize, usize, i32, FrozenSummary)>,
+        cold: Vec<(usize, usize, i32, FrozenSummary)>,
+    ) {
+        let slots: Vec<i32> = dead.iter().chain(cold.iter()).map(|t| t.2).collect();
         self.remove_slots(&slots, FROZEN_TILE);
-        for (tile_row, tile_col, _, summary) in tiles {
+        for (tile_row, tile_col, _, summary) in dead {
             debug_assert_eq!(self.slot_of(tile_row, tile_col), FROZEN_TILE);
             self.frozen.insert((tile_row, tile_col), summary);
         }
+        self.cold += cold.len();
+        for (tile_row, tile_col, _, summary) in cold {
+            debug_assert_eq!(self.slot_of(tile_row, tile_col), FROZEN_TILE);
+            self.set_slot(tile_row, tile_col, COLD_TILE);
+            self.frozen.insert((tile_row, tile_col), summary);
+        }
+    }
+
+    /// Number of cold tiles.
+    #[inline]
+    pub fn cold_count(&self) -> usize {
+        self.cold
+    }
+
+    /// Number of dead (frozen, never burning again) tiles.
+    pub fn dead_count(&self) -> usize {
+        self.frozen.len() - self.cold
     }
 
     /// Summary of a frozen position (`None` if not frozen, or frozen
@@ -239,7 +280,7 @@ impl TileGrid {
         self.frozen.get(&(tile_row, tile_col))
     }
 
-    /// Number of frozen tiles with a summary.
+    /// Number of tiles on disk (dead and cold) with a summary.
     pub fn frozen_count(&self) -> usize {
         self.frozen.len()
     }
@@ -254,14 +295,18 @@ impl TileGrid {
             .map(move |(flat, &slot)| (flat / tiles_w, flat % tiles_w, slot))
     }
 
-    /// Iterate frozen tile positions: (tile_row, tile_col).
-    #[allow(dead_code)]
+    /// Iterate frozen (dead) tile positions: (tile_row, tile_col).
     pub fn frozen_positions(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+        self.positions_of(FROZEN_TILE)
+    }
+
+    /// Iterate positions holding `sentinel`: (tile_row, tile_col).
+    pub fn positions_of(&self, sentinel: i32) -> impl Iterator<Item = (usize, usize)> + '_ {
         let tiles_w = self.tiles_w;
         self.idx
             .iter()
             .enumerate()
-            .filter(|(_, &slot)| slot == FROZEN_TILE)
+            .filter(move |(_, &slot)| slot == sentinel)
             .map(move |(flat, _)| (flat / tiles_w, flat % tiles_w))
     }
 

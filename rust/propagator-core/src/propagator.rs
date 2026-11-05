@@ -12,6 +12,7 @@ use crate::checkpoint::{
 };
 use crate::edges::EdgeCache;
 use crate::error::{PropagatorError, Result};
+use crate::front::FrontHeap;
 use crate::fold::{fold_realization, PropagatorOutput, PropagatorStats, StateFold};
 use crate::fuels::{legacy_fuel_system, FuelSystem};
 use crate::grid::Grid2;
@@ -21,10 +22,11 @@ use crate::rng::Rng;
 use crate::scheduler::{
     BoundaryConditions, Ignitions, Scheduler, SchedulerEvent, UpdateBatch,
 };
-use crate::tile_store::{record_to_tile, TileKey, TileStore};
+use crate::tile_store::{record_to_tile, TileKey, TileStore, RECORD_SIZE};
 use crate::reach::{is_empty, live_open, FuelMasks, Reach};
 use crate::tiles::{
-    FrozenSummary, Tile, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV, FROZEN_TILE, TILE_SHIFT,
+    FrozenSummary, Tile, COLD_TILE, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV, FROZEN_TILE,
+    TILE_SHIFT,
     TILE_SIZE,
 };
 
@@ -65,6 +67,55 @@ pub struct PropagatorConfig {
     pub oob_mode: OobMode,
     /// `None` = available parallelism
     pub n_threads: Option<usize>,
+    /// opt-in fuzzy freezing (needs `freeze_dir`); `None` keeps only the
+    /// exact dead-tile criterion
+    pub fuzzy_freeze: Option<FuzzyFreeze>,
+}
+
+/// Heuristic ("fuzzy") freezing: besides provably dead tiles,
+/// `freeze_inactive_tiles` also moves mostly inactive tiles far from the
+/// front to disk as *cold* tiles. Cold tiles are never read as burnt: the
+/// kernel faults them back in before touching any of their cells, so the
+/// criterion is a pure performance knob and seeded runs stay bitwise
+/// identical to runs without freezing.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FuzzyFreeze {
+    /// minimum fraction of the tile's in-domain cells that are burnt or
+    /// fuel-free
+    pub min_inactive_fraction: f32,
+    /// no pending front event may target the tile or any tile within this
+    /// many tiles of it (hysteresis against freeze/fault thrash)
+    pub event_margin_tiles: usize,
+}
+
+impl Default for FuzzyFreeze {
+    fn default() -> FuzzyFreeze {
+        FuzzyFreeze {
+            min_inactive_fraction: 0.9,
+            event_margin_tiles: 1,
+        }
+    }
+}
+
+/// Tile freezing counters, from [`Propagator::freeze_stats`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct FreezeStats {
+    /// tiles frozen as dead (never burning again), all realizations
+    pub dead_tiles: usize,
+    /// cold (fuzzy-frozen) tiles currently on disk
+    pub cold_tiles: usize,
+    /// cold tiles faulted back in by the kernel since construction
+    pub fault_ins: u64,
+    /// bytes read from the store by those fault-ins
+    pub fault_in_bytes: u64,
+    /// tiles held in memory (pool slots), all realizations
+    pub live_tiles: usize,
+    /// bytes held by those in-memory tiles
+    pub live_tile_bytes: usize,
+    /// bytes held by the shared edge cache
+    pub edge_cache_bytes: usize,
+    /// bytes held in RAM by the frozen-tile output aggregates (fold cache)
+    pub fold_cache_bytes: usize,
 }
 
 impl PropagatorConfig {
@@ -85,6 +136,7 @@ impl PropagatorConfig {
             moisture_model: MoistureModel::default(),
             oob_mode: OobMode::default(),
             n_threads: None,
+            fuzzy_freeze: None,
         }
     }
 }
@@ -129,6 +181,8 @@ pub struct Propagator {
     /// per-tile fuel masks of `veg` for the freeze/thaw floods; reset
     /// whenever the vegetation or the grid changes
     fuel_masks: OnceLock<FuelMasks>,
+    fuzzy_freeze: Option<FuzzyFreeze>,
+    fault_ins: u64,
 }
 
 impl Propagator {
@@ -147,6 +201,17 @@ impl Propagator {
         if !config.do_spotting {
             fuels.disable_spotting();
         }
+        if let Some(fuzzy) = &config.fuzzy_freeze {
+            if config.freeze_dir.is_none() {
+                return Err(PropagatorError::FreezeDirNotSet);
+            }
+            if !(0.0..=1.0).contains(&fuzzy.min_inactive_fraction) {
+                return Err(PropagatorError::InvalidBoundaryConditions(format!(
+                    "fuzzy_freeze.min_inactive_fraction must be in [0, 1], got {}",
+                    fuzzy.min_inactive_fraction
+                )));
+            }
+        }
         let fuel_idx = fuels.build_fuel_index_grid(&config.veg)?;
         let (rows, cols) = config.veg.shape();
         let reals = (0..config.realizations)
@@ -155,7 +220,7 @@ impl Propagator {
                     Some(seed) => Rng::for_realization(seed, r as u64),
                     None => Rng::from_entropy(r as u64),
                 };
-                Realization::new(rows, cols, rng)
+                Realization::new(r, rows, cols, rng)
             })
             .collect();
         let store = match &config.freeze_dir {
@@ -194,6 +259,8 @@ impl Propagator {
             fold_dirty: HashSet::new(),
             fold_valid: true,
             fuel_masks: OnceLock::new(),
+            fuzzy_freeze: config.fuzzy_freeze,
+            fault_ins: 0,
         })
     }
 
@@ -248,14 +315,72 @@ impl Propagator {
         self.edges.allocated_tiles()
     }
 
-    /// Tiles currently frozen to disk, over all realizations.
+    /// Tiles currently on disk (dead and cold), over all realizations.
     pub fn frozen_tiles(&self) -> usize {
         self.reals.iter().map(|real| real.tiles.frozen_count()).sum()
+    }
+
+    /// Dead / cold tile counts, fault-in counters and the RAM held by
+    /// live tiles, the edge cache and the frozen-fold cache.
+    pub fn freeze_stats(&self) -> FreezeStats {
+        let cold_tiles: usize = self.reals.iter().map(|real| real.tiles.cold_count()).sum();
+        let live_tiles: usize = self.reals.iter().map(|real| real.tiles.pool_len()).sum();
+        FreezeStats {
+            dead_tiles: self.frozen_tiles() - cold_tiles,
+            cold_tiles,
+            fault_ins: self.fault_ins,
+            fault_in_bytes: self.fault_ins * RECORD_SIZE as u64,
+            live_tiles,
+            live_tile_bytes: live_tiles * std::mem::size_of::<Tile>(),
+            edge_cache_bytes: self.edges.allocated_bytes(),
+            fold_cache_bytes: self.fold_blocks.len() * StateFold::bytes_for(TILE_SIZE, TILE_SIZE),
+        }
+    }
+
+    /// Current fuzzy-freeze setting (`None`: off).
+    pub fn fuzzy_freeze(&self) -> Option<FuzzyFreeze> {
+        self.fuzzy_freeze
+    }
+
+    /// Enable, retune or disable fuzzy freezing mid-run. Existing cold
+    /// tiles stay valid either way (the kernel faults them in on touch).
+    pub fn set_fuzzy_freeze(&mut self, fuzzy: Option<FuzzyFreeze>) -> Result<()> {
+        if fuzzy.is_some() && self.store.is_none() {
+            return Err(PropagatorError::FreezeDirNotSet);
+        }
+        self.fuzzy_freeze = fuzzy;
+        Ok(())
     }
 
     /// Bytes currently held by the shared edge cache.
     pub fn edge_cache_bytes(&self) -> usize {
         self.edges.allocated_bytes()
+    }
+
+    /// Release edge-cache tiles that no realization will read soon: those
+    /// with no pending front event within `margin_tiles` tiles in any
+    /// realization. A cell's cached edges are only read when that cell
+    /// burns, and the cache holds deterministic values, so a released tile
+    /// is simply recomputed if fire comes back: results stay bitwise
+    /// identical. Needs no `freeze_dir`. Returns the tiles released.
+    pub fn trim_edge_cache(&mut self, margin_tiles: usize) -> usize {
+        let shape = self.edges.tiles_shape();
+        let mut near = vec![false; shape.0 * shape.1];
+        for real in &self.reals {
+            mark_near_events(&real.heap, shape, margin_tiles, &mut near);
+        }
+        let mut released = 0;
+        for tile_row in 0..shape.0 {
+            for tile_col in 0..shape.1 {
+                if !near[tile_row * shape.1 + tile_col]
+                    && self.edges.is_allocated(tile_row, tile_col)
+                {
+                    self.edges.release_tile(tile_row, tile_col);
+                    released += 1;
+                }
+            }
+        }
+        released
     }
 
     /// Which domain edges the front is pressing against, as
@@ -637,14 +762,26 @@ impl Propagator {
             moisture_model: self.moisture_model,
             do_spotting: self.do_spotting,
             edges: &self.edges,
+            store: self.store.as_deref(),
+            origin: self.origin,
         };
-        advance_all(
+        let result = advance_all(
             &mut self.reals,
             &shared,
             end_time,
             halt_on_boundary,
             self.n_threads,
         );
+        // apply the fault-ins of every realization (even on error, so the
+        // fold cache matches the tiles), in realization order
+        for r in 0..self.reals.len() {
+            let faulted = std::mem::take(&mut self.reals[r].faulted);
+            self.fault_ins += faulted.len() as u64;
+            for key in &faulted {
+                self.fold_cache_mark_dirty(key);
+            }
+        }
+        result?;
 
         if self.oob_mode == OobMode::Raise
             && self.reals.iter().any(|real| real.out_of_bounds)
@@ -1032,20 +1169,27 @@ impl Propagator {
             .clone()
             .ok_or(PropagatorError::FreezeDirNotSet)?;
         let do_spotting = self.do_spotting;
+        let fuzzy = self.fuzzy_freeze;
+        let shape = self.veg.shape();
         let fuel = self.fuel_masks();
         // classification is read-only and independent per realization
         let decisions = map_realizations(&self.reals, self.n_threads, |_, real| {
-            freezable_tiles(real, fuel, do_spotting)
+            let dead = freezable_tiles(real, fuel, do_spotting);
+            let cold = match &fuzzy {
+                Some(fuzzy) => cold_tiles(real, fuel, shape, fuzzy, &dead),
+                None => Vec::new(),
+            };
+            (dead, cold)
         });
 
         // writes and fold accumulation stay sequential, in realization
-        // then tile-position order, exactly as before
+        // then tile-position order (dead first, then cold)
         let mut frozen_total = 0usize;
-        for (r, to_freeze) in decisions.into_iter().enumerate() {
-            if to_freeze.is_empty() {
+        for (r, (dead, cold)) in decisions.into_iter().enumerate() {
+            if dead.is_empty() && cold.is_empty() {
                 continue;
             }
-            for &(tile_row, tile_col, slot, _) in &to_freeze {
+            for &(tile_row, tile_col, slot, _) in dead.iter().chain(cold.iter()) {
                 let key = self.tile_world_key(r, tile_row, tile_col);
                 let tile = self.reals[r].tiles.tile(slot);
                 store.freeze(key, tile)?;
@@ -1057,8 +1201,8 @@ impl Propagator {
                     tile,
                 );
             }
-            frozen_total += to_freeze.len();
-            self.reals[r].tiles.freeze_tiles(to_freeze);
+            frozen_total += dead.len() + cold.len();
+            self.reals[r].tiles.store_tiles(dead, cold);
         }
         if frozen_total > 0 {
             self.release_dead_edge_tiles();
@@ -1152,7 +1296,9 @@ impl Propagator {
         let fuel = self.fuel_masks();
         let to_thaw = map_realizations(&self.reals, self.n_threads, |r, real| {
             let cells = &seeds[r];
-            if cells.is_empty() || real.tiles.frozen_count() == 0 {
+            // cold tiles never need a thaw (the kernel faults them in)
+            // but are passable, so dead tiles behind them still thaw
+            if cells.is_empty() || real.tiles.dead_count() == 0 {
                 return Vec::new();
             }
             let mut reach = Reach::build(&real.tiles, fuel);
@@ -1206,7 +1352,8 @@ impl Propagator {
         }
         for realization in 0..self.n_realizations {
             for &(tile_row, tile_col) in &positions {
-                if self.reals[realization].tiles.slot_of(tile_row, tile_col) == FROZEN_TILE {
+                let slot = self.reals[realization].tiles.slot_of(tile_row, tile_col);
+                if slot == FROZEN_TILE || slot == COLD_TILE {
                     self.thaw_tile(realization, tile_row, tile_col)?;
                 }
             }
@@ -1387,6 +1534,7 @@ impl Propagator {
         }
         config.oob_mode = options.oob_mode;
         config.n_threads = options.n_threads;
+        config.fuzzy_freeze = options.fuzzy_freeze;
 
         let mut propagator = Propagator::new(config)?;
         propagator.load_state(checkpoint, row_shift, col_shift)?;
@@ -1728,6 +1876,70 @@ fn freezable_tiles(
         .map(|(tile_row, tile_col, slot)| {
             let open = reach.open_mask(tile_row, tile_col);
             (tile_row, tile_col, slot, FrozenSummary::from_open(&open))
+        })
+        .collect()
+}
+
+/// Mark in `near` (a `tiles_h x tiles_w` row-major grid) every tile within
+/// `margin` tiles (Chebyshev distance) of a pending event of `heap`.
+fn mark_near_events(
+    heap: &FrontHeap,
+    (tiles_h, tiles_w): (usize, usize),
+    margin: usize,
+    near: &mut [bool],
+) {
+    for (row, col) in heap.event_cells() {
+        if row < 0 || col < 0 {
+            continue;
+        }
+        let (tile_row, tile_col) = ((row as usize) >> TILE_SHIFT, (col as usize) >> TILE_SHIFT);
+        if tile_row >= tiles_h || tile_col >= tiles_w {
+            continue;
+        }
+        let row_hi = (tile_row + margin).min(tiles_h - 1);
+        let col_hi = (tile_col + margin).min(tiles_w - 1);
+        for near_row in tile_row.saturating_sub(margin)..=row_hi {
+            let base = near_row * tiles_w;
+            near[base + tile_col.saturating_sub(margin)..=base + col_hi].fill(true);
+        }
+    }
+}
+
+/// Live tiles of one realization that fuzzy freezing moves to disk as
+/// cold, in tile-position order: not `dead`, at least
+/// `min_inactive_fraction` of their in-domain cells burnt or fuel-free,
+/// and no pending front event within `event_margin_tiles` tiles.
+fn cold_tiles(
+    real: &Realization,
+    fuel: &FuelMasks,
+    (rows, cols): (usize, usize),
+    fuzzy: &FuzzyFreeze,
+    dead: &[(usize, usize, i32, FrozenSummary)],
+) -> Vec<(usize, usize, i32, FrozenSummary)> {
+    let tiles = &real.tiles;
+    let (tiles_h, tiles_w) = tiles.tiles_shape();
+    let mut near_event = vec![false; tiles_h * tiles_w];
+    mark_near_events(
+        &real.heap,
+        (tiles_h, tiles_w),
+        fuzzy.event_margin_tiles,
+        &mut near_event,
+    );
+    let dead: HashSet<(usize, usize)> = dead.iter().map(|t| (t.0, t.1)).collect();
+    tiles
+        .allocated()
+        .filter(|&(tile_row, tile_col, _)| {
+            !near_event[tile_row * tiles_w + tile_col] && !dead.contains(&(tile_row, tile_col))
+        })
+        .filter_map(|(tile_row, tile_col, slot)| {
+            let open = live_open(tiles.tile(slot), fuel.get(tile_row, tile_col));
+            let height = TILE_SIZE.min(rows - (tile_row << TILE_SHIFT));
+            let width = TILE_SIZE.min(cols - (tile_col << TILE_SHIFT));
+            let in_domain = (height * width) as f32;
+            let open_cells: u32 = open.iter().map(|bits| bits.count_ones()).sum();
+            let inactive = in_domain - open_cells as f32;
+            (inactive >= fuzzy.min_inactive_fraction * in_domain)
+                .then(|| (tile_row, tile_col, slot, FrozenSummary::from_open(&open)))
         })
         .collect()
 }

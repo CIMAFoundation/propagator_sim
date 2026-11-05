@@ -92,6 +92,8 @@ pub struct ResumeOptions {
     pub seed: Option<u64>,
     pub freeze_dir: Option<PathBuf>,
     pub n_threads: Option<usize>,
+    /// fuzzy freezing for the resumed propagator (needs `freeze_dir`)
+    pub fuzzy_freeze: Option<crate::FuzzyFreeze>,
 }
 
 /// Rewrite a pending scheduler event (in place) for a re-anchored grid:

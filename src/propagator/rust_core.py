@@ -87,7 +87,21 @@ class Propagator:
         moisture_model: str = "trucchia",
         cellsize: float = 20.0,
         n_threads: Optional[int] = None,
+        fuzzy_freeze_threshold: Optional[float] = None,
+        fuzzy_freeze_margin: int = 1,
     ) -> None:
+        """Build the Rust simulator.
+
+        ``fuzzy_freeze_threshold`` (requires ``freeze_dir``) enables fuzzy
+        freezing: besides burned-out tiles, ``freeze_inactive_tiles`` also
+        moves to disk "cold" tiles with at least that fraction of inactive
+        (burnt or fuel-free) cells and no pending front event within
+        ``fuzzy_freeze_margin`` tiles. Cold tiles are loaded back on demand
+        whenever the fire touches them, so results are unchanged; only
+        memory and I/O trade off.
+        """
+        if fuzzy_freeze_threshold is not None and freeze_dir is None:
+            raise ValueError("fuzzy_freeze_threshold requires freeze_dir")
         dem = np.ascontiguousarray(dem, dtype=np.float64)
         veg = np.ascontiguousarray(veg, dtype=np.int32)
         self._sim = _rust.Propagator(
@@ -104,6 +118,12 @@ class Propagator:
             moisture_model=moisture_model,
             cellsize=float(cellsize),
             n_threads=n_threads,
+            fuzzy_freeze_threshold=(
+                float(fuzzy_freeze_threshold)
+                if fuzzy_freeze_threshold is not None
+                else None
+            ),
+            fuzzy_freeze_margin=int(fuzzy_freeze_margin),
         )
 
     # ---- properties mirrored from the numba Propagator -------------------
@@ -199,6 +219,13 @@ class Propagator:
     def freeze_inactive_tiles(self) -> int:
         return self._sim.freeze_inactive_tiles()
 
+    def trim_edge_cache(self, margin_tiles: int = 1) -> int:
+        """Release edge-cache tiles with no pending front event within
+        ``margin_tiles`` tiles in any realization; returns how many were
+        released. Results are unchanged (released tiles are recomputed on
+        demand); needs no ``freeze_dir``."""
+        return int(self._sim.trim_edge_cache(margin_tiles))
+
     def freeze_diagnostic(self) -> dict[str, int]:
         """Count, without freezing, how many live tiles each freeze
         criterion would freeze now.
@@ -210,6 +237,15 @@ class Propagator:
         criterion). Needs no ``freeze_dir``.
         """
         return {k: int(v) for k, v in self._sim.freeze_diagnostic().items()}
+
+    def freeze_stats(self) -> dict[str, int]:
+        """Tile freezing counters: ``dead_tiles`` (burned out, on disk),
+        ``cold_tiles`` (fuzzy-frozen, on disk), ``fault_ins`` (cold tiles
+        loaded back because the fire touched them) and ``fault_in_bytes``
+        (bytes read by those fault-ins), plus RAM gauges: ``live_tiles``
+        and ``live_tile_bytes`` (tiles in memory), ``edge_cache_bytes``
+        and ``fold_cache_bytes`` (frozen-tile output aggregates)."""
+        return {k: int(v) for k, v in self._sim.freeze_stats().items()}
 
     def extinguish(self, success) -> int:
         """Try to put the fire out where ``success`` is positive: a grid

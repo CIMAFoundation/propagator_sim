@@ -16,6 +16,7 @@
 //! identical to the uncached kernel.
 
 use crate::edges::{EdgeCache, BLOCKED};
+use crate::error::{PropagatorError, Result};
 use crate::front::FrontHeap;
 use crate::fuels::{FuelSystem, NO_FUEL};
 use crate::grid::Grid2;
@@ -23,7 +24,10 @@ use crate::models::{
     fireline_intensity, lhv_fuel, p_time, probability_to_neighbour, MoistureModel, RosModel,
 };
 use crate::rng::Rng;
-use crate::tiles::{local_index, TileGrid, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV};
+use crate::tile_store::{TileKey, TileStore};
+use crate::tiles::{
+    local_index, TileGrid, COLD_TILE, FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV, TILE_SHIFT,
+};
 
 // 8-connected neighbour lattice
 pub const N_NEIGHBOURS: usize = 8;
@@ -106,11 +110,18 @@ pub struct SharedInputs<'a> {
     pub do_spotting: bool,
     /// per-cell edge cache for the current generation of the inputs
     pub edges: &'a EdgeCache,
+    /// tile store cold tiles are faulted in from (`None`: no store, so no
+    /// cold tiles either)
+    pub store: Option<&'a TileStore>,
+    /// world (row, col) of local cell (0, 0), for store keys
+    pub origin: (i64, i64),
 }
 
 /// Mutable state of one realization.
 #[derive(Clone)]
 pub struct Realization {
+    /// realization index (store keys)
+    pub index: u32,
     pub heap: FrontHeap,
     pub tiles: TileGrid,
     pub rng: Rng,
@@ -118,18 +129,59 @@ pub struct Realization {
     pub out_of_bounds: bool,
     /// halted before igniting a boundary cell (heap intact)
     pub halted_on_boundary: bool,
+    /// store keys of cold tiles faulted in during the last kernel run;
+    /// the driver drains them (fold cache, counters) after the run
+    pub faulted: Vec<TileKey>,
 }
 
 impl Realization {
-    pub fn new(rows: usize, cols: usize, rng: Rng) -> Realization {
+    pub fn new(index: usize, rows: usize, cols: usize, rng: Rng) -> Realization {
         Realization {
+            index: index as u32,
             heap: FrontHeap::new(),
             tiles: TileGrid::new(rows, cols),
             rng,
             out_of_bounds: false,
             halted_on_boundary: false,
+            faulted: Vec::new(),
         }
     }
+}
+
+/// Make sure the tile holding `(row, col)` is not cold, faulting it in
+/// from the store if it is. Free when the realization has no cold tile.
+#[inline(always)]
+fn ensure_warm(real: &mut Realization, shared: &SharedInputs<'_>, row: usize, col: usize) -> Result<()> {
+    if real.tiles.cold_count() == 0 {
+        return Ok(());
+    }
+    let (tile_row, tile_col) = (row >> TILE_SHIFT, col >> TILE_SHIFT);
+    if real.tiles.slot_of(tile_row, tile_col) != COLD_TILE {
+        return Ok(());
+    }
+    fault_in(real, shared, tile_row, tile_col)
+}
+
+/// Load a cold tile back from the store (the thaw path: insert the tile,
+/// drop its summary; the driver marks the fold cache position dirty).
+#[cold]
+#[inline(never)]
+fn fault_in(
+    real: &mut Realization,
+    shared: &SharedInputs<'_>,
+    tile_row: usize,
+    tile_col: usize,
+) -> Result<()> {
+    let store = shared.store.ok_or(PropagatorError::FreezeDirNotSet)?;
+    let key = (
+        real.index,
+        shared.origin.0 + ((tile_row << TILE_SHIFT) as i64),
+        shared.origin.1 + ((tile_col << TILE_SHIFT) as i64),
+    );
+    let tile = store.thaw(&key)?;
+    real.tiles.insert_tile(tile_row, tile_col, tile);
+    real.faulted.push(key);
+    Ok(())
 }
 
 #[inline]
@@ -145,7 +197,7 @@ pub fn advance_front_until(
     shared: &SharedInputs<'_>,
     end_time: i64,
     halt_on_boundary: bool,
-) {
+) -> Result<()> {
     let geometry = neighbour_geometry();
     let n_rows = shared.veg.rows();
     let n_cols = shared.veg.cols();
@@ -158,6 +210,7 @@ pub fn advance_front_until(
 
         if halt_on_boundary {
             let (peek_row, peek_col) = real.heap.peek_cell().unwrap();
+            ensure_warm(real, shared, peek_row as usize, peek_col as usize)?;
             if on_boundary_ring(peek_row as i64, peek_col as i64, n_rows, n_cols)
                 && real.tiles.read_flags(peek_row as usize, peek_col as usize) & FLAG_FIRE == 0
             {
@@ -170,6 +223,7 @@ pub fn advance_front_until(
         let (time, row_i, col_i, ros_value, fli_value) = real.heap.pop_min().unwrap();
         let row = row_i as usize;
         let col = col_i as usize;
+        ensure_warm(real, shared, row, col)?;
 
         // lazy deletion: already burnt (or frozen: reads as burnt)
         if real.tiles.read_flags(row, col) & FLAG_FIRE != 0 {
@@ -233,6 +287,7 @@ pub fn advance_front_until(
             // a spreadable edge always points inside the grid
             let row_to = (row_i as i64 + dr) as usize;
             let col_to = (col_i as i64 + dc) as usize;
+            ensure_warm(real, shared, row_to, col_to)?;
             if real.tiles.read_flags(row_to, col_to) & FLAG_FIRE != 0 {
                 continue;
             }
@@ -279,9 +334,10 @@ pub fn advance_front_until(
                 w_dir,
                 w_speed,
                 fli_value as f64,
-            );
+            )?;
         }
     }
+    Ok(())
 }
 
 /// A neighbour fire can spread into: in the grid, fuelled, spreading.
@@ -446,7 +502,7 @@ fn compute_spotting(
     w_dir: f64,
     w_speed: f64,
     fireline_intensity: f64,
-) {
+) -> Result<()> {
     let num_embers = real.rng.poisson(LAMBDA_SPOTTING).min(MAX_SPOTTING_EMBERS);
     let w_speed_ms = w_speed / 3.6;
 
@@ -490,6 +546,7 @@ fn compute_spotting(
             continue;
         }
         let (row_to, col_to) = (row_to as usize, col_to as usize);
+        ensure_warm(real, shared, row_to, col_to)?;
         if real.tiles.read_flags(row_to, col_to) & FLAG_FIRE != 0 {
             continue;
         }
@@ -530,6 +587,7 @@ fn compute_spotting(
             0.0,
         );
     }
+    Ok(())
 }
 
 /// Run the kernel for every realization, parallelized over available
@@ -540,24 +598,34 @@ pub fn advance_all(
     end_time: i64,
     halt_on_boundary: bool,
     n_threads: usize,
-) {
+) -> Result<()> {
     let n_threads = n_threads.max(1).min(realizations.len().max(1));
     if n_threads <= 1 || realizations.len() <= 1 {
         for real in realizations.iter_mut() {
-            advance_front_until(real, shared, end_time, halt_on_boundary);
+            advance_front_until(real, shared, end_time, halt_on_boundary)?;
         }
-        return;
+        return Ok(());
     }
     let chunk_size = realizations.len().div_ceil(n_threads);
     std::thread::scope(|scope| {
-        for chunk in realizations.chunks_mut(chunk_size) {
-            scope.spawn(move || {
-                for real in chunk.iter_mut() {
-                    advance_front_until(real, shared, end_time, halt_on_boundary);
-                }
-            });
-        }
-    });
+        let handles: Vec<_> = realizations
+            .chunks_mut(chunk_size)
+            .map(|chunk| {
+                scope.spawn(move || -> Result<()> {
+                    for real in chunk.iter_mut() {
+                        advance_front_until(real, shared, end_time, halt_on_boundary)?;
+                    }
+                    Ok(())
+                })
+            })
+            .collect();
+        // join every worker before reporting the first error
+        let results: Vec<Result<()>> = handles
+            .into_iter()
+            .map(|handle| handle.join().expect("kernel worker panicked"))
+            .collect();
+        results.into_iter().collect()
+    })
 }
 
 #[cfg(test)]

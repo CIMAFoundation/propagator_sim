@@ -44,6 +44,12 @@ pub struct StateFold {
 }
 
 impl StateFold {
+    /// Approximate heap bytes of a `rows x cols` fold: four i32 grids
+    /// (counts, `arrival_min`), five f64 sums and four f32 maxima.
+    pub fn bytes_for(rows: usize, cols: usize) -> usize {
+        rows * cols * (4 * 4 + 5 * 8 + 4 * 4)
+    }
+
     /// A zeroed fold (with `arrival_min` seeded to `i32::MAX`).
     pub fn empty(rows: usize, cols: usize) -> StateFold {
         StateFold {

@@ -178,6 +178,11 @@ impl EdgeCache {
         self.tiles[tile_row * self.tiles_w + tile_col] = OnceLock::new();
     }
 
+    /// Whether the tile covering block `(tile_row, tile_col)` is allocated.
+    pub fn is_allocated(&self, tile_row: usize, tile_col: usize) -> bool {
+        self.tiles[tile_row * self.tiles_w + tile_col].get().is_some()
+    }
+
     /// Number of allocated tiles.
     pub fn allocated_tiles(&self) -> usize {
         self.tiles.iter().filter(|t| t.get().is_some()).count()

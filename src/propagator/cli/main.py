@@ -97,6 +97,28 @@ class PropagatorCLILegacy(BaseSettings):
         description="Directory for freezing burned-out tiles to disk "
         "(keeps memory proportional to the active front)",
     )
+    fuzzy_freeze_threshold: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Rust core only, requires --freeze_dir: also freeze "
+        "'cold' tiles with at least this fraction of inactive (burnt or "
+        "fuel-free) cells and no front event nearby; they are loaded back "
+        "on demand, so results are unchanged (e.g. 0.9)",
+    )
+    fuzzy_freeze_margin: int = Field(
+        1,
+        ge=0,
+        description="Fuzzy freezing: keep tiles live within this many "
+        "tiles of a pending front event",
+    )
+    edge_cache_trim_margin: Optional[int] = Field(
+        1,
+        ge=0,
+        description="Rust core: after each output, free edge-cache tiles "
+        "with no front event within this many tiles (results unchanged; "
+        "null disables)",
+    )
     seed: Optional[int] = Field(
         None,
         description="Seed for the simulation RNGs (reproducible for a "
@@ -225,6 +247,17 @@ class PropagatorCLILegacy(BaseSettings):
             if self.grow_margin % TILE_SIZE:
                 raise ValueError(
                     f"GROW_MARGIN must be a multiple of {TILE_SIZE} cells"
+                )
+
+        if self.fuzzy_freeze_threshold is not None:
+            if self.core != "rust":
+                raise ValueError(
+                    "--fuzzy_freeze_threshold is only supported by the Rust "
+                    "core (--core rust)"
+                )
+            if self.freeze_dir is None:
+                raise ValueError(
+                    "--fuzzy_freeze_threshold requires --freeze_dir"
                 )
 
         return self
@@ -428,6 +461,8 @@ def main() -> None:
             ros_model=cfg.ros_model,
             moisture_model=cfg.prob_moist_model,
             cellsize=cfg.cellsize,
+            fuzzy_freeze_threshold=cli.fuzzy_freeze_threshold,
+            fuzzy_freeze_margin=cli.fuzzy_freeze_margin,
         )
         if cli.verbose:
             info_msg("Using Rust core (propagator_rust)")
@@ -466,6 +501,7 @@ def main() -> None:
         cog_loader=cog_loader,
         grow_margin=cli.grow_margin,
         freeze_dir=cli.freeze_dir,
+        edge_cache_trim_margin=cli.edge_cache_trim_margin,
         on_domain_grow=_on_domain_grow,
         verbose=cli.verbose,
     )

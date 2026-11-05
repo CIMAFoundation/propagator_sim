@@ -372,3 +372,103 @@ def test_rust_freeze_diagnostic_reports_counts():
         counts["blocked_by_strict"]
         == counts["reachability_freezable"] - counts["strict_freezable"]
     )
+
+
+def _rust_spotting_run(
+    tmp_path, fuzzy: float | None, trim_margin: int | None = None
+):
+    pytest.importorskip("propagator_rust")
+    from propagator.core.constants import (  # type: ignore
+        FUEL_SYSTEM_LEGACY_DICT,
+    )
+    from propagator.rust_core import Propagator as RustPropagator
+
+    size = 128
+    simulator = RustPropagator(
+        veg=np.full((size, size), 5, dtype=np.int32),
+        dem=np.zeros((size, size), dtype=np.float32),
+        realizations=4,
+        fuels_dict=FUEL_SYSTEM_LEGACY_DICT,
+        do_spotting=True,
+        seed=12,
+        freeze_dir=tmp_path / f"fuzzy-{fuzzy}" if fuzzy is not None else None,
+        out_of_bounds_mode="ignore",
+        fuzzy_freeze_threshold=fuzzy,
+        fuzzy_freeze_margin=0,
+    )
+    simulator.set_boundary_conditions(
+        BoundaryConditions(
+            time=0,
+            moisture=4.0,
+            wind_dir=270.0,
+            wind_speed=30.0,
+            ignitions=[(64, 20)],
+        )
+    )
+    for _ in range(36):
+        simulator.step(seconds=600)
+        if trim_margin is not None:
+            simulator.trim_edge_cache(trim_margin)
+        if fuzzy is not None:
+            simulator.freeze_inactive_tiles()
+    return simulator
+
+
+def test_rust_fuzzy_freeze_is_result_neutral(tmp_path):
+    plain = _rust_spotting_run(tmp_path, None).get_output()
+    fuzzy_sim = _rust_spotting_run(tmp_path, 0.0)
+    fuzzy = fuzzy_sim.get_output()
+    stats = fuzzy_sim.freeze_stats()
+    assert set(stats) == {
+        "dead_tiles",
+        "cold_tiles",
+        "fault_ins",
+        "fault_in_bytes",
+        "live_tiles",
+        "live_tile_bytes",
+        "edge_cache_bytes",
+        "fold_cache_bytes",
+    }
+    assert stats["live_tile_bytes"] == stats["live_tiles"] * 13312
+    assert stats["fault_ins"] > 0
+    assert stats["fault_in_bytes"] > 0
+    for name in (
+        "fire_probability",
+        "spotting_receiving_probability",
+        "min_arrival_time",
+        "mean_arrival_time",
+        "ros_mean",
+        "fli_max",
+    ):
+        np.testing.assert_array_equal(
+            getattr(fuzzy, name), getattr(plain, name), err_msg=name
+        )
+
+
+def test_rust_fuzzy_freeze_requires_freeze_dir():
+    pytest.importorskip("propagator_rust")
+    from propagator.core.constants import (  # type: ignore
+        FUEL_SYSTEM_LEGACY_DICT,
+    )
+    from propagator.rust_core import Propagator as RustPropagator
+
+    with pytest.raises(ValueError, match="freeze_dir"):
+        RustPropagator(
+            veg=np.full((64, 64), 5, dtype=np.int32),
+            dem=np.zeros((64, 64), dtype=np.float32),
+            realizations=1,
+            fuels_dict=FUEL_SYSTEM_LEGACY_DICT,
+            fuzzy_freeze_threshold=0.9,
+        )
+
+
+def test_rust_edge_cache_trim_is_result_neutral(tmp_path):
+    plain_sim = _rust_spotting_run(tmp_path, None)
+    plain = plain_sim.get_output()
+    trimmed_sim = _rust_spotting_run(tmp_path, None, trim_margin=0)
+    trimmed = trimmed_sim.get_output()
+    assert trimmed_sim.edge_cache_bytes() < plain_sim.edge_cache_bytes()
+    for name in ("fire_probability", "min_arrival_time", "ros_max", "fli_max"):
+        np.testing.assert_array_equal(
+            getattr(plain, name), getattr(trimmed, name), err_msg=name
+        )

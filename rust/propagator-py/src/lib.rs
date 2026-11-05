@@ -15,7 +15,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use propagator_core::{
-    BoundaryConditions, FieldInput, FuelDef, FuelSystem, Grid2, Ignitions, MoistureModel, OobMode,
+    BoundaryConditions, FieldInput, FuelDef, FuelSystem, FuzzyFreeze, Grid2, Ignitions,
+    MoistureModel, OobMode,
     Propagator as CorePropagator, PropagatorConfig, PropagatorError, RosModel,
 };
 use propagator_geo::{extract_isochrone as extract_isochrone_geo, IsochroneOptions};
@@ -354,6 +355,8 @@ impl Propagator {
         moisture_model = "trucchia",
         cellsize = 20.0,
         n_threads = None,
+        fuzzy_freeze_threshold = None,
+        fuzzy_freeze_margin = 1,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -370,6 +373,8 @@ impl Propagator {
         moisture_model: &str,
         cellsize: f64,
         n_threads: Option<usize>,
+        fuzzy_freeze_threshold: Option<f32>,
+        fuzzy_freeze_margin: usize,
     ) -> PyResult<Self> {
         let veg = grid_i32(veg);
         let dem = grid_f64(dem);
@@ -392,6 +397,10 @@ impl Propagator {
             }
         };
         config.n_threads = n_threads;
+        config.fuzzy_freeze = fuzzy_freeze_threshold.map(|threshold| FuzzyFreeze {
+            min_inactive_fraction: threshold,
+            event_margin_tiles: fuzzy_freeze_margin,
+        });
         if let Some(fuels) = fuels {
             config.fuels = Some(parse_fuels(&fuels)?);
         }
@@ -559,6 +568,25 @@ impl Propagator {
         Ok(d)
     }
 
+    /// Tile freezing counters: a dict with `dead_tiles`, `cold_tiles`
+    /// (fuzzy-frozen, faulted back in on touch), `fault_ins` and
+    /// `fault_in_bytes` (read by those fault-ins), plus RAM gauges:
+    /// `live_tiles`, `live_tile_bytes`, `edge_cache_bytes`,
+    /// `fold_cache_bytes`.
+    fn freeze_stats<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let stats = self.inner.freeze_stats();
+        let d = PyDict::new(py);
+        d.set_item("dead_tiles", stats.dead_tiles)?;
+        d.set_item("cold_tiles", stats.cold_tiles)?;
+        d.set_item("fault_ins", stats.fault_ins)?;
+        d.set_item("fault_in_bytes", stats.fault_in_bytes)?;
+        d.set_item("live_tiles", stats.live_tiles)?;
+        d.set_item("live_tile_bytes", stats.live_tile_bytes)?;
+        d.set_item("edge_cache_bytes", stats.edge_cache_bytes)?;
+        d.set_item("fold_cache_bytes", stats.fold_cache_bytes)?;
+        Ok(d)
+    }
+
     /// Try to put the fire out where `success` (float32 grid, probability
     /// of success per cell, 0 = not attempted) is positive, in every
     /// realization; returns the number of front events cancelled. See
@@ -572,6 +600,13 @@ impl Propagator {
     /// the realization count).
     fn edge_cache_bytes(&self) -> usize {
         self.inner.edge_cache_bytes()
+    }
+
+    /// Release edge-cache tiles with no pending front event within
+    /// `margin_tiles` tiles in any realization; returns the tiles released.
+    /// Results are unchanged: released tiles are recomputed on demand.
+    fn trim_edge_cache(&mut self, margin_tiles: usize) -> usize {
+        self.inner.trim_edge_cache(margin_tiles)
     }
 
     /// Snapshot as a dict of numpy rasters plus a nested `stats` dict; the

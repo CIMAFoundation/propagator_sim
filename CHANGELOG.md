@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Rust core: fuzzy freezing (`fuzzy_freeze_threshold` / `--fuzzy_freeze_threshold`,
+  `--fuzzy_freeze_margin`, requires `freeze_dir`; Rust only, the numba core
+  rejects it). Besides provably dead tiles, freezing also pages out *cold*
+  tiles: at least the threshold fraction of their cells burnt or fuel-free
+  and no pending front event within the margin. The kernel never reads a
+  cold tile as burnt: it loads it back from the store on first touch
+  (fire, neighbour or ember), so seeded runs stay bitwise identical. With
+  spotting, where the strict criterion freezes almost nothing, the
+  17-day Evros demo keeps 19% fewer tiles live.
+- Rust core: `trim_edge_cache(margin_tiles)` frees edge-cache tiles with no
+  pending front event within the margin in any realization; freed tiles are
+  recomputed on demand, results unchanged. The runner trims after each
+  output (`--edge_cache_trim_margin`, default 1, `null` disables): on the
+  Evros demo the edge cache ends at 119 MiB instead of 386 MiB.
+- Rust core: `freeze_stats()` reports dead / cold tiles, fault-ins and the
+  RAM held by live tiles, the edge cache and the frozen-tile fold cache;
+  verbose CLI runs log them after each freeze.
+
 - Rust core: `freeze_diagnostic()` (Rust adapter and py binding) counts,
   without freezing anything, the live tiles each freeze criterion would
   freeze, including `blocked_by_strict`: tiles kept in memory only by the
