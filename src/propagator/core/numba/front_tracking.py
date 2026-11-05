@@ -29,6 +29,12 @@ from .tiles import (
 # regrow the buffers and resume.
 FRONT_RESERVE = N_NEIGHBOURS + MAX_SPOTTING_EMBERS
 
+# Source code of a front event not produced by contact spread (an ignition
+# boundary condition or an ember landing). Contact-spread events store the
+# index of the NEIGHBOURS offset that produced them: the source cell is
+# ``target - NEIGHBOURS[src]``. Used by ``Propagator.extinguish``.
+SRC_EXTERNAL = 255
+
 # Worst-case number of tiles a single pop can allocate: the popped cell's
 # tile plus one tile per ember landing cell.
 TILE_RESERVE = 1 + MAX_SPOTTING_EMBERS
@@ -41,6 +47,7 @@ def _heap_swap(
     cols: npt.NDArray[np.int32],
     ros: npt.NDArray[np.float32],
     fli: npt.NDArray[np.float32],
+    src: npt.NDArray[np.uint8],
     i: int,
     j: int,
 ) -> None:
@@ -49,6 +56,7 @@ def _heap_swap(
     cols[i], cols[j] = cols[j], cols[i]
     ros[i], ros[j] = ros[j], ros[i]
     fli[i], fli[j] = fli[j], fli[i]
+    src[i], src[j] = src[j], src[i]
 
 
 @njit(cache=False)
@@ -58,25 +66,28 @@ def _heap_push(
     cols: npt.NDArray[np.int32],
     ros: npt.NDArray[np.float32],
     fli: npt.NDArray[np.float32],
+    src: npt.NDArray[np.uint8],
     size: int,
     time: int,
     row: int,
     col: int,
     ros_value: float,
     fli_value: float,
+    src_value: int,
 ) -> int:
     times[size] = time
     rows[size] = row
     cols[size] = col
     ros[size] = ros_value
     fli[size] = fli_value
+    src[size] = src_value
 
     idx = size
     while idx > 0:
         parent = (idx - 1) // 2
         if times[parent] <= times[idx]:
             break
-        _heap_swap(times, rows, cols, ros, fli, parent, idx)
+        _heap_swap(times, rows, cols, ros, fli, src, parent, idx)
         idx = parent
     return size + 1
 
@@ -88,6 +99,7 @@ def _heap_pop_min(
     cols: npt.NDArray[np.int32],
     ros: npt.NDArray[np.float32],
     fli: npt.NDArray[np.float32],
+    src: npt.NDArray[np.uint8],
     size: int,
 ) -> tuple[int, int, int, float, float, int]:
     if size == 0:
@@ -106,6 +118,7 @@ def _heap_pop_min(
         cols[0] = cols[size]
         ros[0] = ros[size]
         fli[0] = fli[size]
+        src[0] = src[size]
 
         idx = 0
         while True:
@@ -118,7 +131,7 @@ def _heap_pop_min(
                 smallest = right
             if times[idx] <= times[smallest]:
                 break
-            _heap_swap(times, rows, cols, ros, fli, idx, smallest)
+            _heap_swap(times, rows, cols, ros, fli, src, idx, smallest)
             idx = smallest
 
     return time, row, col, ros_value, fli_value, size
@@ -133,6 +146,7 @@ def advance_front_until(
     event_cols: npt.NDArray[np.int32],
     event_ros: npt.NDArray[np.float32],
     event_fli: npt.NDArray[np.float32],
+    event_src: npt.NDArray[np.uint8],
     sizes: npt.NDArray[np.int32],
     overflow: npt.NDArray[np.int8],
     cellsize: float,
@@ -218,6 +232,7 @@ def advance_front_until(
                 event_cols[realization],
                 event_ros[realization],
                 event_fli[realization],
+                event_src[realization],
                 sizes[realization],
             )
             sizes[realization] = new_size
@@ -290,12 +305,14 @@ def advance_front_until(
                     event_cols[realization],
                     event_ros[realization],
                     event_fli[realization],
+                    event_src[realization],
                     sizes[realization],
                     time + int(delta_time),
                     row_to,
                     col_to,
                     ros_to,
                     fli_to,
+                    neighbour_index,
                 )
 
             if fuels.spotting[idx_from]:
@@ -343,10 +360,79 @@ def advance_front_until(
                         event_cols[realization],
                         event_ros[realization],
                         event_fli[realization],
+                        event_src[realization],
                         sizes[realization],
                         time + int(delta_time),
                         row_to,
                         col_to,
                         ros_to,
                         fli_to,
+                        SRC_EXTERNAL,
                     )
+
+
+@njit(cache=False)
+def heap_retain(
+    times: npt.NDArray[np.int32],
+    rows: npt.NDArray[np.int32],
+    cols: npt.NDArray[np.int32],
+    ros: npt.NDArray[np.float32],
+    fli: npt.NDArray[np.float32],
+    src: npt.NDArray[np.uint8],
+    size: int,
+    keep: npt.NDArray[np.bool_],
+) -> int:
+    """Keep the first ``size`` events whose ``keep`` flag is set, then
+    restore the heap invariant (Floyd heapify). Returns the new size.
+
+    Same algorithm as the Rust core's ``FrontHeap::retain``: stable
+    in-place compaction followed by sifting every internal node down.
+    """
+    w = 0
+    for i in range(size):
+        if keep[i]:
+            _heap_swap(times, rows, cols, ros, fli, src, w, i)
+            w += 1
+    start = w // 2 - 1
+    while start >= 0:
+        idx = start
+        while True:
+            left = idx * 2 + 1
+            if left >= w:
+                break
+            right = left + 1
+            smallest = left
+            if right < w and times[right] < times[left]:
+                smallest = right
+            if times[idx] <= times[smallest]:
+                break
+            _heap_swap(times, rows, cols, ros, fli, src, idx, smallest)
+            idx = smallest
+        start -= 1
+    return w
+
+
+@njit(cache=False, parallel=True)
+def draw_extinguish(
+    probabilities: npt.NDArray[np.float32], realizations: int
+) -> npt.NDArray[np.bool_]:
+    """Outcome of an extinguish attempt per realization and attempted cell.
+
+    ``probabilities`` lists the attempted cells (p > 0) in row-major order.
+    Certain cells (p >= 1) draw nothing; the others draw one uniform each,
+    realization by realization, from the kernels' per-thread RNGs. The loop
+    over realizations is a ``prange`` like the one in
+    :func:`advance_front_until`, so each realization draws on the same
+    thread as its spread and a run seeded with ``Propagator.reseed`` stays
+    reproducible (same machine and thread count).
+    """
+    n = probabilities.shape[0]
+    out = np.zeros((realizations, n), dtype=np.bool_)
+    for r in prange(realizations):
+        for i in range(n):
+            p = probabilities[i]
+            if p >= 1.0:
+                out[r, i] = True
+            else:
+                out[r, i] = np.random.random() < p
+    return out

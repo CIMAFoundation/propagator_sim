@@ -32,6 +32,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   freeze, including `blocked_by_strict`: tiles kept in memory only by the
   strict all-burnt criterion used with spotting.
 
+- `Propagator.extinguish(success)` on both cores (numba, Rust crate, Rust
+  adapter): tries to put the fire out over an area, with a per-cell
+  probability of success drawn independently in each realization, so the
+  ensemble carries the risk of failure (a bool mask means certain success).
+  Where it succeeds, pending spread into and out of the cell is cancelled
+  and pending ignitions on it are dropped; fuel is untouched and embers in
+  flight still land. Front heap events now record the neighbour they came
+  from (`FrontHeap::src`, `push_from`, `retain` in Rust; `_front_src` in
+  numba). Seeded runs that never call `extinguish` are unchanged.
+- Rust core: `Propagator` is now `Clone`.
+- Checkpoint format version 3 (numba): adds `front_src`. Version 2 files
+  still load, with every event source unknown.
+- Rust core: `flame_height`, `radiant_reach` and their constants are public,
+  so applications can apply the same relations to their own intensities.
+- Rust core usable as a Git dependency (`rust/propagator-core/README.md`),
+  so downstream projects no longer need to vendor a copy.
 - Flame height outputs `flame_height_mean` and `flame_height_max` (m), on
   both the Rust and the numba core and as CLI rasters. Each realization's
   fireline intensity is turned into a flame height with Byram's relation
@@ -70,6 +86,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   tile, shared by all realizations, reported by `edge_cache_bytes()` on the
   Rust adapter and wasm bindings and included in the web memory guardrail
   for `core: "rust"`.
+
+- Docs: `rust-vs-numba.md` now states that seeded numba runs with more
+  realizations than threads are bitwise repeatable only with the same
+  sequence of `step` windows (the realizations sharing a thread take turns
+  on its RNG), with measurements; the Rust core is unaffected.
 
 ### Added
 

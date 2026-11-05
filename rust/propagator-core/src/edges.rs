@@ -90,6 +90,17 @@ pub struct EdgeCache {
     tiles: Vec<OnceLock<Box<EdgeTile>>>,
 }
 
+/// A clone starts empty with the same shape and mode: the cache is a pure
+/// function of the owner's inputs, so the clone refills lazily and its
+/// results are identical.
+impl Clone for EdgeCache {
+    fn clone(&self) -> EdgeCache {
+        let mut cache = EdgeCache::new(self.tiles_h * TILE_SIZE, self.tiles_w * TILE_SIZE);
+        cache.bypass = self.bypass;
+        cache
+    }
+}
+
 impl EdgeCache {
     /// An empty cache for a `rows x cols` grid.
     pub fn new(rows: usize, cols: usize) -> EdgeCache {

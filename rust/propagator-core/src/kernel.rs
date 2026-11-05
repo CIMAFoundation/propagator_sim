@@ -31,7 +31,7 @@ use crate::tiles::{
 
 // 8-connected neighbour lattice
 pub const N_NEIGHBOURS: usize = 8;
-const NEIGHBOURS: [(i64, i64); N_NEIGHBOURS] = [
+pub(crate) const NEIGHBOURS: [(i64, i64); N_NEIGHBOURS] = [
     (-1, -1),
     (-1, 0),
     (-1, 1),
@@ -118,6 +118,7 @@ pub struct SharedInputs<'a> {
 }
 
 /// Mutable state of one realization.
+#[derive(Clone)]
 pub struct Realization {
     /// realization index (store keys)
     pub index: u32,
@@ -309,8 +310,14 @@ pub fn advance_front_until(
                     (transition, ros, fli)
                 }
             };
-            real.heap
-                .push(time + transition, row_to as i32, col_to as i32, ros, fli);
+            real.heap.push_from(
+                time + transition,
+                row_to as i32,
+                col_to as i32,
+                ros,
+                fli,
+                neighbour as u8,
+            );
         }
         edges.commit();
 
