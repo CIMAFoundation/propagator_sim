@@ -1658,3 +1658,60 @@ fn fold_cache_add(
         .or_insert_with(|| StateFold::empty(TILE_SIZE, TILE_SIZE))
         .accumulate_tile(tile, 0, 0);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scheduler::FieldInput;
+
+    #[test]
+    fn expand_thaws_frozen_tiles_on_the_old_partial_edge() {
+        let freeze_dir = std::env::temp_dir().join(format!(
+            "prop-core-expand-edge-test-{}",
+            std::process::id()
+        ));
+        // 100 = 3 * 32 + 4: tile row/col 3 straddles the south/east edge
+        let mut config =
+            PropagatorConfig::new(Grid2::filled(100, 100, 4), Grid2::filled(100, 100, 0.0));
+        config.realizations = 4;
+        config.seed = Some(8);
+        config.oob_mode = OobMode::Ignore;
+        config.freeze_dir = Some(freeze_dir.clone());
+        let mut sim = Propagator::new(config).unwrap();
+        sim.set_boundary_conditions(BoundaryConditions {
+            time: 0,
+            moisture: Some(FieldInput::Scalar(5.0)),
+            wind_dir: Some(FieldInput::Scalar(0.0)),
+            wind_speed: Some(FieldInput::Scalar(10.0)),
+            ignitions: Some(Ignitions::Points(vec![(50, 50)])),
+            ..Default::default()
+        })
+        .unwrap();
+        while sim.next_time().is_some() {
+            sim.step_window(3600).unwrap();
+        }
+        sim.freeze_inactive_tiles().unwrap();
+        let on_edge = |sim: &Propagator| {
+            sim.reals
+                .iter()
+                .map(|real| {
+                    (0..4)
+                        .filter(|&i| real.tiles.slot_of(3, i) == FROZEN_TILE)
+                        .count()
+                        + (0..3)
+                            .filter(|&i| real.tiles.slot_of(i, 3) == FROZEN_TILE)
+                            .count()
+                })
+                .sum::<usize>()
+        };
+        let edge_frozen = on_edge(&sim);
+        assert!(edge_frozen > 0);
+        let frozen = sim.frozen_tiles();
+
+        sim.expand(Grid2::filled(164, 164, 4), Grid2::filled(164, 164, 0.0), (0, 0))
+            .unwrap();
+        assert_eq!(on_edge(&sim), 0);
+        assert_eq!(sim.frozen_tiles(), frozen - edge_frozen);
+        std::fs::remove_dir_all(&freeze_dir).ok();
+    }
+}
