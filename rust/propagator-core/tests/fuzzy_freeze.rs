@@ -293,3 +293,75 @@ fn fuzzy_freeze_requires_a_store_and_a_valid_fraction() {
     assert!(Propagator::new(config).is_err());
     std::fs::remove_dir_all(temp_dir("fraction")).ok();
 }
+
+/// Run to `CLONE_AT`, clone, then drive the original and the clone
+/// apart (extinguish and a different seed in the clone only), freezing
+/// both after every window when `freeze` is set. Returns both snapshots.
+fn clone_run(spotting: bool, freeze: Option<PathBuf>) -> (Snapshot, Snapshot) {
+    const CLONE_AT: usize = 6;
+    let n = 128;
+    let mut config = PropagatorConfig::new(Grid2::filled(n, n, 5), Grid2::filled(n, n, 0.0));
+    config.realizations = 6;
+    config.seed = Some(4242);
+    config.do_spotting = spotting;
+    config.oob_mode = OobMode::Ignore;
+    config.n_threads = Some(2);
+    if let Some(dir) = &freeze {
+        config.freeze_dir = Some(dir.clone());
+        config.fuzzy_freeze = Some(AGGRESSIVE);
+    }
+    let mut original = Propagator::new(config).unwrap();
+    original
+        .set_boundary_conditions(BoundaryConditions {
+            time: 0,
+            moisture: Some(FieldInput::Scalar(4.0)),
+            wind_dir: Some(FieldInput::Scalar(270.0)),
+            wind_speed: Some(FieldInput::Scalar(30.0)),
+            ignitions: Some(Ignitions::Points(vec![(64, 20)])),
+            ..Default::default()
+        })
+        .unwrap();
+    let window = |sim: &mut Propagator| {
+        sim.step_window(600).unwrap();
+        if freeze.is_some() {
+            sim.freeze_inactive_tiles().unwrap();
+        }
+    };
+    for _ in 0..CLONE_AT {
+        window(&mut original);
+    }
+    let mut forecast = original.clone();
+    // the forecast takes another path: a fire break and another seed
+    let mut fire_break = Grid2::filled(n, n, f32::NAN);
+    for row in 0..n {
+        for col in 60..66 {
+            fire_break[(row, col)] = 0.7;
+        }
+    }
+    forecast.extinguish(&fire_break).unwrap();
+    forecast.reseed(777);
+    // interleave so each one freezes and thaws while the other has
+    // tiles on disk
+    for _ in 0..30 {
+        window(&mut forecast);
+        window(&mut original);
+    }
+    if freeze.is_some() {
+        assert!(original.freeze_stats().fault_ins > 0);
+        assert!(forecast.freeze_stats().fault_ins > 0);
+    }
+    (snapshot(&mut original), snapshot(&mut forecast))
+}
+
+#[test]
+fn clones_do_not_share_the_frozen_index() {
+    for spotting in [false, true] {
+        let (plain_original, plain_forecast) = clone_run(spotting, None);
+        assert!(plain_original != plain_forecast, "the clone must diverge");
+        let dir = temp_dir(&format!("clone-{spotting}"));
+        let (original, forecast) = clone_run(spotting, Some(dir.clone()));
+        std::fs::remove_dir_all(&dir).ok();
+        assert!(original == plain_original, "spotting={spotting}: original changed");
+        assert!(forecast == plain_forecast, "spotting={spotting}: clone changed");
+    }
+}

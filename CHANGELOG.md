@@ -226,6 +226,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Rust core: a cloned `Propagator` with a `freeze_dir` shared the store's
+  frozen-tile index with the original, so a forecast run from a clone could
+  thaw or re-freeze tiles under the original (a panic, or the original
+  reading the clone's future state). The store is now only the append-only
+  file; each realization owns the offsets of its frozen tiles, so clones
+  and checkpoints share the file but never the index. Fold-cache rebuilds
+  also read frozen tiles in sorted key order now. `TileStore` is no longer
+  part of the crate's public API (it was never reachable from a
+  `Propagator`); `TileKey`, `TileIndex` and `RECORD_SIZE` stay exported.
+
 - Rust core: growing the domain (`expand`, `from_checkpoint`) on a grid
   whose size is not a multiple of 32 left frozen tiles on the old south /
   east edge frozen, so their newly in-domain cells read as burnt and could

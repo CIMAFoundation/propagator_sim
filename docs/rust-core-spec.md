@@ -400,6 +400,9 @@ propagation window.
 - `Propagator` is `Clone`: a clone is an independent simulator with the
   same state (used to run forecasts from the live state). The edge cache
   is not copied; the clone refills it lazily, with identical results.
+  With a `freeze_dir`, the clone shares the store *file* (append-only, so
+  every record stays valid) but owns a copy of the frozen-tile index:
+  its freezes and fault-ins never affect the original, and vice versa.
 
 ### 6.5 Outputs
 
@@ -492,11 +495,12 @@ aggregated across realizations:
 Append-only fixed-record file `frozen_tiles.bin` in `freeze_dir`.
 Record = the four tile arrays back-to-back, little-endian, row-major:
 `flags` (32·32 u8) + `arrival` (i32) + `ros` (f32) + `fli` (f32) =
-`RECORD_SIZE = 1024 + 4096·3 = 13312` bytes. In-memory index
-`{(realization, world_row, world_col) -> offset}` of *currently frozen*
-keys; `snapshot_index()` / `restore_index()` support incremental
-checkpointing; `clear()` truncates the file (invalidating any checkpoint
-still referencing the store).
+`RECORD_SIZE = 1024 + 4096·3 = 13312` bytes. The store is only the file
+(`append` / `read(offset)`). The index of *currently frozen* tiles,
+`{(world_row, world_col) -> offset}`, is owned by each realization
+(`Realization::frozen`), so clones and checkpoints can share the file
+without sharing the index; a checkpoint's `{(realization, world_row,
+world_col) -> offset}` view is just a copy of those indices.
 
 ## 8. Checkpointing and domain growth
 
@@ -531,8 +535,9 @@ time, heaps (capacity = next power-of-two-style doubling from 4096 that
 fits `stored + FRONT_RESERVE + 1`), tile state, weather (copy),
 scheduler queue (deep copy), and the frozen index:
 
-- same session store → just `restore_index` (offsets still valid);
-- different store / sidecar file → clear + stream-copy records in;
+- same store file → adopt the checkpoint's offsets (still valid, records
+  are append-only);
+- different store / sidecar file → stream-copy the records in (append);
 - no store on this propagator → materialize frozen records directly
   into pools (thaw-at-load).
 - Always invalidate the fold cache.

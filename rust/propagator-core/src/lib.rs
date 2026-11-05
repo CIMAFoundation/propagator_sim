@@ -69,7 +69,7 @@ pub use propagator::{
 pub use scheduler::{
     BoundaryConditions, FieldInput, Ignitions, Scheduler, SchedulerEvent, UpdateBatch,
 };
-pub use tile_store::{TileIndex, TileKey, TileStore, RECORD_SIZE};
+pub use tile_store::{TileIndex, TileKey, RECORD_SIZE};
 pub use tiles::{
     FLAG_FIRE, FLAG_SPOT_GEN, FLAG_SPOT_RECV, TILE_SIZE,
 };

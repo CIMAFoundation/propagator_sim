@@ -15,6 +15,8 @@
 //! realization. Draw order is unchanged, so seeded runs are bitwise
 //! identical to the uncached kernel.
 
+use std::collections::HashMap;
+
 use crate::edges::{EdgeCache, BLOCKED};
 use crate::error::{PropagatorError, Result};
 use crate::front::FrontHeap;
@@ -132,6 +134,11 @@ pub struct Realization {
     /// store keys of cold tiles faulted in during the last kernel run;
     /// the driver drains them (fold cache, counters) after the run
     pub faulted: Vec<TileKey>,
+    /// record offsets of this realization's frozen (dead or cold) tiles,
+    /// keyed by the world (row, col) of the tile's top-left cell. Owned
+    /// per realization, so a clone shares the store file but not this
+    /// index: its freezes and thaws never leak into the original.
+    pub frozen: HashMap<(i64, i64), u64>,
 }
 
 impl Realization {
@@ -144,6 +151,7 @@ impl Realization {
             out_of_bounds: false,
             halted_on_boundary: false,
             faulted: Vec::new(),
+            frozen: HashMap::new(),
         }
     }
 }
@@ -178,7 +186,11 @@ fn fault_in(
         shared.origin.0 + ((tile_row << TILE_SHIFT) as i64),
         shared.origin.1 + ((tile_col << TILE_SHIFT) as i64),
     );
-    let tile = store.thaw(&key)?;
+    let offset = real
+        .frozen
+        .remove(&(key.1, key.2))
+        .expect("cold tile without a store record");
+    let tile = store.read(offset)?;
     real.tiles.insert_tile(tile_row, tile_col, tile);
     real.faulted.push(key);
     Ok(())
