@@ -199,6 +199,18 @@ class Propagator:
     def freeze_inactive_tiles(self) -> int:
         return self._sim.freeze_inactive_tiles()
 
+    def freeze_diagnostic(self) -> dict[str, int]:
+        """Count, without freezing, how many live tiles each freeze
+        criterion would freeze now.
+
+        Keys: ``allocated``, ``strict_freezable`` (every fuel cell burnt,
+        the criterion used with spotting), ``reachability_freezable`` (no
+        cell reachable from the front, used without spotting) and
+        ``blocked_by_strict`` (tiles kept live only by the strict
+        criterion). Needs no ``freeze_dir``.
+        """
+        return {k: int(v) for k, v in self._sim.freeze_diagnostic().items()}
+
     def edge_cache_bytes(self) -> int:
         """Bytes held by the shared per-cell edge cache (spread quantities
         reused across realizations; grows with the reached area)."""

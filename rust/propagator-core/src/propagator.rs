@@ -247,6 +247,11 @@ impl Propagator {
         self.edges.allocated_tiles()
     }
 
+    /// Tiles currently frozen to disk, over all realizations.
+    pub fn frozen_tiles(&self) -> usize {
+        self.reals.iter().map(|real| real.tiles.frozen_count()).sum()
+    }
+
     /// Bytes currently held by the shared edge cache.
     pub fn edge_cache_bytes(&self) -> usize {
         self.edges.allocated_bytes()

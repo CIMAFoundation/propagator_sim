@@ -85,7 +85,7 @@ fn main() {
 
     // a batch of ignitions: inside the burnt scar (frozen) and far away
     // in unburnt territory, every realization
-    let points = vec![(c, c), (c, c + 3), (n / 8, n / 8), (7 * n / 8, 7 * n / 8)];
+    let points = vec![(c, c - n / 16), (c + 2, c - n / 16 + 3), (n / 8, n / 8), (7 * n / 8, 7 * n / 8)];
     let time = sim.time();
     sim.set_boundary_conditions(BoundaryConditions {
         time,
@@ -93,9 +93,16 @@ fn main() {
         ..Default::default()
     })
     .expect("ignitions");
+    eprintln!("before ignitions: {:?}", sim.freeze_diagnostic());
+    let frozen_before = sim.frozen_tiles();
     let t2 = Instant::now();
     sim.step_window(0).expect("thaw step");
     let thaw_s = t2.elapsed().as_secs_f64();
+    eprintln!(
+        "after ignitions: {:?} (thawed {} of {frozen_before} frozen tiles)",
+        sim.freeze_diagnostic(),
+        frozen_before - sim.frozen_tiles()
+    );
     let t3 = Instant::now();
     let refrozen = sim.freeze_inactive_tiles().expect("freeze");
     let refreeze_s = t3.elapsed().as_secs_f64();
