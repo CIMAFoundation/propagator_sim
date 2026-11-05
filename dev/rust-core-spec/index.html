@@ -1680,7 +1680,10 @@ propagation window.</p>
   cancelled).</li>
 <li><code>Propagator</code> is <code>Clone</code>: a clone is an independent simulator with the
   same state (used to run forecasts from the live state). The edge cache
-  is not copied; the clone refills it lazily, with identical results.</li>
+  is not copied; the clone refills it lazily, with identical results.
+  With a <code>freeze_dir</code>, the clone shares the store <em>file</em> (append-only, so
+  every record stays valid) but owns a copy of the frozen-tile index:
+  its freezes and fault-ins never affect the original, and vice versa.</li>
 </ul>
 <h3 id="65-outputs">6.5 Outputs</h3>
 <ul>
@@ -1765,11 +1768,12 @@ aggregated across realizations:</p>
 <p>Append-only fixed-record file <code>frozen_tiles.bin</code> in <code>freeze_dir</code>.
 Record = the four tile arrays back-to-back, little-endian, row-major:
 <code>flags</code> (32·32 u8) + <code>arrival</code> (i32) + <code>ros</code> (f32) + <code>fli</code> (f32) =
-<code>RECORD_SIZE = 1024 + 4096·3 = 13312</code> bytes. In-memory index
-<code>{(realization, world_row, world_col) -&gt; offset}</code> of <em>currently frozen</em>
-keys; <code>snapshot_index()</code> / <code>restore_index()</code> support incremental
-checkpointing; <code>clear()</code> truncates the file (invalidating any checkpoint
-still referencing the store).</p>
+<code>RECORD_SIZE = 1024 + 4096·3 = 13312</code> bytes. The store is only the file
+(<code>append</code> / <code>read(offset)</code>). The index of <em>currently frozen</em> tiles,
+<code>{(world_row, world_col) -&gt; offset}</code>, is owned by each realization
+(<code>Realization::frozen</code>), so clones and checkpoints can share the file
+without sharing the index; a checkpoint's <code>{(realization, world_row,
+world_col) -&gt; offset}</code> view is just a copy of those indices.</p>
 <h2 id="8-checkpointing-and-domain-growth">8. Checkpointing and domain growth</h2>
 <h3 id="81-world-coordinates">8.1 World coordinates</h3>
 <p><code>origin</code> = world (row, col) of local (0, 0). <code>world_bounds()</code> returns
@@ -1797,8 +1801,9 @@ time, heaps (capacity = next power-of-two-style doubling from 4096 that
 fits <code>stored + FRONT_RESERVE + 1</code>), tile state, weather (copy),
 scheduler queue (deep copy), and the frozen index:</p>
 <ul>
-<li>same session store → just <code>restore_index</code> (offsets still valid);</li>
-<li>different store / sidecar file → clear + stream-copy records in;</li>
+<li>same store file → adopt the checkpoint's offsets (still valid, records
+  are append-only);</li>
+<li>different store / sidecar file → stream-copy the records in (append);</li>
 <li>no store on this propagator → materialize frozen records directly
   into pools (thaw-at-load).</li>
 <li>Always invalidate the fold cache.</li>
