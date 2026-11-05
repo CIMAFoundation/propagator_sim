@@ -15,7 +15,8 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use propagator_core::{
-    BoundaryConditions, FieldInput, FuelDef, FuelSystem, Grid2, Ignitions, MoistureModel, OobMode,
+    BoundaryConditions, FieldInput, FuelDef, FuelSystem, FuzzyFreeze, Grid2, Ignitions,
+    MoistureModel, OobMode,
     Propagator as CorePropagator, PropagatorConfig, PropagatorError, RosModel,
 };
 use propagator_geo::{extract_isochrone as extract_isochrone_geo, IsochroneOptions};
@@ -354,6 +355,8 @@ impl Propagator {
         moisture_model = "trucchia",
         cellsize = 20.0,
         n_threads = None,
+        fuzzy_freeze_threshold = None,
+        fuzzy_freeze_margin = 1,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -370,6 +373,8 @@ impl Propagator {
         moisture_model: &str,
         cellsize: f64,
         n_threads: Option<usize>,
+        fuzzy_freeze_threshold: Option<f32>,
+        fuzzy_freeze_margin: usize,
     ) -> PyResult<Self> {
         let veg = grid_i32(veg);
         let dem = grid_f64(dem);
@@ -392,6 +397,10 @@ impl Propagator {
             }
         };
         config.n_threads = n_threads;
+        config.fuzzy_freeze = fuzzy_freeze_threshold.map(|threshold| FuzzyFreeze {
+            min_inactive_fraction: threshold,
+            event_margin_tiles: fuzzy_freeze_margin,
+        });
         if let Some(fuels) = fuels {
             config.fuels = Some(parse_fuels(&fuels)?);
         }
@@ -556,6 +565,19 @@ impl Propagator {
         d.set_item("strict_freezable", diagnostic.strict_freezable)?;
         d.set_item("reachability_freezable", diagnostic.reachability_freezable)?;
         d.set_item("blocked_by_strict", diagnostic.blocked_by_strict)?;
+        Ok(d)
+    }
+
+    /// Tile freezing counters: a dict with `dead_tiles`, `cold_tiles`
+    /// (fuzzy-frozen, faulted back in on touch), `fault_ins` and
+    /// `fault_in_bytes` (read by those fault-ins).
+    fn freeze_stats<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let stats = self.inner.freeze_stats();
+        let d = PyDict::new(py);
+        d.set_item("dead_tiles", stats.dead_tiles)?;
+        d.set_item("cold_tiles", stats.cold_tiles)?;
+        d.set_item("fault_ins", stats.fault_ins)?;
+        d.set_item("fault_in_bytes", stats.fault_in_bytes)?;
         Ok(d)
     }
 

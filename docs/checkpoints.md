@@ -254,6 +254,30 @@ Everything stays transparent:
   churn and repeated restores.
 - `expand()` keeps frozen tiles valid — store keys are world-anchored.
 
+### Fuzzy freezing (Rust core only)
+
+With spotting enabled the exact criterion is strict (every fuel cell
+burnt), so many burned-out-looking tiles stay in memory. The Rust core
+can additionally freeze *cold* tiles chosen by a heuristic:
+
+```python
+from propagator.rust_core import Propagator as RustPropagator
+
+sim = RustPropagator(..., freeze_dir="/fast-ssd/run-042",
+                     fuzzy_freeze_threshold=0.9,  # >= 90 % burnt/fuel-free
+                     fuzzy_freeze_margin=1)       # no front event within 1 tile
+print(sim.freeze_stats())  # dead_tiles, cold_tiles, fault_ins, fault_in_bytes
+```
+
+or `--core rust --freeze_dir DIR --fuzzy_freeze_threshold 0.9
+[--fuzzy_freeze_margin 1]` on the CLI. A cold tile is never treated as
+burnt: as soon as the fire (or an ember) touches it, the kernel loads it
+back from the store ("fault-in") and continues with the real data. The
+threshold is therefore a pure memory/I-O trade-off and seeded runs stay
+bitwise identical. Lower thresholds free more memory at the price of
+more fault-ins. The option requires `freeze_dir`; the numba core does
+not support it.
+
 Frozen tiles are 13 KB each in an append-only fixed-record file
 (`frozen_tiles.bin`). The store is session-scoped: `save()` copies the
 records a checkpoint references into a sidecar file (see below), so

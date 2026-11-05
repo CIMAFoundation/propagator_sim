@@ -87,7 +87,21 @@ class Propagator:
         moisture_model: str = "trucchia",
         cellsize: float = 20.0,
         n_threads: Optional[int] = None,
+        fuzzy_freeze_threshold: Optional[float] = None,
+        fuzzy_freeze_margin: int = 1,
     ) -> None:
+        """Build the Rust simulator.
+
+        ``fuzzy_freeze_threshold`` (requires ``freeze_dir``) enables fuzzy
+        freezing: besides burned-out tiles, ``freeze_inactive_tiles`` also
+        moves to disk "cold" tiles with at least that fraction of inactive
+        (burnt or fuel-free) cells and no pending front event within
+        ``fuzzy_freeze_margin`` tiles. Cold tiles are loaded back on demand
+        whenever the fire touches them, so results are unchanged; only
+        memory and I/O trade off.
+        """
+        if fuzzy_freeze_threshold is not None and freeze_dir is None:
+            raise ValueError("fuzzy_freeze_threshold requires freeze_dir")
         dem = np.ascontiguousarray(dem, dtype=np.float64)
         veg = np.ascontiguousarray(veg, dtype=np.int32)
         self._sim = _rust.Propagator(
@@ -104,6 +118,12 @@ class Propagator:
             moisture_model=moisture_model,
             cellsize=float(cellsize),
             n_threads=n_threads,
+            fuzzy_freeze_threshold=(
+                float(fuzzy_freeze_threshold)
+                if fuzzy_freeze_threshold is not None
+                else None
+            ),
+            fuzzy_freeze_margin=int(fuzzy_freeze_margin),
         )
 
     # ---- properties mirrored from the numba Propagator -------------------
@@ -210,6 +230,13 @@ class Propagator:
         criterion). Needs no ``freeze_dir``.
         """
         return {k: int(v) for k, v in self._sim.freeze_diagnostic().items()}
+
+    def freeze_stats(self) -> dict[str, int]:
+        """Tile freezing counters: ``dead_tiles`` (burned out, on disk),
+        ``cold_tiles`` (fuzzy-frozen, on disk), ``fault_ins`` (cold tiles
+        loaded back because the fire touched them) and ``fault_in_bytes``
+        (bytes read by those fault-ins)."""
+        return {k: int(v) for k, v in self._sim.freeze_stats().items()}
 
     def edge_cache_bytes(self) -> int:
         """Bytes held by the shared per-cell edge cache (spread quantities

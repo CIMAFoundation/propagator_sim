@@ -211,5 +211,17 @@ class SimulationRunner:
 
         if self.freeze_dir is not None:
             self.simulator.freeze_inactive_tiles()
+            # Rust core: dead / cold (fuzzy-frozen) tiles and fault-ins
+            freeze_stats = getattr(self.simulator, "freeze_stats", None)
+            if self.verbose and freeze_stats is not None:
+                from propagator.cli.console import info_msg
+
+                stats = freeze_stats()
+                info_msg(
+                    f"frozen tiles: {stats['dead_tiles']} dead, "
+                    f"{stats['cold_tiles']} cold; "
+                    f"{stats['fault_ins']} fault-ins "
+                    f"({stats['fault_in_bytes'] / 2**20:.1f} MiB read)"
+                )
 
         return output

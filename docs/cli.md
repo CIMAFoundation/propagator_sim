@@ -73,6 +73,8 @@ files and raster tiles under the selected directory layout.
 | `--grid_dim N` | `3072` | Initial window size in cells around the ignition (cog mode). |
 | `--grow_margin N` | `512` | Cells added per side on automatic domain growth (cog mode); multiple of 32. |
 | `--freeze_dir PATH` | optional | Freeze burned-out tiles to this directory each output interval (see [Checkpoints & Domain Growth](checkpoints.md)). |
+| `--fuzzy_freeze_threshold F` | optional | Rust core only, requires `--freeze_dir`: also page out "cold" tiles with at least this fraction (0–1) of burnt or fuel-free cells and no nearby front event; they are loaded back on demand, so results are unchanged (see [Fuzzy freezing](checkpoints.md#fuzzy-freezing-rust-core-only)). |
+| `--fuzzy_freeze_margin N` | `1` | Fuzzy freezing: keep tiles within `N` tiles of a pending front event in memory. |
 | `--seed N` | optional | Seed the simulation RNGs for reproducible runs (fixed machine and thread count). |
 | `--output PATH` | required | Destination directory; created if missing. Stores GeoTIFF, GeoJSON, and JSON outputs. |
 | `--isochrones FLOAT …` | `0.5 0.75 0.9` | Probability thresholds for GeoJSON isochrone export. Repeat the flag to set multiple values. |
