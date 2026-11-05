@@ -564,6 +564,28 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#fuzzy-freezing-rust-core-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fuzzy freezing (Rust core only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#edge-cache-trimming-rust-core-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Edge-cache trimming (Rust core only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#output-aggregation-cache" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -981,6 +1003,28 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#fuzzy-freezing-rust-core-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fuzzy freezing (Rust core only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#edge-cache-trimming-rust-core-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Edge-cache trimming (Rust core only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#output-aggregation-cache" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1241,6 +1285,35 @@ produces bitwise-identical results with or without freezing.</p>
   churn and repeated restores.</li>
 <li><code>expand()</code> keeps frozen tiles valid — store keys are world-anchored.</li>
 </ul>
+<h3 id="fuzzy-freezing-rust-core-only">Fuzzy freezing (Rust core only)</h3>
+<p>With spotting enabled the exact criterion is strict (every fuel cell
+burnt), so many burned-out-looking tiles stay in memory. The Rust core
+can additionally freeze <em>cold</em> tiles chosen by a heuristic:</p>
+<pre><code class="language-python">from propagator.rust_core import Propagator as RustPropagator
+
+sim = RustPropagator(..., freeze_dir=&quot;/fast-ssd/run-042&quot;,
+                     fuzzy_freeze_threshold=0.9,  # &gt;= 90 % burnt/fuel-free
+                     fuzzy_freeze_margin=1)       # no front event within 1 tile
+print(sim.freeze_stats())  # dead_tiles, cold_tiles, fault_ins, fault_in_bytes
+</code></pre>
+<p>or <code>--core rust --freeze_dir DIR --fuzzy_freeze_threshold 0.9
+[--fuzzy_freeze_margin 1]</code> on the CLI. A cold tile is never treated as
+burnt: as soon as the fire (or an ember) touches it, the kernel loads it
+back from the store ("fault-in") and continues with the real data. The
+threshold is therefore a pure memory/I-O trade-off and seeded runs stay
+bitwise identical. Lower thresholds free more memory at the price of
+more fault-ins. The option requires <code>freeze_dir</code>; the numba core does
+not support it.</p>
+<h3 id="edge-cache-trimming-rust-core-only">Edge-cache trimming (Rust core only)</h3>
+<p>The Rust core caches the realization-independent spread quantities of
+every cell edge (probability, transition time, RoS, intensity) in 32×32
+blocks of ~168 KB, shared by all realizations. A block is only read when
+one of its cells burns, so blocks far from every front are dead weight.
+After each output the runner calls <code>trim_edge_cache(margin)</code>, which frees
+the blocks with no pending front event within <code>margin</code> tiles in any
+realization; a freed block is recomputed with identical values if fire
+comes back, so results stay bitwise identical. It needs no <code>freeze_dir</code>.
+The margin is <code>--edge_cache_trim_margin</code> (default <code>1</code>; <code>null</code> disables).</p>
 <p>Frozen tiles are 13 KB each in an append-only fixed-record file
 (<code>frozen_tiles.bin</code>). The store is session-scoped: <code>save()</code> copies the
 records a checkpoint references into a sidecar file (see below), so
@@ -1250,8 +1323,8 @@ persisted checkpoints never depend on the session store.</p>
 tile is frozen, its contribution to the output aggregates (burn counts,
 spotting counts, arrival min/sum, RoS and intensity sum/max) is folded
 into an in-memory cache — one block per spatial tile position,
-aggregated across all realizations (~44 bytes per frozen cell, i.e.
-~45 KB per 32×32 position). <code>get_output()</code> then adds these cached
+aggregated across all realizations (~72 bytes per frozen cell, i.e.
+~72 KB per 32×32 position). <code>get_output()</code> then adds these cached
 blocks to the live-tile fold, so hourly outputs on a run with a huge
 frozen interior cost no tile I/O at all.</p>
 <p>The cache maintains itself:</p>

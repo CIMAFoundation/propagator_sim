@@ -1174,6 +1174,21 @@ files and raster tiles under the selected directory layout.</p>
 <td>Freeze burned-out tiles to this directory each output interval (see <a href="../checkpoints/">Checkpoints &amp; Domain Growth</a>).</td>
 </tr>
 <tr>
+<td><code>--fuzzy_freeze_threshold F</code></td>
+<td>optional</td>
+<td>Rust core only, requires <code>--freeze_dir</code>: also page out "cold" tiles with at least this fraction (0–1) of burnt or fuel-free cells and no nearby front event; they are loaded back on demand, so results are unchanged (see <a href="../checkpoints/#fuzzy-freezing-rust-core-only">Fuzzy freezing</a>).</td>
+</tr>
+<tr>
+<td><code>--fuzzy_freeze_margin N</code></td>
+<td><code>1</code></td>
+<td>Fuzzy freezing: keep tiles within <code>N</code> tiles of a pending front event in memory.</td>
+</tr>
+<tr>
+<td><code>--edge_cache_trim_margin N</code></td>
+<td><code>1</code></td>
+<td>Rust core: after each output, free edge-cache blocks with no pending front event within <code>N</code> tiles; results are unchanged. <code>null</code> disables (see <a href="../checkpoints/#edge-cache-trimming-rust-core-only">Edge-cache trimming</a>).</td>
+</tr>
+<tr>
 <td><code>--seed N</code></td>
 <td>optional</td>
 <td>Seed the simulation RNGs for reproducible runs (fixed machine and thread count).</td>
