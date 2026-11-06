@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   recomputed on demand, results unchanged. The runner trims after each
   output (`--edge_cache_trim_margin`, default 1, `null` disables): on the
   Evros demo the edge cache ends at 119 MiB instead of 386 MiB.
+- Wasm binding: `output_snapshot()` also packs `flame_height_mean`,
+  `flame_height_max`, `radiant_reach_mean` and `radiant_reach_max`
+  (indices 6–9; `output_variable_count()` is now 10). They are appended,
+  so the six existing indices are unchanged.
 - Rust core: `freeze_stats()` reports dead / cold tiles, fault-ins and the
   RAM held by live tiles, the edge cache and the frozen-tile fold cache;
   verbose CLI runs log them after each freeze.
