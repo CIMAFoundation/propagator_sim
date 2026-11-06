@@ -529,15 +529,25 @@ impl Propagator {
     /// 3. mean fireline intensity, kW/m — `NaN` where never burnt
     /// 4. spotting generation probability, `[0, 1]`
     /// 5. spotting receiving probability, `[0, 1]`
+    /// 6. mean flame height (Byram), m — `NaN` where never burnt
+    /// 7. max flame height (Byram), m — `0` where never burnt
+    /// 8. mean radiant reach, m — `NaN` where never burnt
+    /// 9. max radiant reach, m — `0` where never burnt
+    ///
+    /// New variables are only ever appended, so existing indices stay valid.
     pub fn output_snapshot(&mut self) -> Result<Vec<f32>, JsValue> {
         let out = self.inner.get_output().map_err(to_js)?;
-        let layers = [
+        let layers: [_; OUTPUT_VARIABLE_COUNT] = [
             &out.fire_probability,
             &out.min_arrival_time,
             &out.ros_mean,
             &out.fli_mean,
             &out.spotting_generation_probability,
             &out.spotting_receiving_probability,
+            &out.flame_height_mean,
+            &out.flame_height_max,
+            &out.radiant_reach_mean,
+            &out.radiant_reach_max,
         ];
         let mut packed = Vec::with_capacity(layers.len() * self.rows * self.cols);
         for layer in layers {
@@ -550,5 +560,9 @@ impl Propagator {
 /// Number of per-cell variables packed by [`Propagator::output_snapshot`].
 #[wasm_bindgen]
 pub fn output_variable_count() -> usize {
-    6
+    OUTPUT_VARIABLE_COUNT
 }
+
+/// Grids packed by [`Propagator::output_snapshot`]; the array type there
+/// makes the compiler hold the two in step.
+const OUTPUT_VARIABLE_COUNT: usize = 10;
